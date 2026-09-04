@@ -8,6 +8,20 @@
 const CONTENT = {
   units: [
     {
+      id: 'unit1-defining-matter',
+      title: 'Unit 1: Alchemy — Chapter 1: Defining Matter',
+      description: 'Lab tools & safety, properties, chemistry, and the definition of matter (Lessons 1–3).',
+      activities: [
+        {
+          id: 'matter-review',
+          type: 'review',
+          title: 'Chapter 1 Review: Defining Matter',
+          description: 'A guided walkthrough of lab tools & safety, properties, and what counts as matter, ending in a graded check for understanding — good prep for Quiz A/B.',
+          estimatedMinutes: 35
+        }
+      ]
+    },
+    {
       id: 'unit1-atoms',
       title: 'Unit 1: Atoms, Ions & the Periodic Table',
       description: 'Structure of the atom, ions, and periodic trends.',

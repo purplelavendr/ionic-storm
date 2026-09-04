@@ -1,0 +1,1011 @@
+// "Chapter 1 Review: Defining Matter" (registered as CONTENT activity id 'matter-review').
+//
+// A self-paced, scaffolded lesson (accordion sections: concept -> analogy ->
+// practice with hints -> lab tools/safety) that ends in a graded "Check for
+// Understanding" quiz. Only the quiz's score is saved via ctx.saveProgress
+// (localStorage + Google Sheet) -- the lesson sections above it are an
+// ungraded warm-up, same as they'd be worked through in class.
+(function () {
+  const QUESTIONS = [
+    {
+      id: 'q1', type: 'mc',
+      prompt: 'What is the definition of matter?',
+      choices: [
+        'Anything that has mass and takes up space (volume)',
+        'Anything you can see with your eyes',
+        'Anything that is alive',
+        'Anything that has energy'
+      ],
+      correct: 0,
+      explanation: 'Matter is defined as anything that has mass and takes up space (volume).'
+    },
+    {
+      id: 'q2', type: 'mc',
+      prompt: 'Is helium gas classified as matter?',
+      choices: [
+        'Yes — it has mass and takes up volume, even though you can’t see it',
+        'No — gases don’t have mass',
+        'No — you can’t see it',
+        'Yes — but only because it’s used in balloons'
+      ],
+      correct: 0,
+      explanation: 'A gas still has mass and takes up volume, so it counts as matter even when it’s invisible.'
+    },
+    {
+      id: 'q3', type: 'mc',
+      prompt: 'Which of these is NOT matter?',
+      choices: [
+        'A shoe',
+        'A beam of sunlight',
+        'Car exhaust',
+        'A desk'
+      ],
+      correct: 1,
+      explanation: 'Light is a form of energy, not matter — it has no mass and doesn’t take up space.'
+    },
+    {
+      id: 'q4', type: 'mc',
+      prompt: 'Is a thought or an emotion like anger classified as matter?',
+      choices: [
+        'Yes, because it affects your body',
+        'No — thoughts and emotions don’t have mass or take up space',
+        'Yes, because everyone experiences it',
+        'No, because it’s invisible'
+      ],
+      correct: 1,
+      explanation: 'Thoughts and emotions are not matter — they don’t have mass or occupy volume, even though they are real experiences.'
+    },
+    {
+      id: 'q5', type: 'mc',
+      prompt: 'Is car exhaust classified as matter?',
+      choices: [
+        'No, it just disappears into the air',
+        'Yes — it’s a mixture of gases that has mass and takes up volume',
+        'No, it’s only smoke',
+        'Yes, but only while you can smell it'
+      ],
+      correct: 1,
+      explanation: 'Car exhaust is made of gases, which have mass and take up volume, so it is matter.'
+    },
+    {
+      id: 'q6', type: 'mc',
+      prompt: 'What is a "property" of a substance?',
+      choices: [
+        'A characteristic used to identify or describe it',
+        'The price of the substance',
+        'The brand name given to it',
+        'How much of the substance exists'
+      ],
+      correct: 0,
+      explanation: 'A property is a characteristic of a substance that helps identify or describe it.'
+    },
+    {
+      id: 'q7', type: 'mc',
+      prompt: 'Which of these is a physical property?',
+      choices: [
+        'Flammability',
+        'Reacts with acid',
+        'Boiling point',
+        'Rusts in air'
+      ],
+      correct: 2,
+      explanation: 'Boiling point can be observed without changing what the substance is — that makes it a physical property.'
+    },
+    {
+      id: 'q8', type: 'mc',
+      prompt: 'Which of these is a chemical property?',
+      choices: [
+        'Color',
+        'Density',
+        'Flammability',
+        'Melting point'
+      ],
+      correct: 2,
+      explanation: 'Flammability describes how a substance reacts (burns) — that’s a chemical property, since it changes what the substance is.'
+    },
+    {
+      id: 'q9', type: 'mc',
+      prompt: 'Chemistry is best defined as the study of...',
+      choices: [
+        'Living things and how they grow',
+        'Matter, its properties, and how it can change',
+        'Numbers and equations',
+        'Stars and planets'
+      ],
+      correct: 1,
+      explanation: 'Chemistry is the study of matter, its properties, and how matter can be changed.'
+    },
+    {
+      id: 'q10', type: 'mc',
+      prompt: 'A hypothesis is...',
+      choices: [
+        'A proven fact',
+        'A testable, educated explanation for an observation',
+        'A random guess with no reasoning behind it',
+        'The final conclusion of an experiment'
+      ],
+      correct: 1,
+      explanation: 'A hypothesis is a testable explanation for something you’ve observed — an educated guess, not a proven fact.'
+    },
+    {
+      id: 'q11', type: 'mc',
+      prompt: 'Scientists solve problems using...',
+      choices: [
+        'A random approach',
+        'A systematic, step-by-step approach',
+        'Guessing until something works',
+        'Only opinions'
+      ],
+      correct: 1,
+      explanation: 'Scientists use a systematic (organized) approach so their results are reliable and can be checked by others.'
+    },
+    {
+      id: 'q12', type: 'mc',
+      prompt: 'Which piece of lab equipment is used to precisely measure the volume of a liquid?',
+      choices: [
+        'Graduated cylinder',
+        'Bunsen burner',
+        'Test tube rack',
+        'Balance'
+      ],
+      correct: 0,
+      explanation: 'A graduated cylinder has fine markings for precisely measuring liquid volume.'
+    },
+    {
+      id: 'q13', type: 'mc',
+      prompt: 'Which piece of equipment is used to measure the mass of an object?',
+      choices: [
+        'Erlenmeyer flask',
+        'Balance (scale)',
+        'Beaker',
+        'Eye wash station'
+      ],
+      correct: 1,
+      explanation: 'A balance (scale) measures mass.'
+    },
+    {
+      id: 'q14', type: 'mc',
+      prompt: 'If a chemical splashes into your eyes in the lab, you should immediately use the...',
+      choices: [
+        'Fire extinguisher',
+        'Fume hood',
+        'Eye wash station',
+        'Test tube rack'
+      ],
+      correct: 2,
+      explanation: 'The eye wash station is the safety equipment designed to flush chemicals out of your eyes.'
+    },
+    {
+      id: 'q15', type: 'mc',
+      prompt: 'Which of these is an important chemistry lab safety rule?',
+      choices: [
+        'Always wear safety goggles when working with chemicals',
+        'Taste unknown chemicals to help identify them',
+        'Run in the lab to save time',
+        'Eat a snack at your lab station'
+      ],
+      correct: 0,
+      explanation: 'Safety goggles protect your eyes and should always be worn when working with chemicals — never taste, run, or eat in a lab.'
+    },
+    {
+      id: 'q16', type: 'mc',
+      prompt: 'If you’re unsure about a step in a lab procedure, you should...',
+      choices: [
+        'Guess and keep going',
+        'Ask your teacher before proceeding',
+        'Skip that step',
+        'Copy what a friend across the room is doing'
+      ],
+      correct: 1,
+      explanation: 'When unsure, always check with your teacher before continuing — it’s the safest choice.'
+    }
+  ];
+
+  const STYLE_ID = 'chem-lesson-styles';
+  const FONT_LINK_ID = 'chem-lesson-fonts';
+  const SECTION_COUNT = 7; // sections 0-6
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.chem-lesson {
+  --navy: #0d1b2a;
+  --navy-mid: #1b2d42;
+  --navy-light: #253a52;
+  --teal: #2ec4b6;
+  --teal-dim: #1a8c83;
+  --amber: #f4a261;
+  --cream: #f7f3ec;
+  --cream-dark: #ede8df;
+  --text: #1a1a2e;
+  --text-muted: #5a6475;
+  --note-bg: #fff8e7;
+  --note-border: #f4a261;
+  --correct-bg: #e8f8f5;
+  --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.7;
+  background: var(--cream);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.chem-lesson * { box-sizing: border-box; }
+.chem-lesson .cl-header {
+  background: var(--navy);
+  color: var(--cream);
+  padding: 2rem 1.75rem 1.6rem;
+  position: relative;
+  overflow: hidden;
+}
+.chem-lesson .cl-header::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  border: 32px solid rgba(46,196,182,0.12);
+}
+.chem-lesson .cl-header-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 0.5rem;
+  position: relative;
+}
+.chem-lesson .cl-header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 0.4rem;
+  position: relative;
+}
+.chem-lesson .cl-header h1 span { color: var(--teal); }
+.chem-lesson .cl-header-meta {
+  font-size: 0.82rem;
+  color: rgba(247,243,236,0.65);
+  font-family: 'JetBrains Mono', monospace;
+  position: relative;
+}
+.chem-lesson .cl-progress-wrap {
+  background: var(--navy-mid);
+  padding: 0.7rem 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.chem-lesson .cl-progress-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.chem-lesson .cl-progress-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.chem-lesson .cl-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), var(--amber));
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+.chem-lesson .cl-progress-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: rgba(247,243,236,0.55);
+  white-space: nowrap;
+}
+.chem-lesson main {
+  padding: 1.5rem 1.25rem 2.5rem;
+}
+.chem-lesson .section-card {
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 1.1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.chem-lesson .section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.2rem;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+}
+.chem-lesson .section-header:hover { background: #fafafa; }
+.chem-lesson .section-header.open { border-bottom-color: var(--cream-dark); }
+.chem-lesson .section-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  background: var(--navy);
+  border-radius: 6px;
+  padding: 0.22rem 0.5rem;
+  flex-shrink: 0;
+}
+.chem-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.chem-lesson .section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  flex: 1;
+}
+.chem-lesson .section-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.chem-lesson .section-arrow {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  transition: transform 0.25s;
+  flex-shrink: 0;
+}
+.chem-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.chem-lesson .section-body { display: none; padding: 1.3rem; }
+.chem-lesson .section-body.open { display: block; animation: clFadeIn 0.25s ease; }
+@keyframes clFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.chem-lesson h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem;
+  color: var(--navy);
+  margin: 0 0 0.6rem;
+}
+.chem-lesson h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--navy-mid);
+  margin: 1.1rem 0 0.5rem;
+}
+.chem-lesson p { margin: 0 0 0.85rem; }
+.chem-lesson p:last-child { margin-bottom: 0; }
+.chem-lesson .note-box {
+  background: var(--note-bg);
+  border-left: 4px solid var(--note-border);
+  border-radius: 0 8px 8px 0;
+  padding: 0.9rem 1.1rem;
+  margin: 1.1rem 0;
+  display: flex;
+  gap: 0.7rem;
+  font-size: 0.9rem;
+}
+.chem-lesson .note-box .note-icon { font-size: 1.15rem; flex-shrink: 0; }
+.chem-lesson .concept-box {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+  color: var(--cream);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin: 1.1rem 0;
+}
+.chem-lesson .concept-box .concept-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--teal);
+  margin-bottom: 0.4rem;
+}
+.chem-lesson .concept-box p { color: rgba(247,243,236,0.92); margin-bottom: 0; }
+.chem-lesson .info-panel {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  margin: 1.1rem 0;
+  font-size: 0.9rem;
+}
+.chem-lesson .info-panel .panel-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #0369a1;
+  margin-bottom: 0.35rem;
+}
+.chem-lesson .diagram-wrap {
+  background: var(--cream-dark);
+  border-radius: 10px;
+  padding: 1.1rem;
+  margin: 1.1rem 0;
+  text-align: center;
+}
+.chem-lesson .diagram-wrap svg { max-width: 100%; height: auto; }
+.chem-lesson .diagram-caption {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+.chem-lesson table { width: 100%; border-collapse: collapse; margin: 0.9rem 0; font-size: 0.85rem; }
+.chem-lesson th {
+  background: var(--navy);
+  color: var(--cream);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+.chem-lesson td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cream-dark); }
+.chem-lesson tr:nth-child(even) td { background: #fafafa; }
+.chem-lesson ul, .chem-lesson ol { padding-left: 1.3rem; margin: 0 0 0.85rem; }
+.chem-lesson li { margin-bottom: 0.3rem; font-size: 0.93rem; }
+.chem-lesson .objectives-list { list-style: none; padding: 0; margin: 0.4rem 0; }
+.chem-lesson .objectives-list li {
+  display: flex; align-items: flex-start; gap: 0.55rem;
+  padding: 0.4rem 0; font-size: 0.92rem;
+  border-bottom: 1px solid var(--cream-dark);
+}
+.chem-lesson .objectives-list li:last-child { border-bottom: none; }
+.chem-lesson .obj-check { color: var(--teal); flex-shrink: 0; }
+.chem-lesson .practice-problem {
+  border: 1.5px solid var(--cream-dark);
+  border-radius: 10px;
+  margin-bottom: 1.1rem;
+  overflow: hidden;
+}
+.chem-lesson .pp-header {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.85rem 1.1rem;
+  background: #fafafa;
+  border-bottom: 1px solid var(--cream-dark);
+}
+.chem-lesson .pp-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; font-weight: 700; color: white;
+  background: var(--amber);
+  border-radius: 6px; padding: 0.18rem 0.45rem; flex-shrink: 0;
+}
+.chem-lesson .pp-difficulty {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+  margin-left: auto;
+}
+.chem-lesson .diff-basic { color: #16a34a; }
+.chem-lesson .diff-medium { color: #d97706; }
+.chem-lesson .diff-challenge { color: #dc2626; }
+.chem-lesson .pp-body { padding: 0.95rem 1.1rem; }
+.chem-lesson .pp-body p { font-size: 0.92rem; }
+.chem-lesson .hint-btn, .chem-lesson .reveal-btn, .chem-lesson .mark-done-btn, .chem-lesson .cl-choice, .chem-lesson .cl-next-btn, .chem-lesson .cl-retake-btn {
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  border: none;
+}
+.chem-lesson .hint-btn, .chem-lesson .reveal-btn {
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.chem-lesson .hint-btn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; margin-right: 0.5rem; }
+.chem-lesson .hint-btn:hover { background: #fde68a; }
+.chem-lesson .reveal-btn { background: var(--navy); color: white; }
+.chem-lesson .reveal-btn:hover { background: var(--navy-light); }
+.chem-lesson .hint-box, .chem-lesson .answer-box {
+  border-radius: 7px; padding: 0.75rem 0.95rem; margin-top: 0.7rem;
+  font-size: 0.87rem; display: none;
+}
+.chem-lesson .hint-box.open, .chem-lesson .answer-box.open { display: block; animation: clFadeIn 0.2s ease; }
+.chem-lesson .hint-box { background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; }
+.chem-lesson .answer-box { background: var(--correct-bg); border: 1px solid var(--correct-border); color: #065f46; }
+.chem-lesson .answer-box .answer-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim);
+  margin-bottom: 0.35rem; font-weight: 700;
+}
+.chem-lesson .mark-done-btn {
+  display: block; width: 100%; margin-top: 1.2rem;
+  background: var(--navy); color: var(--cream);
+  border-radius: 8px; padding: 0.75rem 1rem;
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  transition: background 0.2s;
+}
+.chem-lesson .mark-done-btn:hover { background: var(--teal-dim); }
+.chem-lesson .mark-done-btn:disabled { background: var(--teal-dim); cursor: default; opacity: 0.85; }
+.chem-lesson .quiz-note {
+  background: var(--note-bg);
+  border-left: 4px solid var(--note-border);
+  border-radius: 0 8px 8px 0;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.1rem;
+  font-size: 0.88rem;
+}
+.chem-lesson .quiz-progress-bar {
+  height: 6px; background: var(--cream-dark); border-radius: 999px; overflow: hidden; margin: 0.6rem 0 0.9rem;
+}
+.chem-lesson .quiz-progress-fill {
+  height: 100%; background: linear-gradient(90deg, var(--navy), var(--teal)); transition: width 0.2s ease;
+}
+.chem-lesson .quiz-question-count {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted);
+}
+.chem-lesson .quiz-prompt {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem; font-weight: 700; color: var(--navy);
+  margin: 0.5rem 0 1rem;
+}
+.chem-lesson .cl-choice {
+  display: block; width: 100%; text-align: left;
+  background: white; border: 1.5px solid var(--cream-dark);
+  border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem;
+  font-size: 0.93rem; color: var(--text); font-family: 'Source Serif 4', serif;
+  transition: border-color 0.15s, background 0.15s;
+}
+.chem-lesson .cl-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.chem-lesson .cl-choice:disabled { cursor: default; }
+.chem-lesson .cl-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.chem-lesson .cl-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.chem-lesson .cl-feedback {
+  border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600;
+}
+.chem-lesson .cl-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.chem-lesson .cl-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.chem-lesson .cl-next-btn, .chem-lesson .cl-retake-btn {
+  background: var(--navy); color: white; border-radius: 8px;
+  padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem;
+}
+.chem-lesson .cl-next-btn:hover, .chem-lesson .cl-retake-btn:hover { background: var(--navy-light); }
+.chem-lesson .cl-summary { text-align: center; padding: 1rem 0.5rem; }
+.chem-lesson .cl-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0;
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  // ---- Static lesson content (sections 0-5, ungraded / session-only) ----
+
+  function massVolumeSvg() {
+    return `
+      <svg viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg">
+        <!-- HAS MASS: a balance scale, weights level on both sides -->
+        <text x="115" y="24" text-anchor="middle" font-family="'Source Serif 4',serif" font-size="13" fill="#1b2d42" font-weight="600">Has mass</text>
+
+        <polygon points="115,150 85,178 145,178" fill="#253a52"/>
+        <rect x="111" y="55" width="8" height="97" rx="2" fill="#253a52"/>
+        <rect x="48" y="55" width="134" height="7" rx="3.5" fill="#253a52"/>
+        <circle cx="115" cy="58" r="8" fill="#1a8c83"/>
+
+        <line x1="51" y1="60" x2="51" y2="96" stroke="#253a52" stroke-width="2.5"/>
+        <line x1="179" y1="60" x2="179" y2="96" stroke="#253a52" stroke-width="2.5"/>
+        <path d="M35,96 Q51,122 67,96" fill="none" stroke="#253a52" stroke-width="3" stroke-linecap="round"/>
+        <path d="M163,96 Q179,122 195,96" fill="none" stroke="#253a52" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="51" cy="89" r="7" fill="#2ec4b6" stroke="#1a8c83" stroke-width="1.5"/>
+        <circle cx="179" cy="89" r="7" fill="#2ec4b6" stroke="#1a8c83" stroke-width="1.5"/>
+
+        <text x="115" y="200" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#5a6475">a balance can weigh it</text>
+
+        <text x="245" y="120" text-anchor="middle" font-size="26" fill="#9ca3af">+</text>
+
+        <!-- TAKES UP SPACE: a 3D box occupying volume -->
+        <text x="345" y="24" text-anchor="middle" font-family="'Source Serif 4',serif" font-size="13" fill="#1b2d42" font-weight="600">Takes up space</text>
+
+        <polygon points="300,113 365,113 389,95 324,95" fill="#eef6ff" stroke="#1a8c83" stroke-width="2.5" stroke-linejoin="round"/>
+        <polygon points="365,113 365,178 389,160 389,95" fill="#a9d4f5" stroke="#1a8c83" stroke-width="2.5" stroke-linejoin="round"/>
+        <polygon points="300,178 365,178 365,113 300,113" fill="#dbeafe" stroke="#1a8c83" stroke-width="2.5" stroke-linejoin="round"/>
+
+        <text x="345" y="200" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#5a6475">it has a volume</text>
+      </svg>`;
+  }
+
+  const STATIC_SECTIONS = [
+    {
+      title: 'Before You Begin',
+      time: '2 min',
+      bodyHtml: `
+        <p>This review pulls together everything from <strong>Lessons 1–3</strong> — lab tools &amp; safety, properties, and the definition of matter — to get you ready for <strong>Chapter 1 Quiz A/B</strong>.</p>
+        <p><strong>How this works:</strong></p>
+        <ul>
+          <li>Click a section header to open it and read through the content.</li>
+          <li>Work through each practice problem yourself before clicking <em>Reveal Answer</em>.</li>
+          <li>Click <strong>Mark Complete</strong> at the bottom of each section to move to the next.</li>
+          <li>The last section is a <strong>graded Check for Understanding</strong> — that one saves your score for your teacher.</li>
+        </ul>
+        <p><strong>By the end of this review, you should be able to:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Define matter and decide whether something counts as matter</li>
+          <li><span class="obj-check">◎</span> Tell physical properties apart from chemical properties</li>
+          <li><span class="obj-check">◎</span> Define chemistry, hypothesis, and the scientific method</li>
+          <li><span class="obj-check">◎</span> Identify key lab equipment and safety rules</li>
+        </ul>`
+    },
+    {
+      title: 'What Is Matter?',
+      time: '5 min',
+      bodyHtml: `
+        <h2>The Definition of Matter</h2>
+        <p>In Lesson 3 you were asked: <em>what do you think matter is?</em> Chemists have a precise answer.</p>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Matter</strong> is anything that has <em>mass</em> and takes up <em>space</em> (volume).</p>
+        </div>
+        <div class="diagram-wrap">
+          ${massVolumeSvg()}
+          <div class="diagram-caption">Something only counts as matter if BOTH are true — it must have mass AND take up space.</div>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">💡 Quick Test</div>
+          <p>Ask yourself: could I (in theory) put it on a scale, and could I (in theory) pour it into a container? If the answer to both is yes, it's matter.</p>
+        </div>
+        <h3>What ISN'T Matter?</h3>
+        <p>Energy, light, heat, sound, and things like thoughts or emotions are <strong>not</strong> matter — they don't have mass or take up space, even though they are very real and often <em>involve</em> matter.</p>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Matter: anything that has mass and takes up space (volume). Energy is NOT matter, but it involves matter."</em></div>
+        </div>`
+    },
+    {
+      title: 'Classifying Matter',
+      time: '8 min',
+      bodyHtml: `
+        <p>Try each one yourself first — ask "does it have mass, and does it take up space?" — then check your answer.</p>
+        ${practiceProblem('c1', 'Is a shoe matter?', 'basic', 'Does it have mass, and does it take up space?', 'Yes — a shoe has mass and takes up volume. It’s matter.')}
+        ${practiceProblem('c2', 'Is anger matter?', 'basic', 'Could you weigh anger on a scale, or pour it into a container?', 'No — anger is an emotion. It has no mass and takes up no space, so it isn’t matter (even though it’s a real experience).')}
+        ${practiceProblem('c3', 'Is helium gas matter?', 'medium', 'Gases are invisible, but do they still have mass and volume?', 'Yes — helium is a gas, and gases still have mass and take up volume. Being invisible doesn’t disqualify something from being matter.')}
+        ${practiceProblem('c4', 'Is car exhaust matter?', 'medium', 'Exhaust is a mixture of gases — does that mixture have mass and volume?', 'Yes — car exhaust is a mixture of gases, and gases have mass and volume, so it counts as matter.')}
+        ${practiceProblem('c5', 'Is a beam of sunlight matter?', 'challenge', 'Light is a form of what, rather than matter?', 'No — light is a form of energy. It has no mass and takes up no space.')}
+        ${practiceProblem('c6', 'Is a thought matter?', 'challenge', 'Same test as always: mass and volume.', 'No — a thought has no mass and takes up no space, so it isn’t matter.')}`
+    },
+    {
+      title: 'Physical vs. Chemical Properties',
+      time: '7 min',
+      bodyHtml: `
+        <h2>Describing Matter: Properties</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p>A <strong>property</strong> is a characteristic of a substance used to identify or describe it.</p>
+        </div>
+        <p>Properties come in two flavors:</p>
+        <table>
+          <thead><tr><th>Physical Properties</th><th>Chemical Properties</th></tr></thead>
+          <tbody>
+            <tr><td>Observed <em>without</em> changing what the substance is</td><td>Describe how a substance reacts or changes into something new</td></tr>
+            <tr><td>Color, density, hardness, melting/boiling point, mass, volume</td><td>Flammability, reactivity with acid, tendency to rust/tarnish, toxicity</td></tr>
+          </tbody>
+        </table>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write your own definitions for <strong>Physical Properties</strong> and <strong>Chemical Properties</strong>, then list at least two examples of each.</div>
+        </div>
+        ${practiceProblem('p1', 'Is boiling point a physical or chemical property?', 'basic', 'Can you observe it without turning the substance into something new?', 'Physical — you can observe boiling point without changing what the substance is.')}
+        ${practiceProblem('p2', 'Is flammability a physical or chemical property?', 'medium', 'Flammability describes what happens when a substance burns — does burning create a new substance?', 'Chemical — burning turns the substance into new substances (like ash and gases), so flammability is a chemical property.')}
+        ${practiceProblem('p3', 'A nail slowly rusts in the rain. Is rusting a physical or chemical change?', 'challenge', 'Rust (iron oxide) is a different substance than iron. Does that mean something new formed?', 'Chemical — rusting forms a brand new substance (iron oxide), so it reflects a chemical property/change, not a physical one.')}`
+    },
+    {
+      title: 'Chemistry, Hypotheses & the Scientific Method',
+      time: '6 min',
+      bodyHtml: `
+        <h2>What Is Chemistry?</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Chemistry</strong> is the study of matter, its properties, and how matter can be changed.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Where It Started</div>
+          <p>Long ago, alchemists tried to turn ordinary metals into gold. They never succeeded — but their experiments, tools, and (very unscientific) trial and error eventually gave rise to modern chemistry, which studies matter using testable hypotheses instead of guesswork.</p>
+        </div>
+        <p>Scientists solve problems using a <strong>systematic</strong> (organized, step-by-step) approach, rather than random guessing.</p>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p>A <strong>hypothesis</strong> is a testable, educated explanation for an observation — not a proven fact, and not a random guess.</p>
+        </div>
+        ${practiceProblem('h1', 'True or False: A hypothesis must turn out to be correct in order to count as a hypothesis.', 'medium', 'What actually makes something a hypothesis — being right, or being testable?', 'False — a hypothesis just needs to be a testable explanation. It can turn out to be wrong; that’s a normal, useful result in science.')}`
+    },
+    {
+      title: 'Lab Tools & Safety',
+      time: '8 min',
+      bodyHtml: `
+        <h2>Tools of the Trade</h2>
+        <table>
+          <thead><tr><th>Equipment</th><th>What it's for</th></tr></thead>
+          <tbody>
+            <tr><td>Graduated cylinder</td><td>Precisely measuring the volume of a liquid</td></tr>
+            <tr><td>Beaker</td><td>Holding, mixing, and roughly measuring liquids</td></tr>
+            <tr><td>Erlenmeyer flask</td><td>Mixing or swirling liquids without spilling</td></tr>
+            <tr><td>Test tube &amp; rack</td><td>Small-scale reactions; the rack holds tubes upright</td></tr>
+            <tr><td>Balance (scale)</td><td>Measuring mass</td></tr>
+            <tr><td>Bunsen burner</td><td>Heating substances</td></tr>
+            <tr><td>Eye wash station</td><td>Flushing chemicals out of your eyes</td></tr>
+            <tr><td>Fire extinguisher</td><td>Putting out a lab fire</td></tr>
+          </tbody>
+        </table>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, sketch or describe a graduated cylinder, test tube rack, Erlenmeyer flask, balance, and Bunsen burner. Then note where the eye wash station and fire extinguisher are located in your classroom.</div>
+        </div>
+        <h3>Lab Safety Rules</h3>
+        <ul>
+          <li>Always wear safety goggles when working with chemicals</li>
+          <li>Never taste or directly smell an unknown chemical</li>
+          <li>Walk in the lab — never run</li>
+          <li>Report spills or accidents to your teacher immediately</li>
+          <li>If you're unsure about a step, ask your teacher before proceeding</li>
+        </ul>
+        ${practiceProblem('s1', 'Which piece of equipment would you use to measure exactly 25 mL of a liquid?', 'basic', 'You need precision here, not just "roughly."', 'A graduated cylinder — it’s designed for precise liquid volume measurements.')}
+        ${practiceProblem('s2', 'A few drops of acid splash into your lab partner’s eyes. What should they do first?', 'medium', 'Think about which safety station is designed exactly for this.', 'Immediately flush their eyes at the eye wash station and tell your teacher right away.')}
+        ${practiceProblem('s3', 'True or False: If you’re not sure what a chemical is, a quick sniff can help you identify it safely.', 'challenge', 'Is smelling an unknown chemical ever the safe move?', 'False — never taste or directly smell an unknown chemical. If you must smell something, waft the vapor toward you from a distance, and only when instructed to.')}`
+    }
+  ];
+
+  function practiceProblem(idSuffix, prompt, difficulty, hint, answer) {
+    const diffClass = { basic: 'diff-basic', medium: 'diff-medium', challenge: 'diff-challenge' }[difficulty] || 'diff-basic';
+    const diffLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+    return `
+      <div class="practice-problem">
+        <div class="pp-header">
+          <span class="pp-num">Q</span>
+          <span class="pp-difficulty ${diffClass}">● ${escapeHtml(diffLabel)}</span>
+        </div>
+        <div class="pp-body">
+          <p><strong>${escapeHtml(prompt)}</strong></p>
+          <button type="button" class="hint-btn" data-hint-target="hint-${idSuffix}">💡 Hint</button>
+          <button type="button" class="reveal-btn" data-answer-target="ans-${idSuffix}">Reveal Answer</button>
+          <div class="hint-box" id="hint-${idSuffix}">${escapeHtml(hint)}</div>
+          <div class="answer-box" id="ans-${idSuffix}">
+            <div class="answer-label">✓ Answer</div>
+            ${escapeHtml(answer)}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function render(host, ctx) {
+    ensureStylesInjected();
+
+    const sectionsHtml = STATIC_SECTIONS.map((sec, i) => `
+      <div class="section-card" id="cl-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
+          <span class="section-title">${escapeHtml(sec.title)}</span>
+          <span class="section-time">${escapeHtml(sec.time)}</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          ${sec.bodyHtml}
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">✓ Mark Section Complete</button>
+        </div>
+      </div>
+    `).join('');
+
+    host.innerHTML = `
+      <div class="chem-lesson">
+        <div class="cl-header">
+          <div class="cl-header-label">Chapter 1 · Defining Matter</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="cl-header-meta">Self-Paced Review · ~35 Minutes · Good prep for Quiz A/B</div>
+        </div>
+        <div class="cl-progress-wrap">
+          <span class="cl-progress-label">Progress</span>
+          <div class="cl-progress-track"><div class="cl-progress-fill" id="cl-progress-fill"></div></div>
+          <span class="cl-progress-count" id="cl-progress-count">0 / ${SECTION_COUNT} sections</span>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="cl-sec-6" data-section="6">
+            <div class="section-header" data-toggle="6">
+              <span class="section-num">✓</span>
+              <span class="section-title">Check for Understanding</span>
+              <span class="section-time">15 min · graded</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">Unlike the sections above, this quiz <strong>saves your score</strong> and reports it to your teacher. You can retake it any time — your most recent attempt is what's saved.</div>
+              <div id="cl-quiz-mount"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    `;
+
+    const root = host.querySelector('.chem-lesson');
+    const completed = new Array(SECTION_COUNT).fill(false);
+
+    function updateProgress() {
+      const done = completed.filter(Boolean).length;
+      const pct = Math.round((done / SECTION_COUNT) * 100);
+      root.querySelector('#cl-progress-fill').style.width = pct + '%';
+      root.querySelector('#cl-progress-count').textContent = `${done} / ${SECTION_COUNT} sections`;
+    }
+
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#cl-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function toggleSection(i) {
+      const card = root.querySelector(`#cl-sec-${i}`);
+      const body = card.querySelector('.section-body');
+      const header = card.querySelector('.section-header');
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      header.classList.toggle('open', !isOpen);
+    }
+
+    root.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', () => toggleSection(Number(el.getAttribute('data-toggle'))));
+    });
+
+    root.querySelectorAll('[data-mark-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-mark-done'));
+        if (completed[i]) return;
+        completed[i] = true;
+        root.querySelector(`#cl-sec-${i}`).classList.add('done');
+        btn.textContent = '✓ Section Complete';
+        btn.disabled = true;
+        updateProgress();
+        setTimeout(() => openSection(i + 1, true), 250);
+      });
+    });
+
+    root.querySelectorAll('[data-hint-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-hint-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? '▲ Hide Hint' : '💡 Hint';
+      });
+    });
+    root.querySelectorAll('[data-answer-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-answer-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? 'Hide Answer' : 'Reveal Answer';
+      });
+    });
+
+    // Quiz (section 6) — graded, saved via ctx.saveProgress.
+    const quizMount = root.querySelector('#cl-quiz-mount');
+    renderQuiz(quizMount, ctx);
+
+    const progress = ctx.getProgress();
+    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
+      if (progress.status === 'completed') completed[6] = true;
+      openSection(6, false);
+    } else {
+      openSection(0, false);
+    }
+    updateProgress();
+  }
+
+  function renderQuiz(mount, ctx) {
+    const progress = ctx.getProgress();
+    if (progress && progress.status === 'completed') {
+      renderQuizSummary(mount, ctx);
+      return;
+    }
+    const answers = (progress && progress.answers) || [];
+    const index = answers.length;
+    if (index >= QUESTIONS.length) {
+      finishQuiz(mount, ctx, answers);
+      return;
+    }
+    renderQuizQuestion(mount, ctx, answers, index);
+  }
+
+  function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const q = QUESTIONS[index];
+    const pct = Math.round((index / QUESTIONS.length) * 100);
+    mount.innerHTML = `
+      <div class="quiz-question-count">Question ${index + 1} of ${QUESTIONS.length}</div>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <p class="quiz-prompt">${escapeHtml(q.prompt)}</p>
+      <div id="cl-answer-area"></div>
+      <div id="cl-feedback-area"></div>
+      <button type="button" class="cl-next-btn" id="cl-next-btn" style="display:none;">Next Question</button>
+    `;
+
+    const answerArea = mount.querySelector('#cl-answer-area');
+    const feedbackArea = mount.querySelector('#cl-feedback-area');
+    const nextBtn = mount.querySelector('#cl-next-btn');
+    let submitted = false;
+
+    answerArea.innerHTML = q.choices.map((choice, i) => `
+      <button type="button" class="cl-choice" data-choice="${i}">${escapeHtml(choice)}</button>
+    `).join('');
+
+    function submit(response, btnEl) {
+      if (submitted) return;
+      submitted = true;
+
+      const correct = response === q.correct;
+      answerArea.querySelectorAll('.cl-choice').forEach(el => {
+        el.disabled = true;
+        const val = Number(el.getAttribute('data-choice'));
+        if (val === q.correct) el.classList.add('selected-correct');
+        else if (el === btnEl) el.classList.add('selected-incorrect');
+      });
+
+      feedbackArea.innerHTML = `
+        <div class="cl-feedback ${correct ? 'correct' : 'incorrect'}">
+          ${correct ? '✓ Correct!' : '✗ Not quite.'} ${escapeHtml(q.explanation)}
+        </div>
+      `;
+      nextBtn.style.display = 'inline-block';
+
+      const answers = answersSoFar.concat([{ questionId: q.id, response, correct }]);
+      const record = {
+        status: 'in_progress',
+        score: answers.filter(a => a.correct).length,
+        totalQuestions: QUESTIONS.length,
+        answers
+      };
+      ctx.saveProgress(record);
+    }
+
+    answerArea.querySelectorAll('.cl-choice').forEach(btn => {
+      btn.addEventListener('click', () => submit(Number(btn.getAttribute('data-choice')), btn));
+    });
+
+    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
+  }
+
+  async function finishQuiz(mount, ctx, answers) {
+    const record = {
+      status: 'completed',
+      score: answers.filter(a => a.correct).length,
+      totalQuestions: QUESTIONS.length,
+      answers
+    };
+    await ctx.saveProgress(record);
+    renderQuizSummary(mount, ctx);
+  }
+
+  function renderQuizSummary(mount, ctx) {
+    const progress = ctx.getProgress();
+    const score = progress ? progress.score : 0;
+    const total = QUESTIONS.length;
+    mount.innerHTML = `
+      <div class="cl-summary">
+        <div class="cl-score">${score} / ${total}</div>
+        <p>Nice work! You can retake this any time — your most recent attempt is what's saved and sent to your teacher.</p>
+        <button type="button" class="cl-retake-btn" id="cl-retake-btn">Retake Quiz</button>
+      </div>
+    `;
+    mount.querySelector('#cl-retake-btn').addEventListener('click', async () => {
+      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: total, answers: [] });
+      renderQuiz(mount, ctx);
+    });
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['matter-review'] = { render };
+})();
