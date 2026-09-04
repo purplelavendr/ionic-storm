@@ -42,6 +42,7 @@ async function init() {
 }
 
 function render() {
+  document.body.classList.toggle('landing-active', State.view === 'landing');
   const app = $('#app');
   app.innerHTML = '';
   if (State.view === 'landing') renderLanding(app);
@@ -49,12 +50,42 @@ function render() {
   else if (State.view === 'activity') renderActivityView(app);
 }
 
+const ATOM_EMBLEM_SVG = `
+<svg class="atom-emblem" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <radialGradient id="atomNucleus" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a7f3ec"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </radialGradient>
+  </defs>
+  <g transform="rotate(0 60 60)">
+    <path id="atomOrbit1" class="orbit-path" stroke="rgba(167,139,250,0.45)" d="M10,60 A50,20 0 1,1 110,60 A50,20 0 1,1 10,60"/>
+    <circle r="3.2" fill="#a78bfa">
+      <animateMotion dur="5s" repeatCount="indefinite"><mpath href="#atomOrbit1"/></animateMotion>
+    </circle>
+  </g>
+  <g transform="rotate(60 60 60)">
+    <path id="atomOrbit2" class="orbit-path" stroke="rgba(45,212,191,0.45)" d="M10,60 A50,20 0 1,1 110,60 A50,20 0 1,1 10,60"/>
+    <circle r="3.2" fill="#2ec4b6">
+      <animateMotion dur="6.5s" repeatCount="indefinite"><mpath href="#atomOrbit2"/></animateMotion>
+    </circle>
+  </g>
+  <g transform="rotate(120 60 60)">
+    <path id="atomOrbit3" class="orbit-path" stroke="rgba(244,162,97,0.45)" d="M10,60 A50,20 0 1,1 110,60 A50,20 0 1,1 10,60"/>
+    <circle r="3.2" fill="#f4a261">
+      <animateMotion dur="4.2s" repeatCount="indefinite"><mpath href="#atomOrbit3"/></animateMotion>
+    </circle>
+  </g>
+  <circle cx="60" cy="60" r="7" fill="url(#atomNucleus)"/>
+</svg>`;
+
 async function renderLanding(app) {
   const div = document.createElement('div');
   div.className = 'landing-card';
   div.innerHTML = `
-    <h2>Welcome!</h2>
-    <p>Pick your class period, then find your name in the list.</p>
+    ${ATOM_EMBLEM_SVG}
+    <h2>Enter the Lab</h2>
+    <p class="muted">Pick your class period, then find your name to pick up where you left off.</p>
     <div id="landing-body"><p class="muted">Loading class list...</p></div>
   `;
   app.appendChild(div);
@@ -85,7 +116,7 @@ async function renderLanding(app) {
         <input type="checkbox" id="use-manual-name"> My name isn't listed
       </label>
       <input type="text" id="input-name-manual" placeholder="Type your full name" style="display:none;">
-      <button type="submit" class="button">Continue</button>
+      <button type="submit" class="button">Enter Lab →</button>
     </form>
     <p id="identify-status" class="muted"></p>
   `;
@@ -120,7 +151,7 @@ async function renderLanding(app) {
     const period = periodSelect.value;
     const name = manualCheckbox.checked ? manualInput.value.trim() : nameSelect.value;
     if (!name || !period) return;
-    $('#identify-status', body).textContent = 'Loading...';
+    $('#identify-status', body).textContent = 'Entering the lab...';
     await Storage.identify(name, period);
     State.view = 'dashboard';
     render();

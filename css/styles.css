@@ -24,6 +24,11 @@ body {
   background: var(--bg);
   color: var(--ink);
   line-height: 1.5;
+  transition: background 0.4s ease;
+}
+
+h1, h2, h3, .button, button.button {
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .site-header {
@@ -253,4 +258,114 @@ form select:disabled {
   gap: 8px;
   font-weight: 600;
   margin-top: 16px;
+}
+
+/* ---- Landing / "sign in" screen: immersive chemistry-lab hero ---- */
+
+body.landing-active {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(124, 58, 237, 0.38), transparent 55%),
+    radial-gradient(circle at 88% 18%, rgba(6, 182, 212, 0.28), transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(67, 56, 202, 0.35), transparent 60%),
+    linear-gradient(180deg, #191233 0%, #130d29 45%, #0b0821 100%);
+  min-height: 100vh;
+}
+
+body.landing-active .site-header {
+  background: transparent;
+  box-shadow: none;
+}
+
+body.landing-active #app {
+  min-height: calc(100vh - 84px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px 60px;
+}
+
+body.landing-active .site-footer { color: rgba(241, 239, 250, 0.4); }
+
+.atom-emblem {
+  display: block;
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 18px;
+}
+
+.atom-emblem .orbit-path { fill: none; stroke-width: 1.4; }
+
+.landing-card {
+  position: relative;
+  width: 100%;
+}
+
+body.landing-active .landing-card {
+  max-width: 420px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 24px 70px rgba(4, 2, 20, 0.55);
+  text-align: center;
+}
+
+body.landing-active .landing-card h2 {
+  color: #fff;
+  font-size: 1.7rem;
+  margin-bottom: 6px;
+}
+
+body.landing-active .landing-card p.muted {
+  color: rgba(226, 222, 245, 0.65);
+  text-align: center;
+}
+
+body.landing-active .landing-card form { text-align: left; margin-top: 20px; }
+
+body.landing-active .landing-card label {
+  color: rgba(226, 222, 245, 0.85);
+}
+
+body.landing-active .landing-card select,
+body.landing-active .landing-card input[type="text"] {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  color-scheme: dark;
+}
+
+body.landing-active .landing-card select option { color: #1a1a2e; }
+
+body.landing-active .landing-card select:focus,
+body.landing-active .landing-card input[type="text"]:focus {
+  outline: none;
+  border-color: var(--ion-accent);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25);
+}
+
+body.landing-active .landing-card select:disabled {
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(226, 222, 245, 0.4);
+}
+
+body.landing-active .fallback-toggle { color: rgba(226, 222, 245, 0.6); }
+
+body.landing-active .landing-card .button {
+  width: 100%;
+  padding: 12px 18px;
+  background: linear-gradient(120deg, var(--storm-1), var(--ion-accent));
+  box-shadow: 0 10px 28px rgba(6, 182, 212, 0.3);
+  border: none;
+}
+
+body.landing-active .landing-card .button:hover {
+  box-shadow: 0 12px 34px rgba(6, 182, 212, 0.45);
+}
+
+body.landing-active .landing-card .feedback.incorrect {
+  background: rgba(217, 119, 6, 0.18);
+  color: #fcd34d;
+  text-align: left;
 }
