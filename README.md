@@ -4,25 +4,25 @@ A landing page for students to complete built-in reviews and linked simulations,
 with progress saved so they can pick up where they left off, and reported back
 to you in a Google Sheet.
 
-Live site (once GitHub Pages is on): `https://<your-github-username>.github.io/ionic-storm/`
+Live site: [https://purplelavendr.github.io/ionic-storm/](https://purplelavendr.github.io/ionic-storm/)
 
 ## How it works
 
-- A student opens the site, types their name and class period once (their
-  browser remembers it after that).
+- A student opens the site, picks their **class period**, then picks their
+  **name** from that period's roster (their browser remembers this after
+  that, so it's normally a one-time thing per device).
 - The dashboard lists units and activities with a status badge: **Not
   Started**, **In Progress**, or **Completed** (with score, for reviews).
 - Progress saves automatically after every question/click — no "save" button
   needed, and a half-finished review picks back up at the right question,
-  even on a different computer (as long as they type the same name + period).
+  even on a different computer (as long as they pick the same period + name).
 - Every save is also sent to a Google Sheet, which is your live gradebook /
   progress report. Just open the Sheet any time.
 
-There's no login system — a student is identified purely by the name +
-period they type. Two students with the *exact* same name in the *exact*
-same period would be treated as one person, so it's worth telling students
-to use "First Last" consistently. This is a deliberate tradeoff to avoid
-needing accounts.
+There's no login system — a student is identified by the roster entry they
+pick. If a student doesn't see their name (a schedule change, a typo in the
+roster, etc.), there's a "My name isn't listed" fallback that lets them type
+it in — they still show up in that period's tab so you can catch the gap.
 
 ## One-time setup: the progress backend (Google Sheet)
 
@@ -48,28 +48,36 @@ This only needs to be done once, by you.
 8. Send me that URL (or paste it into `js/config.js` yourself, as the
    `appsScriptUrl` value) — I'll wire it in and verify it end-to-end.
 
-Two sheet tabs will be created automatically the first time the site is
-used: **Students** (roster, first/last seen) and **Progress** (one row per
-student per activity — status, score, and a snapshot of their answers).
-
 **If you ever redeploy** the script after editing it, use **Deploy > Manage
 deployments > Edit (pencil icon) > New version** rather than creating a
 brand-new deployment — that keeps the same URL so you don't have to update
 `config.js` again.
 
-## One-time setup: hosting (GitHub Pages)
+## Managing class rosters
 
-1. Create a free account at [github.com](https://github.com) if you don't
-   have one.
-2. Create a new **public** repository named `ionic-storm` (no README/license
-   needed — this project already has one).
-3. Tell me once it exists and I'll push this project to it.
-4. In the repo, go to **Settings > Pages**. Under "Build and deployment",
-   set Source to **Deploy from a branch**, branch `main`, folder `/ (root)`.
-   Save.
-5. GitHub gives you a URL like `https://<username>.github.io/ionic-storm/` —
-   that's the link to share with students (a QR code pointed at it works
-   great for a classroom).
+Each class period gets two sheet tabs:
+
+- **`Roster - <Period>`** — the list of students in that period. You create
+  this one. Row 1 can just say "Name"; list one student per row starting in
+  row 2. The exact tab name is what shows up as a period choice on the site
+  (e.g. a tab named `Roster - Period 3` shows students `Period 3` in the
+  dropdown), so name it exactly how you want the period to read.
+- **`Progress - <Period>`** — created automatically the first time a student
+  in that period saves progress. One row per student per activity.
+
+**To add a new class period:** create a new tab named `Roster - <Period>`
+and list the students. It shows up on the site within a minute or two —
+nothing else to configure.
+
+**To update a roster** (add, drop, or fix a name): edit that period's
+`Roster - <Period>` tab directly, like any spreadsheet. Takes effect
+immediately for the next student who visits.
+
+## Hosting (GitHub Pages)
+
+Already set up — the site deploys automatically from the `main` branch to
+[https://purplelavendr.github.io/ionic-storm/](https://purplelavendr.github.io/ionic-storm/)
+a minute or two after any push.
 
 ## Adding new units, reviews, and simulations
 
@@ -90,9 +98,10 @@ You don't need to write any code yourself — just describe the content
 
 ## Known limitations (v1)
 
-- No login — identity is just name + period, so duplicate names within the
-  same period would share progress.
+- No login — identity is just the roster entry picked, so two identical
+  names in the same period's roster would share progress.
+- Picking a period/name on first visit requires a live connection (it reads
+  the roster from the Sheet). Once identified, answering questions and
+  resuming activities still works offline and syncs when back online.
 - The "report" is the Google Sheet itself; there's no in-site teacher
   dashboard yet. Open the Sheet, use filters/pivot tables as needed.
-- If a student is fully offline, their answers still save to their browser
-  and sync automatically next time they're online and reopen the site.
