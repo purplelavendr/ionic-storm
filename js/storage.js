@@ -133,7 +133,15 @@ const Storage = {
 
   async refreshFromServer(student) {
     if (!student || !student.studentKey) return;
-    const res = await this.apiPost('getProgress', { studentKey: student.studentKey });
+    const res = await this.apiPost('getProgress', { studentKey: student.studentKey, period: student.period });
     if (res.ok) this.mergeServerProgress(res.progress || []);
+  },
+
+  async getPeriods() {
+    return this.apiPost('getPeriods', {});
+  },
+
+  async getRoster(period) {
+    return this.apiPost('getRoster', { period });
   }
 };

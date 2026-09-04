@@ -84,7 +84,7 @@ form label {
   font-size: 0.9rem;
 }
 
-form input[type="text"], .num-input {
+form input[type="text"], form select, .num-input {
   display: block;
   width: 100%;
   margin-top: 6px;
@@ -93,7 +93,26 @@ form input[type="text"], .num-input {
   border-radius: 8px;
   font-size: 1rem;
   font-family: inherit;
+  background: #fff;
 }
+
+form select:disabled {
+  color: var(--muted);
+  background: var(--gray-bg);
+}
+
+.fallback-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.fallback-toggle input { margin: 0; }
+
+#input-name-manual { margin-top: 6px; }
 
 .button, button.button {
   background: var(--storm-1);

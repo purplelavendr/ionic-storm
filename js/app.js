@@ -49,31 +49,78 @@ function render() {
   else if (State.view === 'activity') renderActivityView(app);
 }
 
-function renderLanding(app) {
+async function renderLanding(app) {
   const div = document.createElement('div');
   div.className = 'landing-card';
   div.innerHTML = `
     <h2>Welcome!</h2>
-    <p>Enter your name and class period to get started. Use the exact same name and period every time so your progress is saved and can be found again.</p>
+    <p>Pick your class period, then find your name in the list.</p>
+    <div id="landing-body"><p class="muted">Loading class list...</p></div>
+  `;
+  app.appendChild(div);
+
+  const body = $('#landing-body', div);
+  const periodsRes = await Storage.getPeriods();
+  if (State.view !== 'landing') return; // student navigated away while loading
+  if (!periodsRes.ok || !periodsRes.periods || !periodsRes.periods.length) {
+    body.innerHTML = `<p class="feedback incorrect">Couldn't load the class list. Check your connection and reload the page, or ask your teacher to check the site setup.</p>`;
+    return;
+  }
+
+  const periods = periodsRes.periods;
+  body.innerHTML = `
     <form id="identify-form">
-      <label>Full Name
-        <input type="text" id="input-name" required autocomplete="name">
-      </label>
       <label>Class Period
-        <input type="text" id="input-period" required placeholder="e.g. Period 3">
+        <select id="input-period" required>
+          <option value="" disabled selected>Choose your period...</option>
+          ${periods.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+        </select>
       </label>
+      <label>Your Name
+        <select id="input-name" required disabled>
+          <option value="" disabled selected>Choose a period first...</option>
+        </select>
+      </label>
+      <label class="fallback-toggle">
+        <input type="checkbox" id="use-manual-name"> My name isn't listed
+      </label>
+      <input type="text" id="input-name-manual" placeholder="Type your full name" style="display:none;">
       <button type="submit" class="button">Continue</button>
     </form>
     <p id="identify-status" class="muted"></p>
   `;
-  app.appendChild(div);
 
-  $('#identify-form').addEventListener('submit', async (e) => {
+  const periodSelect = $('#input-period', body);
+  const nameSelect = $('#input-name', body);
+  const manualCheckbox = $('#use-manual-name', body);
+  const manualInput = $('#input-name-manual', body);
+
+  periodSelect.addEventListener('change', async () => {
+    nameSelect.disabled = true;
+    nameSelect.innerHTML = `<option value="" disabled selected>Loading names...</option>`;
+    const res = await Storage.getRoster(periodSelect.value);
+    const names = (res.ok && res.names) ? res.names.slice().sort() : [];
+    nameSelect.innerHTML = `
+      <option value="" disabled selected>Choose your name...</option>
+      ${names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
+    `;
+    nameSelect.disabled = false;
+  });
+
+  manualCheckbox.addEventListener('change', () => {
+    const manual = manualCheckbox.checked;
+    nameSelect.style.display = manual ? 'none' : '';
+    nameSelect.required = !manual;
+    manualInput.style.display = manual ? '' : 'none';
+    manualInput.required = manual;
+  });
+
+  $('#identify-form', body).addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = $('#input-name').value.trim();
-    const period = $('#input-period').value.trim();
+    const period = periodSelect.value;
+    const name = manualCheckbox.checked ? manualInput.value.trim() : nameSelect.value;
     if (!name || !period) return;
-    $('#identify-status').textContent = 'Loading...';
+    $('#identify-status', body).textContent = 'Loading...';
     await Storage.identify(name, period);
     State.view = 'dashboard';
     render();
