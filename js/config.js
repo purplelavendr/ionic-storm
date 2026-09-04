@@ -4,5 +4,5 @@ const CONFIG = {
 
   // Paste your deployed Google Apps Script Web App URL here (it ends in /exec).
   // See README.md -> "Setting up the progress backend" for how to get this.
-  appsScriptUrl: ''
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbwAFlUrS72L4b6bR5rNr-RVdFXzLiZ7dqhJ8QevUVuyr5fktTRBymZ8vQI2EfxsJ2fxbQ/exec'
 };
