@@ -36,9 +36,10 @@ h1, h2, h3, .button, button.button {
 }
 
 .site-header {
-  background: linear-gradient(120deg, var(--storm-1), var(--storm-2) 60%, var(--ion-accent));
-  color: #fff;
+  background: transparent;
+  color: var(--ink);
   padding: 28px 20px;
+  border-bottom: 1px solid var(--border);
 }
 
 .header-inner {
@@ -50,10 +51,13 @@ h1, h2, h3, .button, button.button {
   margin: 0 0 4px 0;
   font-size: 1.9rem;
   letter-spacing: -0.02em;
+  background: linear-gradient(120deg, var(--lavender), var(--ion-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .header-inner .muted {
-  color: rgba(255, 255, 255, 0.85);
   margin: 0;
 }
 
