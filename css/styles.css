@@ -96,7 +96,7 @@ form label {
   color: rgba(226, 222, 245, 0.85);
 }
 
-form input[type="text"], form select, .num-input {
+form input[type="text"], form input[type="password"], form select, .num-input {
   display: block;
   width: 100%;
   margin-top: 6px;
@@ -113,7 +113,7 @@ form input[type="text"], form select, .num-input {
 form select option, .num-input { color: #fff; }
 form select option { color: #1a1a2e; }
 
-form input[type="text"]:focus, form select:focus, .num-input:focus {
+form input[type="text"]:focus, form input[type="password"]:focus, form select:focus, .num-input:focus {
   outline: none;
   border-color: var(--ion-accent);
   box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25);
@@ -325,3 +325,9 @@ body.landing-active #app {
 }
 
 .landing-card .feedback.incorrect { text-align: left; }
+
+.status-error {
+  color: var(--danger);
+  font-weight: 600;
+  text-align: center;
+}

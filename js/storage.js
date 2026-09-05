@@ -4,6 +4,11 @@
 // network) and is best-effort POSTed to the Google Apps Script backend. A
 // failed POST is queued and retried on the next page load or interaction.
 
+// Mirrors the backend's normalizeKey() -- used only for the offline fallback below.
+function normalizeKeyLocal(name, period) {
+  return (name.trim().toLowerCase() + '|' + period.trim().toLowerCase()).replace(/\s+/g, ' ');
+}
+
 const StorageKeys = {
   STUDENT: 'ionicstorm_student_v1',
   PROGRESS: 'ionicstorm_progress_v1',
@@ -66,9 +71,12 @@ const Storage = {
     this.setQueue(queue);
   },
 
+  // networkError marks a request that never reached the server (offline, DNS,
+  // etc.) as opposed to a response the server deliberately sent back with
+  // ok:false (e.g. a wrong student ID) -- callers need to tell those apart.
   async apiPost(action, payload) {
     if (!CONFIG.appsScriptUrl) {
-      return { ok: false, error: 'not configured' };
+      return { ok: false, error: 'not configured', networkError: true };
     }
     try {
       const res = await fetch(CONFIG.appsScriptUrl, {
@@ -79,23 +87,28 @@ const Storage = {
       });
       return await res.json();
     } catch (err) {
-      return { ok: false, error: String(err) };
+      return { ok: false, error: String(err), networkError: true };
     }
   },
 
-  async identify(name, period) {
-    const student = { name, period };
-    const res = await this.apiPost('identify', { name, period });
+  // Returns { ok, student } on success, or { ok: false, error } on a genuine
+  // rejection (wrong student ID, missing fields) that should NOT sign the
+  // student in. A network failure still signs them in locally (offline
+  // fallback) since there's no way to verify anything without the server.
+  async identify(name, period, studentId) {
+    const res = await this.apiPost('identify', { name, period, studentId });
     if (res.ok) {
-      student.studentKey = res.studentKey;
+      const student = { name, period, studentKey: res.studentKey };
       this.mergeServerProgress(res.progress || []);
-    } else {
-      // Offline fallback: derive a local key so the app still works;
-      // it will reconcile with the server once the connection returns.
-      student.studentKey = name.trim().toLowerCase() + '|' + period.trim().toLowerCase();
+      this.setStudent(student);
+      return { ok: true, student };
     }
-    this.setStudent(student);
-    return student;
+    if (res.networkError) {
+      const student = { name, period, studentKey: normalizeKeyLocal(name, period) };
+      this.setStudent(student);
+      return { ok: true, student, offline: true };
+    }
+    return { ok: false, error: res.error || 'identify_failed' };
   },
 
   async saveProgress(student, activity, unitId, record) {

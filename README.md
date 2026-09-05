@@ -19,10 +19,15 @@ Live site: [https://purplelavendr.github.io/ionic-storm/](https://purplelavendr.
 - Every save is also sent to a Google Sheet, which is your live gradebook /
   progress report. Just open the Sheet any time.
 
-There's no login system — a student is identified by the roster entry they
-pick. If a student doesn't see their name (a schedule change, a typo in the
-roster, etc.), there's a "My name isn't listed" fallback that lets them type
-it in — they still show up in that period's tab so you can catch the gap.
+A student is identified by the roster entry they pick, plus their **student
+ID number** as a lightweight password — this stops one student from
+casually picking a classmate's name and messing with their progress. It is
+not real security (a determined student could still find a way around it),
+just a speed bump against casual mischief. If a student doesn't see their
+name (a schedule change, a typo in the roster, etc.), there's a "My name
+isn't listed" fallback that lets them type it in — they still show up in
+that period's tab so you can catch the gap (their typed ID isn't checked
+against anything, since there's no roster row to check it against).
 
 ## One-time setup: the progress backend (Google Sheet)
 
@@ -57,21 +62,27 @@ brand-new deployment — that keeps the same URL so you don't have to update
 
 Each class period gets two sheet tabs:
 
-- **`Roster - <Period>`** — the list of students in that period. You create
-  this one. Row 1 can just say "Name"; list one student per row starting in
-  row 2. The exact tab name is what shows up as a period choice on the site
-  (e.g. a tab named `Roster - Period 3` shows students `Period 3` in the
-  dropdown), so name it exactly how you want the period to read.
+- **`Roster - <Period>`** — the students in that period, with columns
+  **Name** (A) and **StudentID** (B). You maintain this one. The exact tab
+  name is what shows up as a period choice on the site (e.g. a tab named
+  `Roster - Period 3` shows students `Period 3` in the dropdown), so name it
+  exactly how you want the period to read.
 - **`Progress - <Period>`** — created automatically the first time a student
   in that period saves progress. One row per student per activity.
 
-**To add a new class period:** create a new tab named `Roster - <Period>`
-and list the students. It shows up on the site within a minute or two —
-nothing else to configure.
+**To add a new class period:** create a new tab named `Roster - <Period>`,
+then fill in Name and StudentID for each student. Shows up on the site
+within a minute or two — nothing else to configure.
 
-**To update a roster** (add, drop, or fix a name): edit that period's
-`Roster - <Period>` tab directly, like any spreadsheet. Takes effect
-immediately for the next student who visits.
+**To update a roster** (add, drop, fix a name, fix an ID): edit that
+period's `Roster - <Period>` tab directly, like any spreadsheet. Takes
+effect immediately for the next student who visits.
+
+**Leaving a StudentID cell blank** skips the password check for that one
+student (they can type anything and get in) — handy while you're still
+filling in ID numbers for a roster, so nobody's locked out mid-rollout.
+Once redeployed, students can already sign in with an empty StudentID
+column; add the real numbers whenever you get to them.
 
 ## Hosting (GitHub Pages)
 
@@ -98,8 +109,10 @@ You don't need to write any code yourself — just describe the content
 
 ## Known limitations (v1)
 
-- No login — identity is just the roster entry picked, so two identical
-  names in the same period's roster would share progress.
+- No real login — the student ID field is a speed bump against casual
+  mischief, not real security (it's sent as plain text, so a determined
+  student could find it in their browser's network tab). Two identical
+  names in the same period's roster would also share progress.
 - Picking a period/name on first visit requires a live connection (it reads
   the roster from the Sheet). Once identified, answering questions and
   resuming activities still works offline and syncs when back online.

@@ -3,17 +3,24 @@
 // as a Web App. See README.md for exact steps.
 //
 // Sheet layout (per class period):
-//   "Roster - <Period>"   columns: Name, FirstSeen, LastSeen
+//   "Roster - <Period>"   columns: Name, StudentID, FirstSeen, LastSeen
 //   "Progress - <Period>" columns: StudentKey, Name, UnitId, ActivityId,
 //                                  ActivityTitle, Status, Score,
 //                                  TotalQuestions, AnswersJSON, LastUpdated
 //
 // To add a class period: create a new sheet tab named exactly
 // "Roster - <Period>" (e.g. "Roster - Period 3") and list one student name
-// per row starting in row 2 (row 1 can just say "Name"). That's it -- the
-// matching "Progress - <Period>" tab is created automatically the first
-// time a student in that period saves progress. To update a roster
-// (add/drop/rename a student), just edit that tab directly.
+// per row starting in row 2, with their student ID number in column B.
+// That's it -- the matching "Progress - <Period>" tab is created
+// automatically the first time a student in that period saves progress.
+// To update a roster (add/drop/rename a student, fix an ID), just edit
+// that tab directly.
+//
+// StudentID acts as a lightweight password: a student must type the
+// matching ID to sign in as that roster name. Leaving a row's StudentID
+// blank skips the check for that student (useful while first rolling
+// this out, before every ID is entered) -- it does NOT skip the field
+// on the sign-in form, students still have to type something.
 
 var ROSTER_PREFIX = 'Roster - ';
 var PROGRESS_PREFIX = 'Progress - ';
@@ -108,26 +115,33 @@ function handleGetRoster(body) {
 function handleIdentify(body) {
   var name = String(body.name || '').trim();
   var period = String(body.period || '').trim();
-  if (!name || !period) {
-    return { ok: false, error: 'name and period are required' };
+  var studentId = String(body.studentId || '').trim();
+  if (!name || !period || !studentId) {
+    return { ok: false, error: 'name, period, and studentId are required' };
   }
   var studentKey = normalizeKey(name, period);
-  var sheet = getSheet(rosterSheetName(period), ['Name', 'FirstSeen', 'LastSeen']);
+  var sheet = getSheet(rosterSheetName(period), ['Name', 'StudentID', 'FirstSeen', 'LastSeen']);
   var data = sheet.getDataRange().getValues();
   var now = new Date();
-  var found = false;
+  var matchedRow = -1;
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][0] || '').trim().toLowerCase() === name.toLowerCase()) {
-      var firstSeen = data[i][1] || now;
-      sheet.getRange(i + 1, 2, 1, 2).setValues([[firstSeen, now]]);
-      found = true;
+      matchedRow = i;
       break;
     }
   }
-  if (!found) {
+  if (matchedRow === -1) {
     // Not on the pre-loaded roster (e.g. used the "my name isn't listed"
-    // fallback) -- add them so the gap is visible next time the roster is checked.
-    sheet.appendRow([name, now, now]);
+    // fallback) -- add them so the gap is visible next time the roster is
+    // checked. Nothing to check the entered ID against, so just record it.
+    sheet.appendRow([name, studentId, now, now]);
+  } else {
+    var onFile = String(data[matchedRow][1] || '').trim();
+    if (onFile !== '' && onFile !== studentId) {
+      return { ok: false, error: 'incorrect_id' };
+    }
+    var firstSeen = data[matchedRow][2] || now;
+    sheet.getRange(matchedRow + 1, 3, 1, 2).setValues([[firstSeen, now]]);
   }
   return { ok: true, studentKey: studentKey, progress: getProgressForStudent(studentKey, period) };
 }

@@ -116,6 +116,9 @@ async function renderLanding(app) {
         <input type="checkbox" id="use-manual-name"> My name isn't listed
       </label>
       <input type="text" id="input-name-manual" placeholder="Type your full name" style="display:none;">
+      <label>Student ID
+        <input type="password" inputmode="numeric" autocomplete="off" id="input-student-id" required placeholder="Enter your student ID number">
+      </label>
       <button type="submit" class="button">Enter Lab →</button>
     </form>
     <p id="identify-status" class="muted"></p>
@@ -150,9 +153,19 @@ async function renderLanding(app) {
     e.preventDefault();
     const period = periodSelect.value;
     const name = manualCheckbox.checked ? manualInput.value.trim() : nameSelect.value;
-    if (!name || !period) return;
-    $('#identify-status', body).textContent = 'Entering the lab...';
-    await Storage.identify(name, period);
+    const studentId = $('#input-student-id', body).value.trim();
+    if (!name || !period || !studentId) return;
+    const statusEl = $('#identify-status', body);
+    statusEl.className = 'muted';
+    statusEl.textContent = 'Entering the lab...';
+    const result = await Storage.identify(name, period, studentId);
+    if (!result.ok) {
+      statusEl.className = 'status-error';
+      statusEl.textContent = result.error === 'incorrect_id'
+        ? "That student ID doesn't match. Please try again."
+        : 'Something went wrong. Please try again.';
+      return;
+    }
     State.view = 'dashboard';
     render();
   });
