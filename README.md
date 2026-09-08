@@ -116,5 +116,16 @@ You don't need to write any code yourself — just describe the content
 - Picking a period/name on first visit requires a live connection (it reads
   the roster from the Sheet). Once identified, answering questions and
   resuming activities still works offline and syncs when back online.
+- The backend is deployed to run "as Me," so **every student's request
+  counts against your single Google account's quota**, including how many
+  requests can run at the exact same instant (roughly the size of one full
+  class). If a whole class opens the link within the same few seconds, some
+  requests can get rejected outright. The site automatically retries a
+  rejected request a few times before showing an error, and caches the
+  period list and rosters locally so repeat page loads don't add to the
+  load — this should absorb a normal class-opening burst, but if it keeps
+  happening with larger classes, the real fix is a backend that scales
+  per-request instead of per-account (e.g. Firebase) rather than tuning
+  this further.
 - The "report" is the Google Sheet itself; there's no in-site teacher
   dashboard yet. Open the Sheet, use filters/pivot tables as needed.

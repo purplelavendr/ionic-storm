@@ -94,7 +94,11 @@ async function renderLanding(app) {
   const periodsRes = await Storage.getPeriods();
   if (State.view !== 'landing') return; // student navigated away while loading
   if (!periodsRes.ok || !periodsRes.periods || !periodsRes.periods.length) {
-    body.innerHTML = `<p class="feedback incorrect">Couldn't load the class list. Check your connection and reload the page, or ask your teacher to check the site setup.</p>`;
+    body.innerHTML = `
+      <p class="feedback incorrect">Couldn't load the class list. This can happen for a moment if a lot of classmates are signing in at once.</p>
+      <button type="button" class="button" id="retry-periods-btn">Try Again</button>
+    `;
+    $('#retry-periods-btn', body).addEventListener('click', () => render());
     return;
   }
 
@@ -133,7 +137,11 @@ async function renderLanding(app) {
     nameSelect.disabled = true;
     nameSelect.innerHTML = `<option value="" disabled selected>Loading names...</option>`;
     const res = await Storage.getRoster(periodSelect.value);
-    const names = (res.ok && res.names) ? res.names.slice().sort() : [];
+    if (!res.ok) {
+      nameSelect.innerHTML = `<option value="" disabled selected>Couldn't load names -- reselect your period to try again</option>`;
+      return;
+    }
+    const names = (res.names || []).slice().sort();
     nameSelect.innerHTML = `
       <option value="" disabled selected>Choose your name...</option>
       ${names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}

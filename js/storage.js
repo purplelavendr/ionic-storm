@@ -9,6 +9,36 @@ function normalizeKeyLocal(name, period) {
   return (name.trim().toLowerCase() + '|' + period.trim().toLowerCase()).replace(/\s+/g, ' ');
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Tiny localStorage cache with a TTL, used to avoid re-hitting the backend
+// for data that barely changes (periods, rosters) -- this is what keeps a
+// whole class reloading the page from re-triggering a fresh burst of
+// requests every time.
+function cacheGet(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { value, expiresAt } = JSON.parse(raw);
+    if (Date.now() > expiresAt) return null;
+    return value;
+  } catch (e) {
+    return null;
+  }
+}
+function cacheSet(key, value, ttlMs) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ value, expiresAt: Date.now() + ttlMs }));
+  } catch (e) {
+    // localStorage full or unavailable -- just skip caching, not fatal.
+  }
+}
+
+const CACHE_TTL_PERIODS_MS = 20 * 60 * 1000;
+const CACHE_TTL_ROSTER_MS = 10 * 60 * 1000;
+
 const StorageKeys = {
   STUDENT: 'ionicstorm_student_v1',
   PROGRESS: 'ionicstorm_progress_v1',
@@ -72,23 +102,36 @@ const Storage = {
   },
 
   // networkError marks a request that never reached the server (offline, DNS,
-  // etc.) as opposed to a response the server deliberately sent back with
-  // ok:false (e.g. a wrong student ID) -- callers need to tell those apart.
-  async apiPost(action, payload) {
+  // a rejected connection because the backend hit its concurrent-request
+  // ceiling, etc.) as opposed to a response the server deliberately sent
+  // back with ok:false (e.g. a wrong student ID) -- callers need to tell
+  // those apart. Network-level failures are retried a few times with
+  // backoff+jitter before giving up, since they're usually transient (the
+  // whole class hitting the backend in the same few seconds at the start of
+  // class is the classic case) -- a deliberate ok:false from the server is
+  // never retried, since retrying can't change that answer.
+  async apiPost(action, payload, attempts = 3) {
     if (!CONFIG.appsScriptUrl) {
       return { ok: false, error: 'not configured', networkError: true };
     }
-    try {
-      const res = await fetch(CONFIG.appsScriptUrl, {
-        method: 'POST',
-        // text/plain avoids a CORS preflight, which Apps Script web apps don't handle.
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(Object.assign({ action }, payload))
-      });
-      return await res.json();
-    } catch (err) {
-      return { ok: false, error: String(err), networkError: true };
+    let lastErr;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      try {
+        const res = await fetch(CONFIG.appsScriptUrl, {
+          method: 'POST',
+          // text/plain avoids a CORS preflight, which Apps Script web apps don't handle.
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(Object.assign({ action }, payload))
+        });
+        return await res.json();
+      } catch (err) {
+        lastErr = err;
+        if (attempt < attempts - 1) {
+          await sleep(350 * Math.pow(2, attempt) + Math.random() * 250);
+        }
+      }
     }
+    return { ok: false, error: String(lastErr), networkError: true };
   },
 
   // Returns { ok, student } on success, or { ok: false, error } on a genuine
@@ -151,10 +194,20 @@ const Storage = {
   },
 
   async getPeriods() {
-    return this.apiPost('getPeriods', {});
+    const cacheKey = 'ionicstorm_cache_periods';
+    const cached = cacheGet(cacheKey);
+    if (cached) return { ok: true, periods: cached };
+    const res = await this.apiPost('getPeriods', {});
+    if (res.ok) cacheSet(cacheKey, res.periods, CACHE_TTL_PERIODS_MS);
+    return res;
   },
 
   async getRoster(period) {
-    return this.apiPost('getRoster', { period });
+    const cacheKey = 'ionicstorm_cache_roster_' + period;
+    const cached = cacheGet(cacheKey);
+    if (cached) return { ok: true, names: cached };
+    const res = await this.apiPost('getRoster', { period });
+    if (res.ok) cacheSet(cacheKey, res.names, CACHE_TTL_ROSTER_MS);
+    return res;
   }
 };
