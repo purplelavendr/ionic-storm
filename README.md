@@ -75,7 +75,7 @@ everything, backend and frontend both. GitHub Pages still exists as a
 mirror (its code auto-updates on every push) but isn't the link in use.
 
 The Apps Script HTML files (`Index`, `Styles`, `ConfigJs`, `ContentJs`,
-`StorageJs`, `MatterReviewJs`, `AtomsReviewJs`, `AppJs`) are a generated
+`StorageJs`, `MatterReviewJs`, `AppJs`) are a generated
 bundle of `index.html` + `css/styles.css` + every `js/*.js` file, built by
 `apps-script/build.py`. **They do not auto-update** — pushing to GitHub has
 no effect on them, since they're static files pasted into the Apps Script

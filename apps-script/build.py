@@ -36,7 +36,6 @@ JS_FILES = [
     ('ContentJs.html', 'js/content.js'),
     ('StorageJs.html', 'js/storage.js'),
     ('MatterReviewJs.html', 'js/activities/matter-review.js'),
-    ('AtomsReviewJs.html', 'js/activities/atoms-review.js'),
     ('AppJs.html', 'js/app.js'),
 ]
 
@@ -70,7 +69,6 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <?!= include('ContentJs'); ?>
   <?!= include('StorageJs'); ?>
   <?!= include('MatterReviewJs'); ?>
-  <?!= include('AtomsReviewJs'); ?>
   <?!= include('AppJs'); ?>
 </body>
 </html>
