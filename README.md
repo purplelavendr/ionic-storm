@@ -132,22 +132,24 @@ to this PhET simulation for gas laws" — and I'll:
 1. Add the unit/activity to `js/content.js`, and write a new file under
    `js/activities/` for a built-in review (a linked simulation just needs
    an entry with its URL, no new file).
-2. Commit and push — this updates the GitHub Pages mirror automatically,
-   and keeps the repo as the source of truth.
-3. Run `apps-script/build.py` to regenerate the Apps Script HTML bundle,
-   and tell you exactly which of the 8 files actually changed (usually
-   just `ContentJs` plus one activity file).
-4. Give you the `pbcopy` command for each changed file, ready to paste into
-   the Apps Script editor.
+2. Commit and push — this updates the GitHub Pages mirror automatically.
+3. Run `python3 apps-script/build.py --deploy`, which regenerates the Apps
+   Script bundle, pushes it to the Apps Script project, and rolls out a new
+   version of the *live* deployment — same URL, nothing for you to paste.
 
-You still only need to: paste each changed file into its matching Apps
-Script file, save, then **Deploy > Manage deployments > pencil icon > New
-version > Deploy**. That last part — getting the update from your machine
-into the Apps Script editor — is the one step that can't be automated away;
-everything else I handle.
+You don't need to do anything or write any code yourself — just describe
+the content (topics, questions and answers, or the link) and I'll build
+and deploy it, live within a minute or two.
 
-You don't need to write any code yourself — just describe the content
-(topics, questions and answers, or the link) and I'll build it.
+**How the deploy automation works** (`clasp`, Google's Apps Script CLI,
+set up once): `apps-script/.clasp.json` points at the project's script ID;
+authentication lives in `~/.clasprc.json` on this machine, outside the
+repo, from `clasp login`. `apps-script/build.py --deploy` runs `clasp push`
+(sync files to the project) then `clasp deploy --deploymentId <id>` (roll
+the live deployment to a new version) — the deployment ID is hardcoded in
+`build.py` so it always updates the same URL rather than creating a new
+one. If this is ever set up on a different machine, `clasp login` needs to
+be re-run there.
 
 ## Known limitations (v1)
 

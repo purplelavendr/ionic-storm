@@ -10,14 +10,22 @@ the backend can route around that kind of block entirely.
 
 Run this after editing index.html, css/styles.css, or any js/*.js file:
 
-    python3 apps-script/build.py
+    python3 apps-script/build.py --deploy
 
-Then paste the contents of every generated file below into the matching
-file in the Apps Script editor (create any that don't exist yet), save, and
-redeploy (Deploy > Manage deployments > pencil icon > New version). Code.gs
-is hand-maintained, not generated -- this script never touches it.
+--deploy additionally pushes the regenerated files to the Apps Script
+project and rolls out a new version of the LIVE deployment (same URL,
+same DEPLOYMENT_ID below) via `clasp`, so an update goes out with one
+command and no manual copy/paste. Omit --deploy to just regenerate the
+files locally without touching the live site. `clasp login` (one-time)
+must already be done. Code.gs is hand-maintained, not generated -- this
+script never touches it, but --deploy still pushes it along with
+everything else, so edit it directly when it needs to change.
 """
+import subprocess
+import sys
 from pathlib import Path
+
+DEPLOYMENT_ID = 'AKfycbwAFlUrS72L4b6bR5rNr-RVdFXzLiZ7dqhJ8QevUVuyr5fktTRBymZ8vQI2EfxsJ2fxbQ'
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(__file__).resolve().parent
@@ -74,6 +82,17 @@ def write(name, content):
     print(f"wrote apps-script/{name} ({len(content)} bytes)")
 
 
+def deploy():
+    print("\nPushing to Apps Script...")
+    subprocess.run(['clasp', 'push', '--force'], cwd=OUT, check=True)
+    print("\nDeploying new version to the live URL...")
+    subprocess.run(
+        ['clasp', 'deploy', '--deploymentId', DEPLOYMENT_ID, '--description', 'build.py --deploy'],
+        cwd=OUT, check=True
+    )
+    print("\nLive at the usual /exec URL.")
+
+
 def main():
     styles = (ROOT / 'css/styles.css').read_text()
     write('Styles.html', f"<style>\n{styles}\n</style>")
@@ -85,6 +104,9 @@ def main():
         write(out_name, f"<script>\n{content}\n</script>")
 
     write('Index.html', INDEX_TEMPLATE)
+
+    if '--deploy' in sys.argv:
+        deploy()
 
 
 if __name__ == '__main__':
