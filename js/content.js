@@ -43,5 +43,21 @@ const CONTENT = {
         }
       ]
     }
+    // NOT LIVE YET -- built and ready, holding for a later publish date.
+    // Uncomment this unit (and redeploy) whenever it's ready for students:
+    // {
+    //   id: 'mini-math-unit',
+    //   title: 'Mini-Math Unit',
+    //   description: 'A standalone algebra refresher on cross-multiplying and dividing, applied to density.',
+    //   activities: [
+    //     {
+    //       id: 'cross-multiply-density',
+    //       type: 'review',
+    //       title: 'Density & Cross-Multiplying Practice',
+    //       description: 'Practice cross-multiplying and dividing to solve density problems (D = m/V) with step-by-step drag-and-drop, worked practice, and a graded check.',
+    //       estimatedMinutes: 38
+    //     }
+    //   ]
+    // }
   ]
 };
