@@ -4,7 +4,12 @@ A landing page for students to complete built-in reviews and linked simulations,
 with progress saved so they can pick up where they left off, and reported back
 to you in a Google Sheet.
 
-Live site: [https://purplelavendr.github.io/ionic-storm/](https://purplelavendr.github.io/ionic-storm/)
+Live site: the Apps Script URL ending in `/exec` (the same one in
+`js/config.js`) — this is the link to give students. A GitHub Pages
+mirror also exists at
+[https://purplelavendr.github.io/ionic-storm/](https://purplelavendr.github.io/ionic-storm/)
+but isn't currently used, since some school network filters block
+`github.io` while trusting Google's own domains. See "Hosting" below.
 
 ## How it works
 
@@ -58,38 +63,24 @@ deployments > Edit (pencil icon) > New version** rather than creating a
 brand-new deployment — that keeps the same URL so you don't have to update
 `config.js` again.
 
-## Alternate link if the GitHub Pages link is blocked at school
+## Why the site is served from script.google.com, not GitHub Pages
 
 Some school network filters block or intermittently fail on `github.io`
 while already trusting `google.com` / `googleusercontent.com`, since
-Workspace (Sheets, Docs, Classroom) depends on those domains working. If
-students get a blank page or a connection-reset error on the GitHub Pages
-link, the *same* Apps Script Web App you already deployed can also serve
-the entire site directly, as a second link that's much more likely to get
-through a school filter.
+Workspace (Sheets, Docs, Classroom) depends on those domains working. That
+turned out to be exactly what was happening to this class, so the *same*
+Apps Script Web App that already runs the progress backend also serves the
+entire site directly (`doGet` in `Code.gs`) — one Google-trusted URL for
+everything, backend and frontend both. GitHub Pages still exists as a
+mirror (its code auto-updates on every push) but isn't the link in use.
 
-**One-time setup:**
-
-1. In the Apps Script editor (the same project as before), for each of
-   these files: click the **+** next to "Files" > **HTML** > name it
-   *exactly* as shown (no `.html` — Apps Script adds that) > paste in the
-   matching file's contents from the `apps-script/` folder in this project
-   > save.
-   - `Index`, `Styles`, `ConfigJs`, `ContentJs`, `StorageJs`,
-     `MatterReviewJs`, `AtomsReviewJs`, `AppJs`
-2. Also replace `Code.gs` with the current version from
-   [`apps-script/Code.gs`](apps-script/Code.gs) (it now has a `doGet` that
-   serves the page, in addition to the existing API).
-3. **Deploy > Manage deployments > pencil icon > New version > Deploy.**
-4. Visit the *same* Web App URL you already have (the one ending in
-   `/exec`) directly in a browser — it should now show the site itself
-   instead of a JSON message. That URL is the alternate link to give
-   students whose network is blocking the GitHub Pages one.
-
-**Keeping it in sync:** whenever I add new content (a new review, a new
-unit), those `apps-script/*.html` files need regenerating from the current
-site files. Just ask me to update it, or run `python3 apps-script/build.py`
-yourself and repeat step 1 above with the files it prints.
+The Apps Script HTML files (`Index`, `Styles`, `ConfigJs`, `ContentJs`,
+`StorageJs`, `MatterReviewJs`, `AtomsReviewJs`, `AppJs`) are a generated
+bundle of `index.html` + `css/styles.css` + every `js/*.js` file, built by
+`apps-script/build.py`. **They do not auto-update** — pushing to GitHub has
+no effect on them, since they're static files pasted into the Apps Script
+editor. See "Adding new units, reviews, and simulations" below for how
+updates now work.
 
 ## Managing class rosters
 
@@ -117,11 +108,20 @@ filling in ID numbers for a roster, so nobody's locked out mid-rollout.
 Once redeployed, students can already sign in with an empty StudentID
 column; add the real numbers whenever you get to them.
 
-## Hosting (GitHub Pages)
+## Hosting
 
-Already set up — the site deploys automatically from the `main` branch to
+**Primary (in use): Apps Script.** The Web App URL ending in `/exec` serves
+the whole site — this is the link students use. Updating it after a
+content change means regenerating the bundle and pasting it into the Apps
+Script editor (see below); there's no way around that manual step, since
+Apps Script has no equivalent of "push to deploy."
+
+**Mirror (not in use): GitHub Pages.** `main` still auto-deploys to
 [https://purplelavendr.github.io/ionic-storm/](https://purplelavendr.github.io/ionic-storm/)
-a minute or two after any push.
+on every push, at no extra effort — it's just not the link being handed to
+students right now. Worth keeping around in case a future network/filter
+situation makes it useful again, or as a place to preview a change before
+it goes out to the Apps Script link.
 
 ## Adding new units, reviews, and simulations
 
@@ -129,13 +129,22 @@ Just tell me (Claude) what you want to add — e.g. "add a new unit on
 chemical bonding with a review on ionic vs. covalent bonds" or "add a link
 to this PhET simulation for gas laws" — and I'll:
 
-- Add the unit/activity to `js/content.js`.
-- For a new built-in review, write a new file under `js/activities/`
-  (following the pattern in `atoms-review.js`) with your questions.
-- For a linked simulation, just add an entry with its URL — no new file
-  needed.
-- Commit and push the update; GitHub Pages picks it up automatically within
-  a minute or two.
+1. Add the unit/activity to `js/content.js`, and write a new file under
+   `js/activities/` for a built-in review (a linked simulation just needs
+   an entry with its URL, no new file).
+2. Commit and push — this updates the GitHub Pages mirror automatically,
+   and keeps the repo as the source of truth.
+3. Run `apps-script/build.py` to regenerate the Apps Script HTML bundle,
+   and tell you exactly which of the 8 files actually changed (usually
+   just `ContentJs` plus one activity file).
+4. Give you the `pbcopy` command for each changed file, ready to paste into
+   the Apps Script editor.
+
+You still only need to: paste each changed file into its matching Apps
+Script file, save, then **Deploy > Manage deployments > pencil icon > New
+version > Deploy**. That last part — getting the update from your machine
+into the Apps Script editor — is the one step that can't be automated away;
+everything else I handle.
 
 You don't need to write any code yourself — just describe the content
 (topics, questions and answers, or the link) and I'll build it.
