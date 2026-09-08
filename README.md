@@ -58,6 +58,39 @@ deployments > Edit (pencil icon) > New version** rather than creating a
 brand-new deployment — that keeps the same URL so you don't have to update
 `config.js` again.
 
+## Alternate link if the GitHub Pages link is blocked at school
+
+Some school network filters block or intermittently fail on `github.io`
+while already trusting `google.com` / `googleusercontent.com`, since
+Workspace (Sheets, Docs, Classroom) depends on those domains working. If
+students get a blank page or a connection-reset error on the GitHub Pages
+link, the *same* Apps Script Web App you already deployed can also serve
+the entire site directly, as a second link that's much more likely to get
+through a school filter.
+
+**One-time setup:**
+
+1. In the Apps Script editor (the same project as before), for each of
+   these files: click the **+** next to "Files" > **HTML** > name it
+   *exactly* as shown (no `.html` — Apps Script adds that) > paste in the
+   matching file's contents from the `apps-script/` folder in this project
+   > save.
+   - `Index`, `Styles`, `ConfigJs`, `ContentJs`, `StorageJs`,
+     `MatterReviewJs`, `AtomsReviewJs`, `AppJs`
+2. Also replace `Code.gs` with the current version from
+   [`apps-script/Code.gs`](apps-script/Code.gs) (it now has a `doGet` that
+   serves the page, in addition to the existing API).
+3. **Deploy > Manage deployments > pencil icon > New version > Deploy.**
+4. Visit the *same* Web App URL you already have (the one ending in
+   `/exec`) directly in a browser — it should now show the site itself
+   instead of a JSON message. That URL is the alternate link to give
+   students whose network is blocking the GitHub Pages one.
+
+**Keeping it in sync:** whenever I add new content (a new review, a new
+unit), those `apps-script/*.html` files need regenerating from the current
+site files. Just ask me to update it, or run `python3 apps-script/build.py`
+yourself and repeat step 1 above with the files it prints.
+
 ## Managing class rosters
 
 Each class period gets two sheet tabs:

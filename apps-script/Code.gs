@@ -2,6 +2,13 @@
 // attached to your Google Sheet (Extensions -> Apps Script), then deploy it
 // as a Web App. See README.md for exact steps.
 //
+// This same Web App also serves the ENTIRE frontend (doGet, below) --
+// Index.html and the other .html files in this folder are a generated
+// bundle of the site (see build.py) -- so the whole app lives on
+// script.google.com, not just the JSON API. That matters because some
+// school network filters block/degrade github.io while already trusting
+// google.com / googleusercontent.com domains.
+//
 // Sheet layout (per class period):
 //   "Roster - <Period>"   columns: Name, StudentID, FirstSeen, LastSeen
 //   "Progress - <Period>" columns: StudentKey, Name, UnitId, ActivityId,
@@ -52,13 +59,24 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  var body = {
-    ok: true,
-    message: 'Ionic Storm backend is running. This endpoint accepts POST requests only.'
-  };
-  return ContentService
-    .createTextOutput(JSON.stringify(body))
-    .setMimeType(ContentService.MimeType.JSON);
+  // ?ping=1 keeps the old plain JSON health check available for quick
+  // debugging (e.g. pasting the URL straight into a browser with that
+  // param); every other GET serves the app itself.
+  if (e && e.parameter && e.parameter.ping) {
+    var body = { ok: true, message: 'Ionic Storm backend is running.' };
+    return ContentService
+      .createTextOutput(JSON.stringify(body))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('Ionic Storm');
+}
+
+// Used by Index.html's <?!= include('Name'); ?> scriptlets to pull in the
+// other generated .html files (styles, and each JS file) as one page.
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 function rosterSheetName(period) { return ROSTER_PREFIX + period; }
