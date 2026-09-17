@@ -1,0 +1,1025 @@
+<script>
+// "Chapter 2 Review: Basic Building Materials" (registered as CONTENT activity id
+// 'elements-review'). Same accordion + graded-quiz shape as matter-review.js:
+// concept -> analogy -> practice with hints, ending in a graded "Check for
+// Understanding" quiz. Only the quiz's score is saved via ctx.saveProgress.
+(function () {
+  const QUESTIONS = [
+    {
+      id: 'q1', type: 'mc',
+      prompt: 'What is an element?',
+      choices: [
+        'A pure substance that cannot be broken down into simpler substances through chemical processes',
+        'Any substance made of two or more materials mixed together',
+        'A substance that is always a gas at room temperature',
+        'Any chemical formula with a subscript in it'
+      ],
+      correct: 0,
+      explanation: 'An element is a unique substance that can’t be broken down further through chemical processes — the building materials of all matter.'
+    },
+    {
+      id: 'q2', type: 'mc',
+      prompt: 'What is a compound?',
+      choices: [
+        'Another name for an element',
+        'A pure substance that is a chemical combination of two or more elements in a fixed ratio',
+        'Any liquid mixture',
+        'A substance with only one atom'
+      ],
+      correct: 1,
+      explanation: 'A compound is two or more elements chemically combined in a fixed ratio, represented by a chemical formula.'
+    },
+    {
+      id: 'q3', type: 'mc',
+      prompt: 'Based on its formula alone, which of these is an element?',
+      choices: ['H₂O', 'NaCl', 'Mn', 'CO₂'],
+      correct: 2,
+      explanation: 'Mn (manganese) is a single chemical symbol — no other elements combined with it — so it’s an element, not a compound.'
+    },
+    {
+      id: 'q4', type: 'mc',
+      prompt: 'How should a two-letter chemical symbol be written?',
+      choices: [
+        'Both letters uppercase',
+        'Both letters lowercase',
+        'First letter uppercase, second letter lowercase',
+        'First letter lowercase, second letter uppercase'
+      ],
+      correct: 2,
+      explanation: 'Chemical symbols always capitalize only the first letter — e.g. Zn, not ZN or zn.'
+    },
+    {
+      id: 'q5', type: 'mc',
+      prompt: 'What does the label (aq) mean on a chemical formula?',
+      choices: [
+        'The substance is a gas',
+        'The substance is dissolved in water',
+        'The substance is radioactive',
+        'The substance is a solid crystal'
+      ],
+      correct: 1,
+      explanation: '(aq) stands for "aqueous" — the substance is dissolved in water.'
+    },
+    {
+      id: 'q6', type: 'mc',
+      prompt: 'A bottle is labeled MgCl₂(aq). What should you expect to find inside?',
+      choices: [
+        'A clear, colorless gas',
+        'Dry crystals or powder, not dissolved in anything',
+        'The compound dissolved in water — a liquid solution',
+        'A solid block of magnesium metal'
+      ],
+      correct: 2,
+      explanation: 'The (aq) tells you it’s aqueous — dissolved in water — so you’d see a liquid solution, not dry crystals.'
+    },
+    {
+      id: 'q7', type: 'mc',
+      prompt: 'What is the Law of Conservation of Mass?',
+      choices: [
+        'Mass increases every time a chemical reaction happens',
+        'Mass cannot be created or destroyed in a chemical reaction',
+        'Mass and volume are always equal',
+        'Only gases have mass during a reaction'
+      ],
+      correct: 1,
+      explanation: 'The Law of Conservation of Mass states that matter (and its mass) cannot be created or destroyed in a chemical reaction — only rearranged.'
+    },
+    {
+      id: 'q8', type: 'mc',
+      prompt: 'In the copper cycle lab, copper changed color and form several times, but its mass at the end was about the same as at the start. What does this show?',
+      choices: [
+        'Copper was destroyed and a new element was created',
+        'Copper can combine and recombine into different compounds without being created or destroyed',
+        'The scale was broken',
+        'Copper turned into gold'
+      ],
+      correct: 1,
+      explanation: 'Elements combine and recombine during chemical changes, but they are not created or destroyed — evidence for the law of conservation of mass.'
+    },
+    {
+      id: 'q9', type: 'mc',
+      prompt: 'KI(aq) is added to Pb(NO₃)₂(aq). The reaction produces KNO₃(aq) and a new solid. Which is most likely the solid product?',
+      choices: [
+        'KI(aq), since it was one of the starting substances',
+        'Pb(NO₃)₂(aq), since it was one of the starting substances',
+        'A new compound formed from the reactants, appearing as a solid — like PbI₂(s)',
+        'KNO₃(aq), since a reaction happened'
+      ],
+      correct: 2,
+      explanation: 'A solid forming out of two dissolved (aq) solutions means a brand-new, insoluble compound formed — here, PbI₂(s). The reactants themselves are listed as (aq), not (s).'
+    },
+    {
+      id: 'q10', type: 'mc',
+      prompt: 'Mendeleev organized his periodic table based on which two properties?',
+      choices: [
+        'Color and smell',
+        'Reactivity and atomic mass',
+        'Melting point and price',
+        'Alphabetical order'
+      ],
+      correct: 1,
+      explanation: 'Mendeleev arranged elements by reactivity and atomic mass — an arrangement that even predicted undiscovered elements.'
+    },
+    {
+      id: 'q11', type: 'mc',
+      prompt: 'What is atomic mass?',
+      choices: [
+        'The number of protons in an atom',
+        'The mass of a single atom (or isotope) of an element',
+        'The number of elements in a compound',
+        'The temperature at which an element melts'
+      ],
+      correct: 1,
+      explanation: 'Atomic mass is the mass of a single atom (or isotope) of an element, usually shown as a decimal on the periodic table.'
+    },
+    {
+      id: 'q12', type: 'mc',
+      prompt: 'What is atomic number?',
+      choices: [
+        'The number of protons in an atom’s nucleus',
+        'The mass of the whole atom',
+        'The number of compounds an element can form',
+        'The group number on the periodic table'
+      ],
+      correct: 0,
+      explanation: 'Atomic number equals the number of protons in an atom’s nucleus — it’s what an element’s identity is based on.'
+    },
+    {
+      id: 'q13', type: 'mc',
+      prompt: 'A vertical column on the periodic table is called a:',
+      choices: ['Period', 'Group', 'Phase', 'Family reunion'],
+      correct: 1,
+      explanation: 'A vertical column is a group — elements in the same group share similar properties.'
+    },
+    {
+      id: 'q14', type: 'mc',
+      prompt: 'A horizontal row on the periodic table is called a:',
+      choices: ['Group', 'Period', 'Series', 'Column'],
+      correct: 1,
+      explanation: 'A horizontal row is a period.'
+    },
+    {
+      id: 'q15', type: 'mc',
+      prompt: 'The elements in Group 7A are called the:',
+      choices: ['Alkali metals', 'Alkaline earth metals', 'Halogens', 'Noble gases'],
+      correct: 2,
+      explanation: 'Group 7A elements are the halogens.'
+    },
+    {
+      id: 'q16', type: 'mc',
+      prompt: 'The elements in Group 8A are called the noble gases. Why "noble"?',
+      choices: [
+        'They are the heaviest elements',
+        'They are not reactive',
+        'They were discovered by royalty',
+        'They are only found in outer space'
+      ],
+      correct: 1,
+      explanation: 'They’re called "noble" gases because they are not reactive — they don’t readily combine with other elements.'
+    },
+    {
+      id: 'q17', type: 'mc',
+      prompt: 'Where are metalloids found on the periodic table?',
+      choices: [
+        'Scattered randomly throughout',
+        'Only in the two bottom rows (lanthanides and actinides)',
+        'Along the stair-step line, between the metals and nonmetals',
+        'Only in Group 1A'
+      ],
+      correct: 2,
+      explanation: 'Metalloids sit along the stair-step line, with properties between metals and nonmetals.'
+    }
+  ];
+
+  const STYLE_ID = 'el-lesson-styles';
+  const FONT_LINK_ID = 'el-lesson-fonts';
+  const SECTION_COUNT = 7; // sections 0-6 (6 content sections + the graded quiz)
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.el-lesson {
+  --navy: #0d1b2a;
+  --navy-mid: #1b2d42;
+  --navy-light: #253a52;
+  --teal: #2ec4b6;
+  --teal-dim: #1a8c83;
+  --amber: #f4a261;
+  --cream: #f7f3ec;
+  --cream-dark: #ede8df;
+  --text: #1a1a2e;
+  --text-muted: #5a6475;
+  --note-bg: #fff8e7;
+  --note-border: #f4a261;
+  --correct-bg: #e8f8f5;
+  --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.7;
+  background: var(--cream);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.el-lesson * { box-sizing: border-box; }
+.el-lesson .el-header {
+  background: var(--navy);
+  color: var(--cream);
+  padding: 2rem 1.75rem 1.6rem;
+  position: relative;
+  overflow: hidden;
+}
+.el-lesson .el-header::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  border: 32px solid rgba(46,196,182,0.12);
+}
+.el-lesson .el-header-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 0.5rem;
+  position: relative;
+}
+.el-lesson .el-header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 0.4rem;
+  position: relative;
+}
+.el-lesson .el-header-meta {
+  font-size: 0.82rem;
+  color: rgba(247,243,236,0.65);
+  font-family: 'JetBrains Mono', monospace;
+  position: relative;
+}
+.el-lesson .el-progress-wrap {
+  background: var(--navy-mid);
+  padding: 0.7rem 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.el-lesson .el-progress-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.el-lesson .el-progress-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.el-lesson .el-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), var(--amber));
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+.el-lesson .el-progress-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: rgba(247,243,236,0.55);
+  white-space: nowrap;
+}
+.el-lesson main {
+  padding: 1.5rem 1.25rem 2.5rem;
+}
+.el-lesson .section-card {
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 1.1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.el-lesson .section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.2rem;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+}
+.el-lesson .section-header:hover { background: #fafafa; }
+.el-lesson .section-header.open { border-bottom-color: var(--cream-dark); }
+.el-lesson .section-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  background: var(--navy);
+  border-radius: 6px;
+  padding: 0.22rem 0.5rem;
+  flex-shrink: 0;
+}
+.el-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.el-lesson .section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  flex: 1;
+}
+.el-lesson .section-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.el-lesson .section-arrow {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  transition: transform 0.25s;
+  flex-shrink: 0;
+}
+.el-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.el-lesson .section-body { display: none; padding: 1.3rem; }
+.el-lesson .section-body.open { display: block; animation: elFadeIn 0.25s ease; }
+@keyframes elFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.el-lesson h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem;
+  color: var(--navy);
+  margin: 0 0 0.6rem;
+}
+.el-lesson h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--navy-mid);
+  margin: 1.1rem 0 0.5rem;
+}
+.el-lesson p { margin: 0 0 0.85rem; }
+.el-lesson p:last-child { margin-bottom: 0; }
+.el-lesson .note-box {
+  background: var(--note-bg);
+  border-left: 4px solid var(--note-border);
+  border-radius: 0 8px 8px 0;
+  padding: 0.9rem 1.1rem;
+  margin: 1.1rem 0;
+  display: flex;
+  gap: 0.7rem;
+  font-size: 0.9rem;
+}
+.el-lesson .note-box .note-icon { font-size: 1.15rem; flex-shrink: 0; }
+.el-lesson .concept-box {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+  color: var(--cream);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin: 1.1rem 0;
+}
+.el-lesson .concept-box .concept-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--teal);
+  margin-bottom: 0.4rem;
+}
+.el-lesson .concept-box p { color: rgba(247,243,236,0.92); margin-bottom: 0; }
+.el-lesson .info-panel {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  margin: 1.1rem 0;
+  font-size: 0.9rem;
+}
+.el-lesson .info-panel .panel-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #0369a1;
+  margin-bottom: 0.35rem;
+}
+.el-lesson table { width: 100%; border-collapse: collapse; margin: 0.9rem 0; font-size: 0.85rem; }
+.el-lesson th {
+  background: var(--navy);
+  color: var(--cream);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+.el-lesson td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cream-dark); }
+.el-lesson tr:nth-child(even) td { background: #fafafa; }
+.el-lesson ul, .el-lesson ol { padding-left: 1.3rem; margin: 0 0 0.85rem; }
+.el-lesson li { margin-bottom: 0.3rem; font-size: 0.93rem; }
+.el-lesson .objectives-list { list-style: none; padding: 0; margin: 0.4rem 0; }
+.el-lesson .objectives-list li {
+  display: flex; align-items: flex-start; gap: 0.55rem;
+  padding: 0.4rem 0; font-size: 0.92rem;
+  border-bottom: 1px solid var(--cream-dark);
+}
+.el-lesson .objectives-list li:last-child { border-bottom: none; }
+.el-lesson .obj-check { color: var(--teal); flex-shrink: 0; }
+.el-lesson .practice-problem {
+  border: 1.5px solid var(--cream-dark);
+  border-radius: 10px;
+  margin-bottom: 1.1rem;
+  overflow: hidden;
+}
+.el-lesson .pp-header {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.85rem 1.1rem;
+  background: #fafafa;
+  border-bottom: 1px solid var(--cream-dark);
+}
+.el-lesson .pp-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; font-weight: 700; color: white;
+  background: var(--amber);
+  border-radius: 6px; padding: 0.18rem 0.45rem; flex-shrink: 0;
+}
+.el-lesson .pp-difficulty {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+  margin-left: auto;
+}
+.el-lesson .diff-basic { color: #16a34a; }
+.el-lesson .diff-medium { color: #d97706; }
+.el-lesson .diff-challenge { color: #dc2626; }
+.el-lesson .pp-body { padding: 0.95rem 1.1rem; }
+.el-lesson .pp-body p { font-size: 0.92rem; }
+.el-lesson .hint-btn, .el-lesson .reveal-btn, .el-lesson .mark-done-btn, .el-lesson .el-choice, .el-lesson .el-next-btn, .el-lesson .el-retake-btn {
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  border: none;
+}
+.el-lesson .hint-btn, .el-lesson .reveal-btn {
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.el-lesson .hint-btn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; margin-right: 0.5rem; }
+.el-lesson .hint-btn:hover { background: #fde68a; }
+.el-lesson .reveal-btn { background: var(--navy); color: white; }
+.el-lesson .reveal-btn:hover { background: var(--navy-light); }
+.el-lesson .hint-box, .el-lesson .answer-box {
+  border-radius: 7px; padding: 0.75rem 0.95rem; margin-top: 0.7rem;
+  font-size: 0.87rem; display: none;
+}
+.el-lesson .hint-box.open, .el-lesson .answer-box.open { display: block; animation: elFadeIn 0.2s ease; }
+.el-lesson .hint-box { background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; }
+.el-lesson .answer-box { background: var(--correct-bg); border: 1px solid var(--correct-border); color: #065f46; }
+.el-lesson .answer-box .answer-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim);
+  margin-bottom: 0.35rem; font-weight: 700;
+}
+.el-lesson .mark-done-btn {
+  display: block; width: 100%; margin-top: 1.2rem;
+  background: var(--navy); color: var(--cream);
+  border-radius: 8px; padding: 0.75rem 1rem;
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  transition: background 0.2s;
+}
+.el-lesson .mark-done-btn:hover:not(:disabled) { background: var(--teal-dim); }
+.el-lesson .mark-done-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.el-lesson .quiz-note {
+  background: var(--note-bg);
+  border-left: 4px solid var(--note-border);
+  border-radius: 0 8px 8px 0;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.1rem;
+  font-size: 0.88rem;
+}
+.el-lesson .quiz-progress-bar {
+  height: 6px; background: var(--cream-dark); border-radius: 999px; overflow: hidden; margin: 0.6rem 0 0.9rem;
+}
+.el-lesson .quiz-progress-fill {
+  height: 100%; background: linear-gradient(90deg, var(--navy), var(--teal)); transition: width 0.2s ease;
+}
+.el-lesson .quiz-question-count {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted);
+}
+.el-lesson .quiz-prompt {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem; font-weight: 700; color: var(--navy);
+  margin: 0.5rem 0 1rem;
+}
+.el-lesson .el-choice {
+  display: block; width: 100%; text-align: left;
+  background: white; border: 1.5px solid var(--cream-dark);
+  border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem;
+  font-size: 0.93rem; color: var(--text); font-family: 'Source Serif 4', serif;
+  transition: border-color 0.15s, background 0.15s;
+}
+.el-lesson .el-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.el-lesson .el-choice:disabled { cursor: default; }
+.el-lesson .el-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.el-lesson .el-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.el-lesson .el-feedback {
+  border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600;
+}
+.el-lesson .el-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.el-lesson .el-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.el-lesson .el-next-btn, .el-lesson .el-retake-btn {
+  background: var(--navy); color: white; border-radius: 8px;
+  padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem;
+}
+.el-lesson .el-next-btn:hover, .el-lesson .el-retake-btn:hover { background: var(--navy-light); }
+.el-lesson .el-summary { text-align: center; padding: 1rem 0.5rem; }
+.el-lesson .el-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0;
+}
+.el-lesson .formula-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  background: var(--cream-dark);
+  border-radius: 6px;
+  padding: 0.1rem 0.4rem;
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  // ---- Static lesson content (sections 0-4, ungraded / session-only) ----
+
+  function practiceProblem(idSuffix, prompt, difficulty, hint, answer) {
+    const diffClass = { basic: 'diff-basic', medium: 'diff-medium', challenge: 'diff-challenge' }[difficulty] || 'diff-basic';
+    const diffLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+    return `
+      <div class="practice-problem">
+        <div class="pp-header">
+          <span class="pp-num">Q</span>
+          <span class="pp-difficulty ${diffClass}">● ${escapeHtml(diffLabel)}</span>
+        </div>
+        <div class="pp-body">
+          <p><strong>${prompt}</strong></p>
+          <button type="button" class="hint-btn" data-hint-target="hint-${idSuffix}">💡 Hint</button>
+          <button type="button" class="reveal-btn" data-answer-target="ans-${idSuffix}">Reveal Answer</button>
+          <div class="hint-box" id="hint-${idSuffix}">${hint}</div>
+          <div class="answer-box" id="ans-${idSuffix}">
+            <div class="answer-label">✓ Answer</div>
+            ${answer}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const STATIC_SECTIONS = [
+    {
+      title: 'Before You Begin',
+      time: '2 min',
+      bodyHtml: `
+        <p>This review pulls together <strong>Lessons 6–10</strong> — elements &amp; compounds, chemical phases, conservation of mass, and how the periodic table is organized — to get you ready for <strong>Chapter 2 Quiz A/B</strong>.</p>
+        <p><strong>How this works:</strong></p>
+        <ul>
+          <li>Click a section header to open it and read through the content.</li>
+          <li>Work through each practice problem yourself before clicking <em>Reveal Answer</em>.</li>
+          <li>Click <strong>Mark Complete</strong> at the bottom of each section to move to the next.</li>
+          <li>The last section is a <strong>graded Check for Understanding</strong> — that one saves your score for your teacher.</li>
+        </ul>
+        <p><strong>By the end of this review, you should be able to:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Tell elements apart from compounds using a chemical formula</li>
+          <li><span class="obj-check">◎</span> Explain what (s), (l), (g), and (aq) mean on a formula</li>
+          <li><span class="obj-check">◎</span> Use the law of conservation of mass to reason about a chemical reaction's products</li>
+          <li><span class="obj-check">◎</span> Explain how the periodic table is organized, and what atomic number and atomic mass mean</li>
+          <li><span class="obj-check">◎</span> Identify metals, nonmetals, metalloids, and key element families</li>
+        </ul>`
+    },
+    {
+      title: 'Elements, Compounds & Chemical Formulas',
+      time: '7 min',
+      bodyHtml: `
+        <h2>The Language of Chemistry</h2>
+        <p>All matter in the universe is either an element, or made of some combination of elements.</p>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Element</strong>: a unique substance that cannot be broken down into simpler substances through chemical processes. Elements are the building materials of all matter.</p>
+        </div>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Compound</strong>: a pure substance that is a chemical combination of two or more elements in a fixed ratio, written as a <em>chemical formula</em> — symbols and subscripts that show which elements are present and in what amounts.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">✍️ Symbol Rule</div>
+          <p>A chemical symbol's first letter is always <strong>uppercase</strong>; a second letter (if there is one) is always <strong>lowercase</strong> — <span class="formula-chip">Zn</span> is zinc, but <span class="formula-chip">ZN</span> or <span class="formula-chip">zn</span> isn't a real symbol at all.</p>
+        </div>
+        <h3>Element or Compound?</h3>
+        <p>A quick test: does the formula have <strong>more than one different element symbol</strong> in it? If yes, it's a compound. A single symbol (even with a subscript, like H₂) means it's still just one element.</p>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, sort these into Element or Compound: <span class="formula-chip">ZnSO₄</span>, <span class="formula-chip">Mn</span>, <span class="formula-chip">Mg(NO₃)₂</span>, <span class="formula-chip">H₂</span>, <span class="formula-chip">KOH</span>, <span class="formula-chip">NH₃</span>, <span class="formula-chip">Na₃PO₄</span>.</div>
+        </div>
+        ${practiceProblem('e1', 'Is <span class="formula-chip">Mn</span> an element or a compound?', 'basic', 'Count the different element symbols in the formula.', 'Element — Mn (manganese) is a single symbol, no other elements combined with it.')}
+        ${practiceProblem('e2', 'Is <span class="formula-chip">H₂</span> an element or a compound?', 'medium', 'The subscript tells you how many atoms — but how many <em>different</em> elements are shown?', 'Element — H₂ is two atoms of the same element (hydrogen gas), not a combination of different elements.')}
+        ${practiceProblem('e3', 'Is <span class="formula-chip">ZnSO₄</span> an element or a compound?', 'medium', 'How many different element symbols appear in this formula?', 'Compound — it combines zinc (Zn), sulfur (S), and oxygen (O): three different elements in a fixed ratio.')}
+        ${practiceProblem('e4', 'Is <span class="formula-chip">Na₃PO₄</span> an element or a compound?', 'challenge', 'Same test as always — how many different elements does it combine?', 'Compound — it combines sodium (Na), phosphorus (P), and oxygen (O).')}`
+    },
+    {
+      title: 'Phases & Aqueous Solutions',
+      time: '6 min',
+      bodyHtml: `
+        <h2>Reading the Phase Label</h2>
+        <p>A chemical formula is often followed by a label in parentheses showing its <strong>phase</strong> — the physical form the substance is in.</p>
+        <table>
+          <thead><tr><th>Label</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>(s)</td><td>Solid</td></tr>
+            <tr><td>(l)</td><td>Liquid</td></tr>
+            <tr><td>(g)</td><td>Gas</td></tr>
+            <tr><td>(aq)</td><td>Aqueous — dissolved in water</td></tr>
+          </tbody>
+        </table>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Phase</strong>: the physical form a substance is in (solid, liquid, or gas), heavily influenced by temperature. <strong>Aqueous</strong> means dissolved in water.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Same Formula, Different Bottle</div>
+          <p><span class="formula-chip">Cu₂SO₄(s)</span> is a dry solid — you'd expect to see crystals or powder. <span class="formula-chip">Cu₂SO₄(aq)</span> is the same compound dissolved in water — you'd expect to see a clear liquid solution instead, with no visible solid at all.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write the formula for ice — solid water — using a phase label. Then note what all substances labeled (aq) have in common.</div>
+        </div>
+        ${practiceProblem('a1', 'A bottle is labeled <span class="formula-chip">Cu₂SO₄(aq)</span>. What should you expect to see inside?', 'basic', 'What does (aq) tell you about where the compound is?', 'A liquid solution — the compound is dissolved in water, so you\'d see a (blue) liquid, not dry crystals.')}
+        ${practiceProblem('a2', 'What is the correct formula + phase label for ice?', 'medium', 'Water is H₂O — what phase is ice?', 'H₂O(s) — ice is solid water.')}
+        ${practiceProblem('a3', 'What do all substances labeled (aq) have in common?', 'medium', 'Think about what the letters a-q stand for.', 'They are all dissolved in water (aqueous solutions).')}`
+    },
+    {
+      title: 'Chemical Change & Conservation of Mass',
+      time: '8 min',
+      bodyHtml: `
+        <h2>What Happens When Matter Changes?</h2>
+        <p>In the copper cycle lab, copper changed color and form several times — but it was never destroyed.</p>
+        <div class="concept-box">
+          <div class="concept-label">Law of Conservation of Mass</div>
+          <p>Mass cannot be gained or lost in a chemical reaction — matter cannot be created or destroyed.</p>
+        </div>
+        <p>No matter what was done to the copper in the lab, it was never broken down any further — it just combined and recombined into different compounds. Measuring its mass at the beginning and the end of the experiment proved it was never destroyed.</p>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Connecting Back</div>
+          <p>This is more evidence for something from Chapter 1: a "golden" penny that's really zinc with a copper coating isn't actually gold — elements keep their identity through chemical changes; they don't transform into different elements.</p>
+        </div>
+        <h3>Identifying Reaction Products</h3>
+        <p>When two dissolved (aq) solutions react and a solid forms, that solid is a <strong>brand-new compound</strong> that was created by the reaction — not one of the original ingredients.</p>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Law of conservation of mass: matter cannot be created or destroyed in a chemical reaction — only rearranged."</em></div>
+        </div>
+        ${practiceProblem('cc1', 'You start a lab with 5.0 g of copper. It goes through several reactions and color changes. About how much copper (by mass) should be left at the end?', 'basic', 'What does the law of conservation of mass say happens to the total mass?', 'About 5.0 g — mass isn\'t created or destroyed in a chemical reaction, so the copper is still there, just possibly in a different compound.')}
+        ${practiceProblem('cc2', 'BaCl₂(aq) is added to Na₂SO₄(aq), producing NaCl(aq) and a white solid. Which is most likely the white solid?', 'medium', 'A solid forming from two dissolved solutions means a new, insoluble compound was created — which option is a genuinely new pairing of ions, not one of the starting ingredients?', 'BaSO₄(s) — it\'s a new compound formed from the reaction (barium + sulfate), and its (s) label matches "solid."')}
+        ${practiceProblem('cc3', 'True or False: if a chemical reaction seems to make matter "disappear," it was actually destroyed.', 'challenge', 'Could the matter have just changed into something less visible, like a gas or a dissolved substance?', 'False — the law of conservation of mass says matter isn\'t destroyed. Anything that seems to disappear (like a gas escaping) is still there — just harder to see or measure.')}`
+    },
+    {
+      title: 'How the Periodic Table Is Organized',
+      time: '8 min',
+      bodyHtml: `
+        <h2>Mendeleev's Big Idea</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Atomic mass</strong>: the mass of a single atom (or isotope) of an element, expressed as a decimal number.</p>
+        </div>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Reactivity</strong>: whether an element chemically combines with other substances to form compounds, and how fast that reaction happens.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Where It Started</div>
+          <p>Mendeleev organized his periodic table based on reactivity and atomic mass. His arrangement was so consistent that it helped predict the existence and properties of elements that hadn't even been discovered yet.</p>
+        </div>
+        <p>Elements grouped together tend to share similar properties — including combining with other elements in the <strong>same ratio</strong>. That combining ratio is a strong clue for spotting elements in the same family.</p>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Mendeleev organized the periodic table by reactivity and atomic mass. Elements in the same group have similar properties."</em></div>
+        </div>
+        <table>
+          <thead><tr><th>Element</th><th>Description</th><th>Reactivity</th><th>Chlorine Compound</th></tr></thead>
+          <tbody>
+            <tr><td>Cadmium (Cd)</td><td>Moderately soft, silvery, solid, metal</td><td>Reacts very slowly with water</td><td>CdCl₂(s)</td></tr>
+            <tr><td>Zinc (Zn)</td><td>Moderately hard, silvery, solid, metal</td><td>Reacts very slowly with water</td><td>ZnCl₂(s)</td></tr>
+            <tr><td>Iodine (I)</td><td>Purple, solid, nonmetal</td><td>Reacts slowly with metals</td><td>ICl(s)</td></tr>
+            <tr><td>Mercury (Hg)</td><td>Silvery, liquid, metal</td><td>Does not react with water</td><td>HgCl₂(s)</td></tr>
+          </tbody>
+        </table>
+        ${practiceProblem(
+          'g1',
+          'Using the table above, which two elements would you expect to be grouped together?',
+          'medium',
+          'Compare BOTH the physical description and the combining ratio with chlorine (the subscript).',
+          'Cadmium and zinc — both are silvery solid metals with nearly identical reactivity, and both form a 1-to-2 ratio with chlorine (CdCl₂, ZnCl₂). Iodine is a nonmetal with different reactivity, and mercury is a liquid, so neither matches as closely.'
+        )}
+        <table>
+          <thead><tr><th>Element</th><th>Description</th><th>Reactivity</th><th>Chlorine Compound</th></tr></thead>
+          <tbody>
+            <tr><td>Element J</td><td>Colorless, nonmetal, gas</td><td>Does not react with water</td><td>JCl₃(l)</td></tr>
+            <tr><td>Element K</td><td>Yellow, nonmetal, gas</td><td>Reacts slowly with water</td><td>KCl(g)</td></tr>
+            <tr><td>Element L</td><td>Gray-black, nonmetal, solid</td><td>Reacts slowly with water</td><td>LCl(s)</td></tr>
+            <tr><td>Element M</td><td>Orange-brown, nonmetal, liquid</td><td>Reacts slowly with water</td><td>MCl(g)</td></tr>
+          </tbody>
+        </table>
+        ${practiceProblem(
+          'g2',
+          'Using the table above, which THREE elements would you expect to be in the same group? Explain your thinking.',
+          'challenge',
+          'Look at the combining ratio with chlorine (the subscript) across all four — three should match, one shouldn\'t.',
+          'K, L, and M — all three form a 1-to-1 ratio with chlorine (KCl, LCl, MCl) and share similar reactivity (react slowly with water), suggesting they belong to the same group. J is the odd one out: it forms JCl₃ (a different ratio) and doesn\'t react with water at all.'
+        )}`
+    },
+    {
+      title: 'Reading the Periodic Table',
+      time: '9 min',
+      bodyHtml: `
+        <h2>What the Table Reveals</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Atomic number</strong>: the consecutive whole numbers associated with each element on the periodic table — equal to the number of protons in that element's nucleus.</p>
+        </div>
+        <table>
+          <thead><tr><th>Term</th><th>What it means</th></tr></thead>
+          <tbody>
+            <tr><td>Group</td><td>A vertical column — elements in a group have similar properties</td></tr>
+            <tr><td>Period</td><td>A horizontal row</td></tr>
+            <tr><td>Main group elements</td><td>Groups 1A–8A</td></tr>
+            <tr><td>Transition elements</td><td>Groups 1B–8B</td></tr>
+            <tr><td>Alkali metals</td><td>Group 1A</td></tr>
+            <tr><td>Alkaline earth metals</td><td>Group 2A</td></tr>
+            <tr><td>Halogens</td><td>Group 7A</td></tr>
+            <tr><td>Noble gases</td><td>Group 8A — called "noble" because they aren't reactive</td></tr>
+            <tr><td>Lanthanides &amp; actinides</td><td>The two rows of 14 elements placed separately at the bottom</td></tr>
+          </tbody>
+        </table>
+        <h3>Metals, Nonmetals & Metalloids</h3>
+        <div class="info-panel">
+          <div class="panel-label">📐 The Stair-Step Line</div>
+          <p><strong>Metals</strong> (excellent conductors, shiny, malleable) are to the left of the stair-step line. <strong>Nonmetals</strong> (poor conductors, dull, brittle) are to the right. <strong>Metalloids</strong> sit right along the stair-step line, with properties in between.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, sketch the stair-step line and label where metals, nonmetals, and metalloids sit relative to it. Then list the group numbers for alkali metals, alkaline earth metals, halogens, and noble gases.</div>
+        </div>
+        ${practiceProblem('r1', 'Is silicon (Si) a metal, nonmetal, or metalloid?', 'basic', 'Silicon sits right along the stair-step line.', 'Metalloid — silicon is one of the classic metalloids, right on the stair-step line.')}
+        ${practiceProblem('r2', 'In what phase would you expect to find bromine (Br) at room temperature?', 'medium', 'Bromine is one of the few elements that is neither a solid nor a gas at room temperature.', 'Liquid — bromine is one of only two elements that are liquid at room temperature (along with mercury).')}
+        ${practiceProblem('r3', 'Which family are the Group 1A elements, and are they generally very reactive or not very reactive?', 'medium', 'This is the leftmost column of the main group elements.', 'Alkali metals — they are highly reactive, especially with water.')}
+        ${practiceProblem('r4', 'Would you expect argon (Ar) to react easily with other elements? Why or why not?', 'challenge', 'What group is argon in?', 'No — argon is a noble gas (Group 8A), and noble gases are "noble" specifically because they are not reactive.')}`
+    }
+  ];
+
+  function render(host, ctx) {
+    ensureStylesInjected();
+
+    const sectionsHtml = STATIC_SECTIONS.map((sec, i) => `
+      <div class="section-card" id="el-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
+          <span class="section-title">${escapeHtml(sec.title)}</span>
+          <span class="section-time">${escapeHtml(sec.time)}</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          ${sec.bodyHtml}
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">✓ Mark Section Complete</button>
+        </div>
+      </div>
+    `).join('');
+
+    host.innerHTML = `
+      <div class="el-lesson">
+        <div class="el-header">
+          <div class="el-header-label">Chapter 2 · Basic Building Materials</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="el-header-meta">Self-Paced Review · ~40 Minutes · Good prep for Quiz A/B</div>
+        </div>
+        <div class="el-progress-wrap">
+          <span class="el-progress-label">Progress</span>
+          <div class="el-progress-track"><div class="el-progress-fill" id="el-progress-fill"></div></div>
+          <span class="el-progress-count" id="el-progress-count">0 / ${SECTION_COUNT} sections</span>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="el-sec-${SECTION_COUNT - 1}" data-section="${SECTION_COUNT - 1}">
+            <div class="section-header" data-toggle="${SECTION_COUNT - 1}">
+              <span class="section-num">✓</span>
+              <span class="section-title">Check for Understanding</span>
+              <span class="section-time">15 min · graded</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">Unlike the sections above, this quiz <strong>saves your score</strong> and reports it to your teacher. You can retake it any time — your most recent attempt is what's saved.</div>
+              <div id="el-quiz-mount"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    `;
+
+    const root = host.querySelector('.el-lesson');
+    const quizIndex = SECTION_COUNT - 1;
+    const completed = new Array(SECTION_COUNT).fill(false);
+
+    function updateProgress() {
+      const done = completed.filter(Boolean).length;
+      const pct = Math.round((done / SECTION_COUNT) * 100);
+      root.querySelector('#el-progress-fill').style.width = pct + '%';
+      root.querySelector('#el-progress-count').textContent = `${done} / ${SECTION_COUNT} sections`;
+    }
+
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#el-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function toggleSection(i) {
+      const card = root.querySelector(`#el-sec-${i}`);
+      const body = card.querySelector('.section-body');
+      const header = card.querySelector('.section-header');
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      header.classList.toggle('open', !isOpen);
+    }
+
+    root.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', () => toggleSection(Number(el.getAttribute('data-toggle'))));
+    });
+
+    root.querySelectorAll('[data-mark-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-mark-done'));
+        if (completed[i]) return;
+        completed[i] = true;
+        root.querySelector(`#el-sec-${i}`).classList.add('done');
+        btn.textContent = '✓ Section Complete';
+        btn.disabled = true;
+        updateProgress();
+        setTimeout(() => openSection(i + 1, true), 250);
+      });
+    });
+
+    root.querySelectorAll('[data-hint-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-hint-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? '▲ Hide Hint' : '💡 Hint';
+      });
+    });
+    root.querySelectorAll('[data-answer-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-answer-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? 'Hide Answer' : 'Reveal Answer';
+      });
+    });
+
+    // Quiz (final section) — graded, saved via ctx.saveProgress.
+    const quizMount = root.querySelector('#el-quiz-mount');
+    renderQuiz(quizMount, ctx);
+
+    const progress = ctx.getProgress();
+    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
+      if (progress.status === 'completed') completed[quizIndex] = true;
+      openSection(quizIndex, false);
+    } else {
+      openSection(0, false);
+    }
+    updateProgress();
+  }
+
+  function renderQuiz(mount, ctx) {
+    const progress = ctx.getProgress();
+    if (progress && progress.status === 'completed') {
+      renderQuizSummary(mount, ctx);
+      return;
+    }
+    const answers = (progress && progress.answers) || [];
+    const index = answers.length;
+    if (index >= QUESTIONS.length) {
+      finishQuiz(mount, ctx, answers);
+      return;
+    }
+    renderQuizQuestion(mount, ctx, answers, index);
+  }
+
+  function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const q = QUESTIONS[index];
+    const pct = Math.round((index / QUESTIONS.length) * 100);
+    mount.innerHTML = `
+      <div class="quiz-question-count">Question ${index + 1} of ${QUESTIONS.length}</div>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <p class="quiz-prompt">${escapeHtml(q.prompt)}</p>
+      <div id="el-answer-area"></div>
+      <div id="el-feedback-area"></div>
+      <button type="button" class="el-next-btn" id="el-next-btn" style="display:none;">Next Question</button>
+    `;
+
+    const answerArea = mount.querySelector('#el-answer-area');
+    const feedbackArea = mount.querySelector('#el-feedback-area');
+    const nextBtn = mount.querySelector('#el-next-btn');
+    let submitted = false;
+
+    answerArea.innerHTML = q.choices.map((choice, i) => `
+      <button type="button" class="el-choice" data-choice="${i}">${escapeHtml(choice)}</button>
+    `).join('');
+
+    function submit(response, btnEl) {
+      if (submitted) return;
+      submitted = true;
+
+      const correct = response === q.correct;
+      answerArea.querySelectorAll('.el-choice').forEach(el => {
+        el.disabled = true;
+        const val = Number(el.getAttribute('data-choice'));
+        if (val === q.correct) el.classList.add('selected-correct');
+        else if (el === btnEl) el.classList.add('selected-incorrect');
+      });
+
+      feedbackArea.innerHTML = `
+        <div class="el-feedback ${correct ? 'correct' : 'incorrect'}">
+          ${correct ? '✓ Correct!' : '✗ Not quite.'} ${escapeHtml(q.explanation)}
+        </div>
+      `;
+      nextBtn.style.display = 'inline-block';
+
+      const answers = answersSoFar.concat([{ questionId: q.id, response, correct }]);
+      const record = {
+        status: 'in_progress',
+        score: answers.filter(a => a.correct).length,
+        totalQuestions: QUESTIONS.length,
+        answers
+      };
+      ctx.saveProgress(record);
+    }
+
+    answerArea.querySelectorAll('.el-choice').forEach(btn => {
+      btn.addEventListener('click', () => submit(Number(btn.getAttribute('data-choice')), btn));
+    });
+
+    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
+  }
+
+  async function finishQuiz(mount, ctx, answers) {
+    const record = {
+      status: 'completed',
+      score: answers.filter(a => a.correct).length,
+      totalQuestions: QUESTIONS.length,
+      answers
+    };
+    await ctx.saveProgress(record);
+    renderQuizSummary(mount, ctx);
+  }
+
+  function renderQuizSummary(mount, ctx) {
+    const progress = ctx.getProgress();
+    const score = progress ? progress.score : 0;
+    const total = QUESTIONS.length;
+    mount.innerHTML = `
+      <div class="el-summary">
+        <div class="el-score">${score} / ${total}</div>
+        <p>Nice work! You can retake this any time — your most recent attempt is what's saved and sent to your teacher.</p>
+        <button type="button" class="el-retake-btn" id="el-retake-btn">Retake Quiz</button>
+      </div>
+    `;
+    mount.querySelector('#el-retake-btn').addEventListener('click', async () => {
+      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: total, answers: [] });
+      renderQuiz(mount, ctx);
+    });
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['elements-review'] = { render };
+})();
+
+</script>

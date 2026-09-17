@@ -20,6 +20,20 @@ const CONTENT = {
           estimatedMinutes: 35
         }
       ]
+    },
+    {
+      id: 'unit1-basic-building-materials',
+      title: 'Unit 1: Alchemy — Chapter 2: Basic Building Materials',
+      description: 'Elements & compounds, chemical phases, conservation of mass, and how the periodic table is organized (Lessons 6–10).',
+      activities: [
+        {
+          id: 'elements-review',
+          type: 'review',
+          title: 'Chapter 2 Review: Basic Building Materials',
+          description: 'A guided walkthrough of elements, compounds, phases, conservation of mass, and the periodic table, ending in a graded check for understanding — good prep for Quiz A/B.',
+          estimatedMinutes: 40
+        }
+      ]
     }
     // NOT LIVE YET -- built and ready, holding for a later publish date.
     // Uncomment this unit (and redeploy) whenever it's ready for students:
