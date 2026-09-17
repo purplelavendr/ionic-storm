@@ -5,199 +5,204 @@
 // Understanding" quiz. Only the quiz's score is saved via ctx.saveProgress
 // (localStorage + Google Sheet) -- the lesson sections above it are an
 // ungraded warm-up, same as they'd be worked through in class.
+//
+// Supports an EN/ES language toggle (see LANG_KEY below). This only affects
+// this activity's own display text -- grading is always based on the
+// answer's positional index (QUESTIONS[i].correct), never on which
+// language's text is shown, so translation can never affect correctness.
 (function () {
   const QUESTIONS = [
     {
       id: 'q1', type: 'mc',
-      prompt: 'What is the definition of matter?',
+      prompt: { en: 'What is the definition of matter?', es: '¿Cuál es la definición de la materia?' },
       choices: [
-        'Anything that has mass and takes up space (volume)',
-        'Anything you can see with your eyes',
-        'Anything that is alive',
-        'Anything that has energy'
+        { en: 'Anything that has mass and takes up space (volume)', es: 'Todo lo que tiene masa y ocupa espacio (volumen)' },
+        { en: 'Anything you can see with your eyes', es: 'Todo lo que se puede ver con los ojos' },
+        { en: 'Anything that is alive', es: 'Todo lo que está vivo' },
+        { en: 'Anything that has energy', es: 'Todo lo que tiene energía' }
       ],
       correct: 0,
-      explanation: 'Matter is defined as anything that has mass and takes up space (volume).'
+      explanation: { en: 'Matter is defined as anything that has mass and takes up space (volume).', es: 'La materia se define como todo lo que tiene masa y ocupa espacio (volumen).' }
     },
     {
       id: 'q2', type: 'mc',
-      prompt: 'Is helium gas classified as matter?',
+      prompt: { en: 'Is helium gas classified as matter?', es: '¿Se clasifica el gas helio como materia?' },
       choices: [
-        'Yes — it has mass and takes up volume, even though you can’t see it',
-        'No — gases don’t have mass',
-        'No — you can’t see it',
-        'Yes — but only because it’s used in balloons'
+        { en: 'Yes — it has mass and takes up volume, even though you can’t see it', es: 'Sí — tiene masa y ocupa volumen, aunque no se pueda ver' },
+        { en: 'No — gases don’t have mass', es: 'No — los gases no tienen masa' },
+        { en: 'No — you can’t see it', es: 'No — no se puede ver' },
+        { en: 'Yes — but only because it’s used in balloons', es: 'Sí — pero solo porque se usa en globos' }
       ],
       correct: 0,
-      explanation: 'A gas still has mass and takes up volume, so it counts as matter even when it’s invisible.'
+      explanation: { en: 'A gas still has mass and takes up volume, so it counts as matter even when it’s invisible.', es: 'Un gas sigue teniendo masa y ocupa volumen, así que cuenta como materia aunque sea invisible.' }
     },
     {
       id: 'q3', type: 'mc',
-      prompt: 'Which of these is NOT matter?',
+      prompt: { en: 'Which of these is NOT matter?', es: '¿Cuál de estos NO es materia?' },
       choices: [
-        'A shoe',
-        'A beam of sunlight',
-        'Car exhaust',
-        'A desk'
+        { en: 'A shoe', es: 'Un zapato' },
+        { en: 'A beam of sunlight', es: 'Un rayo de luz solar' },
+        { en: 'Car exhaust', es: 'El humo del escape de un auto' },
+        { en: 'A desk', es: 'Un escritorio' }
       ],
       correct: 1,
-      explanation: 'Light is a form of energy, not matter — it has no mass and doesn’t take up space.'
+      explanation: { en: 'Light is a form of energy, not matter — it has no mass and doesn’t take up space.', es: 'La luz es una forma de energía, no materia — no tiene masa ni ocupa espacio.' }
     },
     {
       id: 'q4', type: 'mc',
-      prompt: 'Is a thought or an emotion like anger classified as matter?',
+      prompt: { en: 'Is a thought or an emotion like anger classified as matter?', es: '¿Se clasifica un pensamiento o una emoción como el enojo como materia?' },
       choices: [
-        'Yes, because it affects your body',
-        'No — thoughts and emotions don’t have mass or take up space',
-        'Yes, because everyone experiences it',
-        'No, because it’s invisible'
+        { en: 'Yes, because it affects your body', es: 'Sí, porque afecta tu cuerpo' },
+        { en: 'No — thoughts and emotions don’t have mass or take up space', es: 'No — los pensamientos y las emociones no tienen masa ni ocupan espacio' },
+        { en: 'Yes, because everyone experiences it', es: 'Sí, porque todos lo experimentan' },
+        { en: 'No, because it’s invisible', es: 'No, porque es invisible' }
       ],
       correct: 1,
-      explanation: 'Thoughts and emotions are not matter — they don’t have mass or occupy volume, even though they are real experiences.'
+      explanation: { en: 'Thoughts and emotions are not matter — they don’t have mass or occupy volume, even though they are real experiences.', es: 'Los pensamientos y las emociones no son materia — no tienen masa ni ocupan volumen, aunque son experiencias reales.' }
     },
     {
       id: 'q5', type: 'mc',
-      prompt: 'Is car exhaust classified as matter?',
+      prompt: { en: 'Is car exhaust classified as matter?', es: '¿Se clasifica el humo del escape de un auto como materia?' },
       choices: [
-        'No, it just disappears into the air',
-        'Yes — it’s a mixture of gases that has mass and takes up volume',
-        'No, it’s only smoke',
-        'Yes, but only while you can smell it'
+        { en: 'No, it just disappears into the air', es: 'No, simplemente desaparece en el aire' },
+        { en: 'Yes — it’s a mixture of gases that has mass and takes up volume', es: 'Sí — es una mezcla de gases que tiene masa y ocupa volumen' },
+        { en: 'No, it’s only smoke', es: 'No, es solo humo' },
+        { en: 'Yes, but only while you can smell it', es: 'Sí, pero solo mientras se puede oler' }
       ],
       correct: 1,
-      explanation: 'Car exhaust is made of gases, which have mass and take up volume, so it is matter.'
+      explanation: { en: 'Car exhaust is made of gases, which have mass and take up volume, so it is matter.', es: 'El humo del escape de un auto está hecho de gases, que tienen masa y ocupan volumen, así que es materia.' }
     },
     {
       id: 'q6', type: 'mc',
-      prompt: 'What is a "property" of a substance?',
+      prompt: { en: 'What is a "property" of a substance?', es: '¿Qué es una "propiedad" de una sustancia?' },
       choices: [
-        'A characteristic used to identify or describe it',
-        'The price of the substance',
-        'The brand name given to it',
-        'How much of the substance exists'
+        { en: 'A characteristic used to identify or describe it', es: 'Una característica que se usa para identificarla o describirla' },
+        { en: 'The price of the substance', es: 'El precio de la sustancia' },
+        { en: 'The brand name given to it', es: 'El nombre de marca que se le da' },
+        { en: 'How much of the substance exists', es: 'Cuánta cantidad de la sustancia existe' }
       ],
       correct: 0,
-      explanation: 'A property is a characteristic of a substance that helps identify or describe it.'
+      explanation: { en: 'A property is a characteristic of a substance that helps identify or describe it.', es: 'Una propiedad es una característica de una sustancia que ayuda a identificarla o describirla.' }
     },
     {
       id: 'q7', type: 'mc',
-      prompt: 'Which of these is a physical property?',
+      prompt: { en: 'Which of these is a physical property?', es: '¿Cuál de estas es una propiedad física?' },
       choices: [
-        'Flammability',
-        'Reacts with acid',
-        'Boiling point',
-        'Rusts in air'
+        { en: 'Flammability', es: 'La inflamabilidad' },
+        { en: 'Reacts with acid', es: 'Reacciona con ácido' },
+        { en: 'Boiling point', es: 'El punto de ebullición' },
+        { en: 'Rusts in air', es: 'Se oxida en el aire' }
       ],
       correct: 2,
-      explanation: 'Boiling point can be observed without changing what the substance is — that makes it a physical property.'
+      explanation: { en: 'Boiling point can be observed without changing what the substance is — that makes it a physical property.', es: 'El punto de ebullición se puede observar sin cambiar lo que es la sustancia — eso lo convierte en una propiedad física.' }
     },
     {
       id: 'q8', type: 'mc',
-      prompt: 'Which of these is a chemical property?',
+      prompt: { en: 'Which of these is a chemical property?', es: '¿Cuál de estas es una propiedad química?' },
       choices: [
-        'Color',
-        'Density',
-        'Flammability',
-        'Melting point'
+        { en: 'Color', es: 'El color' },
+        { en: 'Density', es: 'La densidad' },
+        { en: 'Flammability', es: 'La inflamabilidad' },
+        { en: 'Melting point', es: 'El punto de fusión' }
       ],
       correct: 2,
-      explanation: 'Flammability describes how a substance reacts (burns) — that’s a chemical property, since it changes what the substance is.'
+      explanation: { en: 'Flammability describes how a substance reacts (burns) — that’s a chemical property, since it changes what the substance is.', es: 'La inflamabilidad describe cómo reacciona (se quema) una sustancia — eso es una propiedad química, ya que cambia lo que es la sustancia.' }
     },
     {
       id: 'q9', type: 'mc',
-      prompt: 'Chemistry is best defined as the study of...',
+      prompt: { en: 'Chemistry is best defined as the study of...', es: 'La química se define mejor como el estudio de...' },
       choices: [
-        'Living things and how they grow',
-        'Matter, its properties, and how it can change',
-        'Numbers and equations',
-        'Stars and planets'
+        { en: 'Living things and how they grow', es: 'Los seres vivos y cómo crecen' },
+        { en: 'Matter, its properties, and how it can change', es: 'La materia, sus propiedades y cómo puede cambiar' },
+        { en: 'Numbers and equations', es: 'Los números y las ecuaciones' },
+        { en: 'Stars and planets', es: 'Las estrellas y los planetas' }
       ],
       correct: 1,
-      explanation: 'Chemistry is the study of matter, its properties, and how matter can be changed.'
+      explanation: { en: 'Chemistry is the study of matter, its properties, and how matter can be changed.', es: 'La química es el estudio de la materia, sus propiedades y cómo se puede cambiar la materia.' }
     },
     {
       id: 'q10', type: 'mc',
-      prompt: 'A hypothesis is...',
+      prompt: { en: 'A hypothesis is...', es: 'Una hipótesis es...' },
       choices: [
-        'A proven fact',
-        'A testable, educated explanation for an observation',
-        'A random guess with no reasoning behind it',
-        'The final conclusion of an experiment'
+        { en: 'A proven fact', es: 'Un hecho comprobado' },
+        { en: 'A testable, educated explanation for an observation', es: 'Una explicación fundamentada y comprobable de una observación' },
+        { en: 'A random guess with no reasoning behind it', es: 'Una suposición al azar sin razonamiento detrás' },
+        { en: 'The final conclusion of an experiment', es: 'La conclusión final de un experimento' }
       ],
       correct: 1,
-      explanation: 'A hypothesis is a testable explanation for something you’ve observed — an educated guess, not a proven fact.'
+      explanation: { en: 'A hypothesis is a testable explanation for something you’ve observed — an educated guess, not a proven fact.', es: 'Una hipótesis es una explicación comprobable de algo que has observado — una suposición fundamentada, no un hecho comprobado.' }
     },
     {
       id: 'q11', type: 'mc',
-      prompt: 'Scientists solve problems using...',
+      prompt: { en: 'Scientists solve problems using...', es: 'Los científicos resuelven problemas usando...' },
       choices: [
-        'A random approach',
-        'A systematic, step-by-step approach',
-        'Guessing until something works',
-        'Only opinions'
+        { en: 'A random approach', es: 'Un enfoque al azar' },
+        { en: 'A systematic, step-by-step approach', es: 'Un enfoque sistemático, paso a paso' },
+        { en: 'Guessing until something works', es: 'Adivinando hasta que algo funcione' },
+        { en: 'Only opinions', es: 'Solo opiniones' }
       ],
       correct: 1,
-      explanation: 'Scientists use a systematic (organized) approach so their results are reliable and can be checked by others.'
+      explanation: { en: 'Scientists use a systematic (organized) approach so their results are reliable and can be checked by others.', es: 'Los científicos usan un enfoque sistemático (organizado) para que sus resultados sean confiables y otros puedan verificarlos.' }
     },
     {
       id: 'q12', type: 'mc',
-      prompt: 'Which piece of lab equipment is used to precisely measure the volume of a liquid?',
+      prompt: { en: 'Which piece of lab equipment is used to precisely measure the volume of a liquid?', es: '¿Qué pieza de equipo de laboratorio se usa para medir con precisión el volumen de un líquido?' },
       choices: [
-        'Graduated cylinder',
-        'Bunsen burner',
-        'Test tube rack',
-        'Balance'
+        { en: 'Graduated cylinder', es: 'La probeta graduada' },
+        { en: 'Bunsen burner', es: 'El mechero Bunsen' },
+        { en: 'Test tube rack', es: 'La gradilla para tubos de ensayo' },
+        { en: 'Balance', es: 'La balanza' }
       ],
       correct: 0,
-      explanation: 'A graduated cylinder has fine markings for precisely measuring liquid volume.'
+      explanation: { en: 'A graduated cylinder has fine markings for precisely measuring liquid volume.', es: 'Una probeta graduada tiene marcas finas para medir con precisión el volumen de un líquido.' }
     },
     {
       id: 'q13', type: 'mc',
-      prompt: 'Which piece of equipment is used to measure the mass of an object?',
+      prompt: { en: 'Which piece of equipment is used to measure the mass of an object?', es: '¿Qué pieza de equipo se usa para medir la masa de un objeto?' },
       choices: [
-        'Erlenmeyer flask',
-        'Balance (scale)',
-        'Beaker',
-        'Eye wash station'
+        { en: 'Erlenmeyer flask', es: 'El matraz Erlenmeyer' },
+        { en: 'Balance (scale)', es: 'La balanza' },
+        { en: 'Beaker', es: 'El vaso de precipitados' },
+        { en: 'Eye wash station', es: 'La estación de lavado de ojos' }
       ],
       correct: 1,
-      explanation: 'A balance (scale) measures mass.'
+      explanation: { en: 'A balance (scale) measures mass.', es: 'Una balanza mide la masa.' }
     },
     {
       id: 'q14', type: 'mc',
-      prompt: 'If a chemical splashes into your eyes in the lab, you should immediately use the...',
+      prompt: { en: 'If a chemical splashes into your eyes in the lab, you should immediately use the...', es: 'Si un químico te salpica los ojos en el laboratorio, debes usar inmediatamente...' },
       choices: [
-        'Fire extinguisher',
-        'Fume hood',
-        'Eye wash station',
-        'Test tube rack'
+        { en: 'Fire extinguisher', es: 'El extintor de incendios' },
+        { en: 'Fume hood', es: 'La campana de extracción' },
+        { en: 'Eye wash station', es: 'La estación de lavado de ojos' },
+        { en: 'Test tube rack', es: 'La gradilla para tubos de ensayo' }
       ],
       correct: 2,
-      explanation: 'The eye wash station is the safety equipment designed to flush chemicals out of your eyes.'
+      explanation: { en: 'The eye wash station is the safety equipment designed to flush chemicals out of your eyes.', es: 'La estación de lavado de ojos es el equipo de seguridad diseñado para enjuagar los químicos de tus ojos.' }
     },
     {
       id: 'q15', type: 'mc',
-      prompt: 'Which of these is an important chemistry lab safety rule?',
+      prompt: { en: 'Which of these is an important chemistry lab safety rule?', es: '¿Cuál de estas es una regla de seguridad importante en el laboratorio de química?' },
       choices: [
-        'Always wear safety goggles when working with chemicals',
-        'Taste unknown chemicals to help identify them',
-        'Run in the lab to save time',
-        'Eat a snack at your lab station'
+        { en: 'Always wear safety goggles when working with chemicals', es: 'Usar siempre gafas de seguridad al trabajar con químicos' },
+        { en: 'Taste unknown chemicals to help identify them', es: 'Probar químicos desconocidos para ayudar a identificarlos' },
+        { en: 'Run in the lab to save time', es: 'Correr en el laboratorio para ahorrar tiempo' },
+        { en: 'Eat a snack at your lab station', es: 'Comer un bocadillo en tu estación de laboratorio' }
       ],
       correct: 0,
-      explanation: 'Safety goggles protect your eyes and should always be worn when working with chemicals — never taste, run, or eat in a lab.'
+      explanation: { en: 'Safety goggles protect your eyes and should always be worn when working with chemicals — never taste, run, or eat in a lab.', es: 'Las gafas de seguridad protegen tus ojos y siempre se deben usar al trabajar con químicos — nunca pruebes, corras ni comas en un laboratorio.' }
     },
     {
       id: 'q16', type: 'mc',
-      prompt: 'If you’re unsure about a step in a lab procedure, you should...',
+      prompt: { en: 'If you’re unsure about a step in a lab procedure, you should...', es: 'Si no estás seguro de un paso en un procedimiento de laboratorio, debes...' },
       choices: [
-        'Guess and keep going',
-        'Ask your teacher before proceeding',
-        'Skip that step',
-        'Copy what a friend across the room is doing'
+        { en: 'Guess and keep going', es: 'Adivinar y seguir adelante' },
+        { en: 'Ask your teacher before proceeding', es: 'Preguntarle a tu maestro antes de continuar' },
+        { en: 'Skip that step', es: 'Saltarte ese paso' },
+        { en: 'Copy what a friend across the room is doing', es: 'Copiar lo que hace un compañero al otro lado del salón' }
       ],
       correct: 1,
-      explanation: 'When unsure, always check with your teacher before continuing — it’s the safest choice.'
+      explanation: { en: 'When unsure, always check with your teacher before continuing — it’s the safest choice.', es: 'Cuando no estés seguro, siempre consulta con tu maestro antes de continuar — es la opción más segura.' }
     }
   ];
 
@@ -208,6 +213,63 @@
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
+
+  // ---- Translation (EN/ES) ----
+  // LANG_KEY is a shared literal string: elements-review.js uses the exact
+  // same key (each file owns its own copy of this small helper block rather
+  // than a shared module, matching this codebase's convention), so picking
+  // a language in one review carries over to the other automatically.
+  const LANG_KEY = 'ionicstorm_lang_v1';
+
+  function getLang() {
+    return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en';
+  }
+  function setLang(lang) {
+    localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en');
+  }
+  function tr(field, lang) {
+    return (field && typeof field === 'object') ? (field[lang] || field.en) : field;
+  }
+  function t(key, lang, ...args) {
+    const entry = STRINGS[key] || {};
+    const val = entry[lang] || entry.en;
+    return typeof val === 'function' ? val(...args) : val;
+  }
+
+  const DIFF_LABELS = {
+    en: { basic: 'Basic', medium: 'Medium', challenge: 'Challenge' },
+    es: { basic: 'Básico', medium: 'Medio', challenge: 'Desafío' }
+  };
+
+  const STRINGS = {
+    headerLabel: { en: 'Chapter 1 · Defining Matter', es: 'Capítulo 1 · Definiendo la Materia' },
+    headerMeta: { en: 'Self-Paced Review · ~35 Minutes · Good prep for Quiz A/B', es: 'Repaso a tu Propio Ritmo · ~35 Minutos · Buena preparación para el Quiz A/B' },
+    langToggleAria: { en: 'Language', es: 'Idioma' },
+    progress: { en: 'Progress', es: 'Progreso' },
+    sectionCount: { en: (done, total) => `${done} / ${total} sections`, es: (done, total) => `${done} / ${total} secciones` },
+    checkForUnderstanding: { en: 'Check for Understanding', es: 'Comprobación de Comprensión' },
+    quizTimeGraded: { en: '15 min · graded', es: '15 min · calificado' },
+    quizNote: {
+      en: 'Unlike the sections above, this quiz <strong>saves your score</strong> and reports it to your teacher. You can retake it any time — your most recent attempt is what\'s saved.',
+      es: 'A diferencia de las secciones anteriores, este quiz <strong>guarda tu puntaje</strong> y se lo reporta a tu maestro. Puedes volver a hacerlo en cualquier momento — se guarda tu intento más reciente.'
+    },
+    markSectionComplete: { en: '✓ Mark Section Complete', es: '✓ Marcar Sección como Completa' },
+    sectionComplete: { en: '✓ Section Complete', es: '✓ Sección Completa' },
+    hintShow: { en: '💡 Hint', es: '💡 Pista' },
+    hintHide: { en: '▲ Hide Hint', es: '▲ Ocultar Pista' },
+    revealAnswer: { en: 'Reveal Answer', es: 'Mostrar Respuesta' },
+    hideAnswer: { en: 'Hide Answer', es: 'Ocultar Respuesta' },
+    answerLabel: { en: '✓ Answer', es: '✓ Respuesta' },
+    questionCount: { en: (n, total) => `Question ${n} of ${total}`, es: (n, total) => `Pregunta ${n} de ${total}` },
+    nextQuestion: { en: 'Next Question', es: 'Siguiente Pregunta' },
+    correctPrefix: { en: '✓ Correct!', es: '✓ ¡Correcto!' },
+    incorrectPrefix: { en: '✗ Not quite.', es: '✗ No exactamente.' },
+    retakeQuiz: { en: 'Retake Quiz', es: 'Repetir el Quiz' },
+    summaryText: {
+      en: 'Nice work! You can retake this any time — your most recent attempt is what\'s saved and sent to your teacher.',
+      es: '¡Buen trabajo! Puedes repetirlo en cualquier momento — se guarda y se envía a tu maestro tu intento más reciente.'
+    }
+  };
 
   function ensureStylesInjected() {
     if (!document.getElementById(FONT_LINK_ID)) {
@@ -261,6 +323,28 @@
   border-radius: 50%;
   border: 32px solid rgba(46,196,182,0.12);
 }
+.chem-lesson .cl-lang-toggle {
+  position: absolute;
+  top: 1.75rem;
+  right: 1.75rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.3rem;
+}
+.chem-lesson .cl-lang-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(247,243,236,0.35);
+  color: rgba(247,243,236,0.65);
+  cursor: pointer;
+}
+.chem-lesson .cl-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.chem-lesson .cl-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
 .chem-lesson .cl-header-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.68rem;
@@ -591,11 +675,14 @@
 
   // ---- Static lesson content (sections 0-5, ungraded / session-only) ----
 
-  function massVolumeSvg() {
+  function massVolumeSvg(lang) {
+    const L = lang === 'es'
+      ? { mass: 'Tiene masa', space: 'Ocupa espacio', balance: 'una balanza puede pesarlo', volume: 'tiene un volumen' }
+      : { mass: 'Has mass', space: 'Takes up space', balance: 'a balance can weigh it', volume: 'it has a volume' };
     return `
       <svg viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg">
         <!-- HAS MASS: a balance scale, weights level on both sides -->
-        <text x="115" y="24" text-anchor="middle" font-family="'Source Serif 4',serif" font-size="13" fill="#1b2d42" font-weight="600">Has mass</text>
+        <text x="115" y="24" text-anchor="middle" font-family="'Source Serif 4',serif" font-size="13" fill="#1b2d42" font-weight="600">${escapeHtml(L.mass)}</text>
 
         <polygon points="115,150 85,178 145,178" fill="#253a52"/>
         <rect x="111" y="55" width="8" height="97" rx="2" fill="#253a52"/>
@@ -609,26 +696,49 @@
         <circle cx="51" cy="89" r="7" fill="#2ec4b6" stroke="#1a8c83" stroke-width="1.5"/>
         <circle cx="179" cy="89" r="7" fill="#2ec4b6" stroke="#1a8c83" stroke-width="1.5"/>
 
-        <text x="115" y="200" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#5a6475">a balance can weigh it</text>
+        <text x="115" y="200" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#5a6475">${escapeHtml(L.balance)}</text>
 
         <text x="245" y="120" text-anchor="middle" font-size="26" fill="#9ca3af">+</text>
 
         <!-- TAKES UP SPACE: a 3D box occupying volume -->
-        <text x="345" y="24" text-anchor="middle" font-family="'Source Serif 4',serif" font-size="13" fill="#1b2d42" font-weight="600">Takes up space</text>
+        <text x="345" y="24" text-anchor="middle" font-family="'Source Serif 4',serif" font-size="13" fill="#1b2d42" font-weight="600">${escapeHtml(L.space)}</text>
 
         <polygon points="300,113 365,113 389,95 324,95" fill="#eef6ff" stroke="#1a8c83" stroke-width="2.5" stroke-linejoin="round"/>
         <polygon points="365,113 365,178 389,160 389,95" fill="#a9d4f5" stroke="#1a8c83" stroke-width="2.5" stroke-linejoin="round"/>
         <polygon points="300,178 365,178 365,113 300,113" fill="#dbeafe" stroke="#1a8c83" stroke-width="2.5" stroke-linejoin="round"/>
 
-        <text x="345" y="200" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#5a6475">it has a volume</text>
+        <text x="345" y="200" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" fill="#5a6475">${escapeHtml(L.volume)}</text>
       </svg>`;
+  }
+
+  function practiceProblem(lang, idSuffix, prompt, difficulty, hint, answer) {
+    const diffClass = { basic: 'diff-basic', medium: 'diff-medium', challenge: 'diff-challenge' }[difficulty] || 'diff-basic';
+    const diffLabel = (DIFF_LABELS[lang] || DIFF_LABELS.en)[difficulty] || difficulty;
+    return `
+      <div class="practice-problem">
+        <div class="pp-header">
+          <span class="pp-num">Q</span>
+          <span class="pp-difficulty ${diffClass}">● ${escapeHtml(diffLabel)}</span>
+        </div>
+        <div class="pp-body">
+          <p><strong>${escapeHtml(prompt)}</strong></p>
+          <button type="button" class="hint-btn" data-hint-target="hint-${idSuffix}">${escapeHtml(t('hintShow', lang))}</button>
+          <button type="button" class="reveal-btn" data-answer-target="ans-${idSuffix}">${escapeHtml(t('revealAnswer', lang))}</button>
+          <div class="hint-box" id="hint-${idSuffix}">${escapeHtml(hint)}</div>
+          <div class="answer-box" id="ans-${idSuffix}">
+            <div class="answer-label">${escapeHtml(t('answerLabel', lang))}</div>
+            ${escapeHtml(answer)}
+          </div>
+        </div>
+      </div>`;
   }
 
   const STATIC_SECTIONS = [
     {
-      title: 'Before You Begin',
-      time: '2 min',
-      bodyHtml: `
+      title: { en: 'Before You Begin', es: 'Antes de Empezar' },
+      time: { en: '2 min', es: '2 min' },
+      bodyHtml: {
+        en: `
         <p>This review pulls together everything from <strong>Lessons 1–3</strong> — lab tools &amp; safety, properties, and the definition of matter — to get you ready for <strong>Chapter 1 Quiz A/B</strong>.</p>
         <p><strong>How this works:</strong></p>
         <ul>
@@ -643,12 +753,30 @@
           <li><span class="obj-check">◎</span> Tell physical properties apart from chemical properties</li>
           <li><span class="obj-check">◎</span> Define chemistry, hypothesis, and the scientific method</li>
           <li><span class="obj-check">◎</span> Identify key lab equipment and safety rules</li>
+        </ul>`,
+        es: `
+        <p>Este repaso reúne todo lo de las <strong>Lecciones 1 a 3</strong> — herramientas y seguridad del laboratorio, propiedades y la definición de la materia — para prepararte para el <strong>Quiz A/B del Capítulo 1</strong>.</p>
+        <p><strong>Cómo funciona esto:</strong></p>
+        <ul>
+          <li>Haz clic en el encabezado de una sección para abrirla y leer el contenido.</li>
+          <li>Resuelve cada problema de práctica tú mismo antes de hacer clic en <em>Mostrar Respuesta</em>.</li>
+          <li>Haz clic en <strong>Marcar como Completo</strong> al final de cada sección para pasar a la siguiente.</li>
+          <li>La última sección es una <strong>Comprobación de Comprensión calificada</strong> — esa guarda tu puntaje para tu maestro.</li>
+        </ul>
+        <p><strong>Al terminar este repaso, deberías poder:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Definir la materia y decidir si algo cuenta como materia</li>
+          <li><span class="obj-check">◎</span> Distinguir las propiedades físicas de las propiedades químicas</li>
+          <li><span class="obj-check">◎</span> Definir la química, la hipótesis y el método científico</li>
+          <li><span class="obj-check">◎</span> Identificar el equipo de laboratorio clave y las reglas de seguridad</li>
         </ul>`
+      }
     },
     {
-      title: 'What Is Matter?',
-      time: '5 min',
-      bodyHtml: `
+      title: { en: 'What Is Matter?', es: '¿Qué Es la Materia?' },
+      time: { en: '5 min', es: '5 min' },
+      bodyHtml: {
+        en: `
         <h2>The Definition of Matter</h2>
         <p>In Lesson 3 you were asked: <em>what do you think matter is?</em> Chemists have a precise answer.</p>
         <div class="concept-box">
@@ -656,7 +784,7 @@
           <p><strong>Matter</strong> is anything that has <em>mass</em> and takes up <em>space</em> (volume).</p>
         </div>
         <div class="diagram-wrap">
-          ${massVolumeSvg()}
+          ${massVolumeSvg('en')}
           <div class="diagram-caption">Something only counts as matter if BOTH are true — it must have mass AND take up space.</div>
         </div>
         <div class="info-panel">
@@ -668,24 +796,57 @@
         <div class="note-box">
           <span class="note-icon">📝</span>
           <div class="note-text">On your guided notes, write: <em>"Matter: anything that has mass and takes up space (volume). Energy is NOT matter, but it involves matter."</em></div>
+        </div>`,
+        es: `
+        <h2>La Definición de la Materia</h2>
+        <p>En la Lección 3 te preguntaron: <em>¿qué crees que es la materia?</em> Los químicos tienen una respuesta precisa.</p>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p>La <strong>materia</strong> es todo lo que tiene <em>masa</em> y ocupa <em>espacio</em> (volumen).</p>
+        </div>
+        <div class="diagram-wrap">
+          ${massVolumeSvg('es')}
+          <div class="diagram-caption">Algo solo cuenta como materia si AMBAS cosas son ciertas — debe tener masa Y ocupar espacio.</div>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">💡 Prueba Rápida</div>
+          <p>Pregúntate: ¿podría (en teoría) ponerlo en una balanza, y podría (en teoría) verterlo en un recipiente? Si la respuesta a ambas es sí, es materia.</p>
+        </div>
+        <h3>¿Qué NO Es Materia?</h3>
+        <p>La energía, la luz, el calor, el sonido y cosas como los pensamientos o las emociones <strong>no</strong> son materia — no tienen masa ni ocupan espacio, aunque son muy reales y a menudo <em>involucran</em> a la materia.</p>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, escribe: <em>"Materia: todo lo que tiene masa y ocupa espacio (volumen). La energía NO es materia, pero involucra a la materia."</em></div>
         </div>`
+      }
     },
     {
-      title: 'Classifying Matter',
-      time: '8 min',
-      bodyHtml: `
+      title: { en: 'Classifying Matter', es: 'Clasificando la Materia' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
         <p>Try each one yourself first — ask "does it have mass, and does it take up space?" — then check your answer.</p>
-        ${practiceProblem('c1', 'Is a shoe matter?', 'basic', 'Does it have mass, and does it take up space?', 'Yes — a shoe has mass and takes up volume. It’s matter.')}
-        ${practiceProblem('c2', 'Is anger matter?', 'basic', 'Could you weigh anger on a scale, or pour it into a container?', 'No — anger is an emotion. It has no mass and takes up no space, so it isn’t matter (even though it’s a real experience).')}
-        ${practiceProblem('c3', 'Is helium gas matter?', 'medium', 'Gases are invisible, but do they still have mass and volume?', 'Yes — helium is a gas, and gases still have mass and take up volume. Being invisible doesn’t disqualify something from being matter.')}
-        ${practiceProblem('c4', 'Is car exhaust matter?', 'medium', 'Exhaust is a mixture of gases — does that mixture have mass and volume?', 'Yes — car exhaust is a mixture of gases, and gases have mass and volume, so it counts as matter.')}
-        ${practiceProblem('c5', 'Is a beam of sunlight matter?', 'challenge', 'Light is a form of what, rather than matter?', 'No — light is a form of energy. It has no mass and takes up no space.')}
-        ${practiceProblem('c6', 'Is a thought matter?', 'challenge', 'Same test as always: mass and volume.', 'No — a thought has no mass and takes up no space, so it isn’t matter.')}`
+        ${practiceProblem('en', 'c1', 'Is a shoe matter?', 'basic', 'Does it have mass, and does it take up space?', 'Yes — a shoe has mass and takes up volume. It’s matter.')}
+        ${practiceProblem('en', 'c2', 'Is anger matter?', 'basic', 'Could you weigh anger on a scale, or pour it into a container?', 'No — anger is an emotion. It has no mass and takes up no space, so it isn’t matter (even though it’s a real experience).')}
+        ${practiceProblem('en', 'c3', 'Is helium gas matter?', 'medium', 'Gases are invisible, but do they still have mass and volume?', 'Yes — helium is a gas, and gases still have mass and take up volume. Being invisible doesn’t disqualify something from being matter.')}
+        ${practiceProblem('en', 'c4', 'Is car exhaust matter?', 'medium', 'Exhaust is a mixture of gases — does that mixture have mass and volume?', 'Yes — car exhaust is a mixture of gases, and gases have mass and volume, so it counts as matter.')}
+        ${practiceProblem('en', 'c5', 'Is a beam of sunlight matter?', 'challenge', 'Light is a form of what, rather than matter?', 'No — light is a form of energy. It has no mass and takes up no space.')}
+        ${practiceProblem('en', 'c6', 'Is a thought matter?', 'challenge', 'Same test as always: mass and volume.', 'No — a thought has no mass and takes up no space, so it isn’t matter.')}`,
+        es: `
+        <p>Intenta resolver cada uno tú mismo primero — pregúntate "¿tiene masa y ocupa espacio?" — y después revisa tu respuesta.</p>
+        ${practiceProblem('es', 'c1', '¿Es un zapato materia?', 'basic', '¿Tiene masa y ocupa espacio?', 'Sí — un zapato tiene masa y ocupa volumen. Es materia.')}
+        ${practiceProblem('es', 'c2', '¿Es el enojo materia?', 'basic', '¿Podrías pesar el enojo en una balanza, o verterlo en un recipiente?', 'No — el enojo es una emoción. No tiene masa ni ocupa espacio, así que no es materia (aunque es una experiencia real).')}
+        ${practiceProblem('es', 'c3', '¿Es el gas helio materia?', 'medium', 'Los gases son invisibles, pero ¿siguen teniendo masa y volumen?', 'Sí — el helio es un gas, y los gases siguen teniendo masa y ocupando volumen. Ser invisible no descalifica a algo de ser materia.')}
+        ${practiceProblem('es', 'c4', '¿Es el humo del escape de un auto materia?', 'medium', 'El escape es una mezcla de gases — ¿tiene esa mezcla masa y volumen?', 'Sí — el humo del escape es una mezcla de gases, y los gases tienen masa y volumen, así que cuenta como materia.')}
+        ${practiceProblem('es', 'c5', '¿Es un rayo de luz solar materia?', 'challenge', '¿La luz es una forma de qué, en lugar de materia?', 'No — la luz es una forma de energía. No tiene masa ni ocupa espacio.')}
+        ${practiceProblem('es', 'c6', '¿Es un pensamiento materia?', 'challenge', 'La misma prueba de siempre: masa y volumen.', 'No — un pensamiento no tiene masa ni ocupa espacio, así que no es materia.')}`
+      }
     },
     {
-      title: 'Physical vs. Chemical Properties',
-      time: '7 min',
-      bodyHtml: `
+      title: { en: 'Physical vs. Chemical Properties', es: 'Propiedades Físicas vs. Químicas' },
+      time: { en: '7 min', es: '7 min' },
+      bodyHtml: {
+        en: `
         <h2>Describing Matter: Properties</h2>
         <div class="concept-box">
           <div class="concept-label">Definition</div>
@@ -703,14 +864,37 @@
           <span class="note-icon">📝</span>
           <div class="note-text">On your guided notes, write your own definitions for <strong>Physical Properties</strong> and <strong>Chemical Properties</strong>, then list at least two examples of each.</div>
         </div>
-        ${practiceProblem('p1', 'Is boiling point a physical or chemical property?', 'basic', 'Can you observe it without turning the substance into something new?', 'Physical — you can observe boiling point without changing what the substance is.')}
-        ${practiceProblem('p2', 'Is flammability a physical or chemical property?', 'medium', 'Flammability describes what happens when a substance burns — does burning create a new substance?', 'Chemical — burning turns the substance into new substances (like ash and gases), so flammability is a chemical property.')}
-        ${practiceProblem('p3', 'A nail slowly rusts in the rain. Is rusting a physical or chemical change?', 'challenge', 'Rust (iron oxide) is a different substance than iron. Does that mean something new formed?', 'Chemical — rusting forms a brand new substance (iron oxide), so it reflects a chemical property/change, not a physical one.')}`
+        ${practiceProblem('en', 'p1', 'Is boiling point a physical or chemical property?', 'basic', 'Can you observe it without turning the substance into something new?', 'Physical — you can observe boiling point without changing what the substance is.')}
+        ${practiceProblem('en', 'p2', 'Is flammability a physical or chemical property?', 'medium', 'Flammability describes what happens when a substance burns — does burning create a new substance?', 'Chemical — burning turns the substance into new substances (like ash and gases), so flammability is a chemical property.')}
+        ${practiceProblem('en', 'p3', 'A nail slowly rusts in the rain. Is rusting a physical or chemical change?', 'challenge', 'Rust (iron oxide) is a different substance than iron. Does that mean something new formed?', 'Chemical — rusting forms a brand new substance (iron oxide), so it reflects a chemical property/change, not a physical one.')}`,
+        es: `
+        <h2>Describiendo la Materia: Propiedades</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p>Una <strong>propiedad</strong> es una característica de una sustancia que se usa para identificarla o describirla.</p>
+        </div>
+        <p>Las propiedades vienen en dos tipos:</p>
+        <table>
+          <thead><tr><th>Propiedades Físicas</th><th>Propiedades Químicas</th></tr></thead>
+          <tbody>
+            <tr><td>Se observan <em>sin</em> cambiar lo que es la sustancia</td><td>Describen cómo reacciona una sustancia o se convierte en algo nuevo</td></tr>
+            <tr><td>Color, densidad, dureza, punto de fusión/ebullición, masa, volumen</td><td>Inflamabilidad, reactividad con ácido, tendencia a oxidarse/deslustrarse, toxicidad</td></tr>
+          </tbody>
+        </table>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, escribe tus propias definiciones de <strong>Propiedades Físicas</strong> y <strong>Propiedades Químicas</strong>, y luego enumera al menos dos ejemplos de cada una.</div>
+        </div>
+        ${practiceProblem('es', 'p1', '¿Es el punto de ebullición una propiedad física o química?', 'basic', '¿Puedes observarlo sin convertir la sustancia en algo nuevo?', 'Física — puedes observar el punto de ebullición sin cambiar lo que es la sustancia.')}
+        ${practiceProblem('es', 'p2', '¿Es la inflamabilidad una propiedad física o química?', 'medium', 'La inflamabilidad describe lo que pasa cuando una sustancia se quema — ¿crea la combustión una nueva sustancia?', 'Química — quemarse convierte la sustancia en nuevas sustancias (como cenizas y gases), así que la inflamabilidad es una propiedad química.')}
+        ${practiceProblem('es', 'p3', 'Un clavo se oxida lentamente bajo la lluvia. ¿Es la oxidación un cambio físico o químico?', 'challenge', 'El óxido (óxido de hierro) es una sustancia diferente al hierro. ¿Significa eso que se formó algo nuevo?', 'Química — la oxidación forma una sustancia completamente nueva (óxido de hierro), así que refleja una propiedad/cambio químico, no físico.')}`
+      }
     },
     {
-      title: 'Chemistry, Hypotheses & the Scientific Method',
-      time: '6 min',
-      bodyHtml: `
+      title: { en: 'Chemistry, Hypotheses & the Scientific Method', es: 'La Química, las Hipótesis y el Método Científico' },
+      time: { en: '6 min', es: '6 min' },
+      bodyHtml: {
+        en: `
         <h2>What Is Chemistry?</h2>
         <div class="concept-box">
           <div class="concept-label">Definition</div>
@@ -725,12 +909,30 @@
           <div class="concept-label">Definition</div>
           <p>A <strong>hypothesis</strong> is a testable, educated explanation for an observation — not a proven fact, and not a random guess.</p>
         </div>
-        ${practiceProblem('h1', 'True or False: A hypothesis must turn out to be correct in order to count as a hypothesis.', 'medium', 'What actually makes something a hypothesis — being right, or being testable?', 'False — a hypothesis just needs to be a testable explanation. It can turn out to be wrong; that’s a normal, useful result in science.')}`
+        ${practiceProblem('en', 'h1', 'True or False: A hypothesis must turn out to be correct in order to count as a hypothesis.', 'medium', 'What actually makes something a hypothesis — being right, or being testable?', 'False — a hypothesis just needs to be a testable explanation. It can turn out to be wrong; that’s a normal, useful result in science.')}`,
+        es: `
+        <h2>¿Qué Es la Química?</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p>La <strong>química</strong> es el estudio de la materia, sus propiedades y cómo se puede cambiar la materia.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Cómo Empezó</div>
+          <p>Hace mucho tiempo, los alquimistas intentaron convertir metales comunes en oro. Nunca lo lograron — pero sus experimentos, herramientas y ensayo y error (muy poco científico) eventualmente dieron origen a la química moderna, que estudia la materia usando hipótesis comprobables en lugar de adivinanzas.</p>
+        </div>
+        <p>Los científicos resuelven problemas usando un enfoque <strong>sistemático</strong> (organizado, paso a paso), en lugar de adivinar al azar.</p>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p>Una <strong>hipótesis</strong> es una explicación fundamentada y comprobable de una observación — no un hecho comprobado, ni una suposición al azar.</p>
+        </div>
+        ${practiceProblem('es', 'h1', 'Verdadero o Falso: Una hipótesis debe resultar correcta para contar como hipótesis.', 'medium', '¿Qué es lo que realmente hace que algo sea una hipótesis — tener razón, o ser comprobable?', 'Falso — una hipótesis solo necesita ser una explicación comprobable. Puede resultar incorrecta; ese es un resultado normal y útil en la ciencia.')}`
+      }
     },
     {
-      title: 'Lab Tools & Safety',
-      time: '8 min',
-      bodyHtml: `
+      title: { en: 'Lab Tools & Safety', es: 'Herramientas y Seguridad del Laboratorio' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
         <h2>Tools of the Trade</h2>
         <table>
           <thead><tr><th>Equipment</th><th>What it's for</th></tr></thead>
@@ -757,48 +959,58 @@
           <li>Report spills or accidents to your teacher immediately</li>
           <li>If you're unsure about a step, ask your teacher before proceeding</li>
         </ul>
-        ${practiceProblem('s1', 'Which piece of equipment would you use to measure exactly 25 mL of a liquid?', 'basic', 'You need precision here, not just "roughly."', 'A graduated cylinder — it’s designed for precise liquid volume measurements.')}
-        ${practiceProblem('s2', 'A few drops of acid splash into your lab partner’s eyes. What should they do first?', 'medium', 'Think about which safety station is designed exactly for this.', 'Immediately flush their eyes at the eye wash station and tell your teacher right away.')}
-        ${practiceProblem('s3', 'True or False: If you’re not sure what a chemical is, a quick sniff can help you identify it safely.', 'challenge', 'Is smelling an unknown chemical ever the safe move?', 'False — never taste or directly smell an unknown chemical. If you must smell something, waft the vapor toward you from a distance, and only when instructed to.')}`
+        ${practiceProblem('en', 's1', 'Which piece of equipment would you use to measure exactly 25 mL of a liquid?', 'basic', 'You need precision here, not just "roughly."', 'A graduated cylinder — it’s designed for precise liquid volume measurements.')}
+        ${practiceProblem('en', 's2', 'A few drops of acid splash into your lab partner’s eyes. What should they do first?', 'medium', 'Think about which safety station is designed exactly for this.', 'Immediately flush their eyes at the eye wash station and tell your teacher right away.')}
+        ${practiceProblem('en', 's3', 'True or False: If you’re not sure what a chemical is, a quick sniff can help you identify it safely.', 'challenge', 'Is smelling an unknown chemical ever the safe move?', 'False — never taste or directly smell an unknown chemical. If you must smell something, waft the vapor toward you from a distance, and only when instructed to.')}`,
+        es: `
+        <h2>Herramientas del Oficio</h2>
+        <table>
+          <thead><tr><th>Equipo</th><th>Para qué sirve</th></tr></thead>
+          <tbody>
+            <tr><td>Probeta graduada</td><td>Medir con precisión el volumen de un líquido</td></tr>
+            <tr><td>Vaso de precipitados</td><td>Contener, mezclar y medir líquidos de forma aproximada</td></tr>
+            <tr><td>Matraz Erlenmeyer</td><td>Mezclar o agitar líquidos sin derramarlos</td></tr>
+            <tr><td>Tubo de ensayo y gradilla</td><td>Reacciones a pequeña escala; la gradilla mantiene los tubos verticales</td></tr>
+            <tr><td>Balanza</td><td>Medir la masa</td></tr>
+            <tr><td>Mechero Bunsen</td><td>Calentar sustancias</td></tr>
+            <tr><td>Estación de lavado de ojos</td><td>Enjuagar químicos de tus ojos</td></tr>
+            <tr><td>Extintor de incendios</td><td>Apagar un incendio en el laboratorio</td></tr>
+          </tbody>
+        </table>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, dibuja o describe una probeta graduada, una gradilla para tubos de ensayo, un matraz Erlenmeyer, una balanza y un mechero Bunsen. Luego anota dónde está ubicada la estación de lavado de ojos y el extintor de incendios en tu salón de clases.</div>
+        </div>
+        <h3>Reglas de Seguridad del Laboratorio</h3>
+        <ul>
+          <li>Usa siempre gafas de seguridad al trabajar con químicos</li>
+          <li>Nunca pruebes ni huelas directamente un químico desconocido</li>
+          <li>Camina en el laboratorio — nunca corras</li>
+          <li>Informa a tu maestro inmediatamente sobre derrames o accidentes</li>
+          <li>Si no estás seguro de un paso, pregúntale a tu maestro antes de continuar</li>
+        </ul>
+        ${practiceProblem('es', 's1', '¿Qué pieza de equipo usarías para medir exactamente 25 mL de un líquido?', 'basic', 'Aquí necesitas precisión, no solo algo "aproximado".', 'Una probeta graduada — está diseñada para medir con precisión el volumen de líquidos.')}
+        ${practiceProblem('es', 's2', 'Unas gotas de ácido le salpican los ojos a tu compañero de laboratorio. ¿Qué debería hacer primero?', 'medium', 'Piensa en qué estación de seguridad está diseñada exactamente para esto.', 'Enjuagarse los ojos de inmediato en la estación de lavado de ojos y avisar a tu maestro de inmediato.')}
+        ${practiceProblem('es', 's3', 'Verdadero o Falso: Si no estás seguro de qué es un químico, olerlo rápidamente puede ayudarte a identificarlo de forma segura.', 'challenge', '¿Alguna vez es seguro oler un químico desconocido?', 'Falso — nunca pruebes ni huelas directamente un químico desconocido. Si debes oler algo, abanica el vapor hacia ti desde una distancia, y solo cuando te lo indiquen.')}`
+      }
     }
   ];
 
-  function practiceProblem(idSuffix, prompt, difficulty, hint, answer) {
-    const diffClass = { basic: 'diff-basic', medium: 'diff-medium', challenge: 'diff-challenge' }[difficulty] || 'diff-basic';
-    const diffLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-    return `
-      <div class="practice-problem">
-        <div class="pp-header">
-          <span class="pp-num">Q</span>
-          <span class="pp-difficulty ${diffClass}">● ${escapeHtml(diffLabel)}</span>
-        </div>
-        <div class="pp-body">
-          <p><strong>${escapeHtml(prompt)}</strong></p>
-          <button type="button" class="hint-btn" data-hint-target="hint-${idSuffix}">💡 Hint</button>
-          <button type="button" class="reveal-btn" data-answer-target="ans-${idSuffix}">Reveal Answer</button>
-          <div class="hint-box" id="hint-${idSuffix}">${escapeHtml(hint)}</div>
-          <div class="answer-box" id="ans-${idSuffix}">
-            <div class="answer-label">✓ Answer</div>
-            ${escapeHtml(answer)}
-          </div>
-        </div>
-      </div>`;
-  }
-
   function render(host, ctx) {
     ensureStylesInjected();
+    const lang = getLang();
 
     const sectionsHtml = STATIC_SECTIONS.map((sec, i) => `
       <div class="section-card" id="cl-sec-${i}" data-section="${i}">
         <div class="section-header" data-toggle="${i}">
           <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
-          <span class="section-title">${escapeHtml(sec.title)}</span>
-          <span class="section-time">${escapeHtml(sec.time)}</span>
+          <span class="section-title">${escapeHtml(tr(sec.title, lang))}</span>
+          <span class="section-time">${escapeHtml(tr(sec.time, lang))}</span>
           <span class="section-arrow">▼</span>
         </div>
         <div class="section-body">
-          ${sec.bodyHtml}
-          <button type="button" class="mark-done-btn" data-mark-done="${i}">✓ Mark Section Complete</button>
+          ${tr(sec.bodyHtml, lang)}
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">${escapeHtml(t('markSectionComplete', lang))}</button>
         </div>
       </div>
     `).join('');
@@ -806,26 +1018,30 @@
     host.innerHTML = `
       <div class="chem-lesson">
         <div class="cl-header">
-          <div class="cl-header-label">Chapter 1 · Defining Matter</div>
+          <div class="cl-lang-toggle" role="group" aria-label="${escapeHtml(t('langToggleAria', lang))}">
+            <button type="button" class="cl-lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="cl-lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="cl-header-label">${escapeHtml(t('headerLabel', lang))}</div>
           <h1>${escapeHtml(ctx.activity.title)}</h1>
-          <div class="cl-header-meta">Self-Paced Review · ~35 Minutes · Good prep for Quiz A/B</div>
+          <div class="cl-header-meta">${escapeHtml(t('headerMeta', lang))}</div>
         </div>
         <div class="cl-progress-wrap">
-          <span class="cl-progress-label">Progress</span>
+          <span class="cl-progress-label">${escapeHtml(t('progress', lang))}</span>
           <div class="cl-progress-track"><div class="cl-progress-fill" id="cl-progress-fill"></div></div>
-          <span class="cl-progress-count" id="cl-progress-count">0 / ${SECTION_COUNT} sections</span>
+          <span class="cl-progress-count" id="cl-progress-count">${escapeHtml(t('sectionCount', lang, 0, SECTION_COUNT))}</span>
         </div>
         <main>
           ${sectionsHtml}
           <div class="section-card" id="cl-sec-6" data-section="6">
             <div class="section-header" data-toggle="6">
               <span class="section-num">✓</span>
-              <span class="section-title">Check for Understanding</span>
-              <span class="section-time">15 min · graded</span>
+              <span class="section-title">${escapeHtml(t('checkForUnderstanding', lang))}</span>
+              <span class="section-time">${escapeHtml(t('quizTimeGraded', lang))}</span>
               <span class="section-arrow">▼</span>
             </div>
             <div class="section-body">
-              <div class="quiz-note">Unlike the sections above, this quiz <strong>saves your score</strong> and reports it to your teacher. You can retake it any time — your most recent attempt is what's saved.</div>
+              <div class="quiz-note">${t('quizNote', lang)}</div>
               <div id="cl-quiz-mount"></div>
             </div>
           </div>
@@ -840,7 +1056,7 @@
       const done = completed.filter(Boolean).length;
       const pct = Math.round((done / SECTION_COUNT) * 100);
       root.querySelector('#cl-progress-fill').style.width = pct + '%';
-      root.querySelector('#cl-progress-count').textContent = `${done} / ${SECTION_COUNT} sections`;
+      root.querySelector('#cl-progress-count').textContent = t('sectionCount', lang, done, SECTION_COUNT);
     }
 
     function openSection(i, scroll) {
@@ -870,7 +1086,7 @@
         if (completed[i]) return;
         completed[i] = true;
         root.querySelector(`#cl-sec-${i}`).classList.add('done');
-        btn.textContent = '✓ Section Complete';
+        btn.textContent = t('sectionComplete', lang);
         btn.disabled = true;
         updateProgress();
         setTimeout(() => openSection(i + 1, true), 250);
@@ -881,14 +1097,23 @@
       btn.addEventListener('click', () => {
         const box = root.querySelector('#' + btn.getAttribute('data-hint-target'));
         const open = box.classList.toggle('open');
-        btn.textContent = open ? '▲ Hide Hint' : '💡 Hint';
+        btn.textContent = open ? t('hintHide', lang) : t('hintShow', lang);
       });
     });
     root.querySelectorAll('[data-answer-target]').forEach(btn => {
       btn.addEventListener('click', () => {
         const box = root.querySelector('#' + btn.getAttribute('data-answer-target'));
         const open = box.classList.toggle('open');
-        btn.textContent = open ? 'Hide Answer' : 'Reveal Answer';
+        btn.textContent = open ? t('hideAnswer', lang) : t('revealAnswer', lang);
+      });
+    });
+
+    root.querySelectorAll('[data-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newLang = btn.getAttribute('data-lang');
+        if (newLang === lang) return;
+        setLang(newLang);
+        render(host, ctx); // full re-render; progress lives in ctx.getProgress(), untouched by language
       });
     });
 
@@ -922,15 +1147,16 @@
   }
 
   function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const lang = getLang();
     const q = QUESTIONS[index];
     const pct = Math.round((index / QUESTIONS.length) * 100);
     mount.innerHTML = `
-      <div class="quiz-question-count">Question ${index + 1} of ${QUESTIONS.length}</div>
+      <div class="quiz-question-count">${escapeHtml(t('questionCount', lang, index + 1, QUESTIONS.length))}</div>
       <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
-      <p class="quiz-prompt">${escapeHtml(q.prompt)}</p>
+      <p class="quiz-prompt">${escapeHtml(tr(q.prompt, lang))}</p>
       <div id="cl-answer-area"></div>
       <div id="cl-feedback-area"></div>
-      <button type="button" class="cl-next-btn" id="cl-next-btn" style="display:none;">Next Question</button>
+      <button type="button" class="cl-next-btn" id="cl-next-btn" style="display:none;">${escapeHtml(t('nextQuestion', lang))}</button>
     `;
 
     const answerArea = mount.querySelector('#cl-answer-area');
@@ -939,7 +1165,7 @@
     let submitted = false;
 
     answerArea.innerHTML = q.choices.map((choice, i) => `
-      <button type="button" class="cl-choice" data-choice="${i}">${escapeHtml(choice)}</button>
+      <button type="button" class="cl-choice" data-choice="${i}">${escapeHtml(tr(choice, lang))}</button>
     `).join('');
 
     function submit(response, btnEl) {
@@ -956,7 +1182,7 @@
 
       feedbackArea.innerHTML = `
         <div class="cl-feedback ${correct ? 'correct' : 'incorrect'}">
-          ${correct ? '✓ Correct!' : '✗ Not quite.'} ${escapeHtml(q.explanation)}
+          ${correct ? escapeHtml(t('correctPrefix', lang)) : escapeHtml(t('incorrectPrefix', lang))} ${escapeHtml(tr(q.explanation, lang))}
         </div>
       `;
       nextBtn.style.display = 'inline-block';
@@ -990,14 +1216,15 @@
   }
 
   function renderQuizSummary(mount, ctx) {
+    const lang = getLang();
     const progress = ctx.getProgress();
     const score = progress ? progress.score : 0;
     const total = QUESTIONS.length;
     mount.innerHTML = `
       <div class="cl-summary">
         <div class="cl-score">${score} / ${total}</div>
-        <p>Nice work! You can retake this any time — your most recent attempt is what's saved and sent to your teacher.</p>
-        <button type="button" class="cl-retake-btn" id="cl-retake-btn">Retake Quiz</button>
+        <p>${escapeHtml(t('summaryText', lang))}</p>
+        <button type="button" class="cl-retake-btn" id="cl-retake-btn">${escapeHtml(t('retakeQuiz', lang))}</button>
       </div>
     `;
     mount.querySelector('#cl-retake-btn').addEventListener('click', async () => {

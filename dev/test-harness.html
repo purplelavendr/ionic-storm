@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ionic Storm — Activity Test Harness</title>
+</head>
+<body style="background:#f6f5fb; margin:0; font-family:-apple-system,sans-serif;">
+<!--
+  Dev-only harness for testing a review activity locally, without the real
+  roster login (which needs a live network connection this harness doesn't
+  have). Mounts an activity directly with a mock `ctx` shaped exactly like
+  the one app.js really passes to window.Activities[id].render(host, ctx).
+
+  NOT part of the live site: not referenced by index.html, and not in
+  apps-script/build.py's JS_FILES list, so it never enters the Apps Script
+  bundle or ships to students.
+
+  Usage: pick which activity to test by editing ACTIVITY_ID and the
+  <script src> below, then serve this repo with:
+    python3 -m http.server
+  and open http://localhost:8000/dev/test-harness.html
+-->
+<div style="max-width:900px;margin:20px auto;padding:0 16px;">
+  <p style="font-family:monospace;font-size:0.8rem;color:#666;">
+    dev harness — mock ctx, no backend. Open devtools console for logs.
+  </p>
+  <div id="host"></div>
+</div>
+
+<script src="../js/activities/matter-review.js"></script>
+<script src="../js/activities/elements-review.js"></script>
+<script>
+  const ACTIVITY_ID = 'elements-review'; // change to 'matter-review' to test Chapter 1
+
+  const ACTIVITY_META = {
+    'matter-review': { title: 'Chapter 1 Review: Defining Matter', unitId: 'unit1-alchemy' },
+    'elements-review': { title: 'Chapter 2 Review: Basic Building Materials', unitId: 'unit1-alchemy' }
+  };
+
+  let progress = null; // in-memory, mimics one activity's saved record
+
+  const ctx = {
+    activity: { id: ACTIVITY_ID, title: ACTIVITY_META[ACTIVITY_ID].title },
+    unit: { id: ACTIVITY_META[ACTIVITY_ID].unitId },
+    student: { name: 'Test Student' },
+    getProgress: () => progress,
+    saveProgress: (record) => {
+      progress = record;
+      console.log('[harness] saveProgress', JSON.parse(JSON.stringify(record)));
+      return Promise.resolve();
+    }
+  };
+
+  window.Activities[ACTIVITY_ID].render(document.getElementById('host'), ctx);
+</script>
+</body>
+</html>
