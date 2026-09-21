@@ -1,5 +1,8 @@
 // The unit/activity catalog. Add new units and activities here as the year goes on.
 //
+// Optional activity.chapter: the dashboard shows a chapter heading whenever it changes
+// from the previous activity's, so chapters group naturally inside one unit card.
+//
 // Activity types:
 //   'review' - a built-in interactive review. Needs a matching module registered
 //              on window.Activities[activity.id] (see js/activities/*.js).
@@ -14,6 +17,7 @@ const CONTENT = {
       activities: [
         {
           id: 'matter-review',
+          chapter: 'Chapter 1 · Defining Matter',
           type: 'review',
           title: 'Chapter 1 Review: Defining Matter',
           description: 'A guided walkthrough of lab tools & safety, properties, and what counts as matter, ending in a graded check for understanding — good prep for Quiz A/B.',
@@ -21,10 +25,19 @@ const CONTENT = {
         },
         {
           id: 'elements-review',
+          chapter: 'Chapter 2 · Basic Building Materials',
           type: 'review',
           title: 'Chapter 2 Review: Basic Building Materials',
           description: 'A guided walkthrough of elements, compounds, phases, conservation of mass, and the periodic table, ending in a graded check for understanding — good prep for Quiz A/B.',
           estimatedMinutes: 40
+        },
+        {
+          id: 'atomic-models',
+          chapter: 'Chapter 3 · A World of Particles',
+          type: 'review',
+          title: 'Lesson 11: Atomic Pudding',
+          description: 'An interactive, animated tour of the models of the atom — from solid sphere to electron cloud — with color-coded labels, two practice games, and a graded check.',
+          estimatedMinutes: 30
         }
       ]
     }

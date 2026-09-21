@@ -194,6 +194,19 @@ form select:disabled {
   padding: 0;
 }
 
+.chapter-heading {
+  list-style: none;
+  margin: 14px 0 2px;
+  padding: 0 4px;
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ion-accent);
+}
+.chapter-heading:first-child { margin-top: 4px; }
+
 .activity-row {
   display: flex;
   justify-content: space-between;

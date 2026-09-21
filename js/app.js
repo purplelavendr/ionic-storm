@@ -197,13 +197,18 @@ function renderDashboard(app) {
     const section = document.createElement('section');
     section.className = 'unit-card';
 
+    let lastChapter = null;
     const activitiesHtml = unit.activities.map(act => {
+      const chapterHtml = (act.chapter && act.chapter !== lastChapter)
+        ? `<li class="chapter-heading">${escapeHtml(act.chapter)}</li>`
+        : '';
+      lastChapter = act.chapter || lastChapter;
       const status = statusOf(act.id);
       const progress = Storage.getProgress(act.id);
       const scoreText = (status === 'completed' && progress && progress.totalQuestions)
         ? ` — ${progress.score}/${progress.totalQuestions}`
         : '';
-      return `
+      return `${chapterHtml}
         <li class="activity-row" data-activity-id="${act.id}">
           <div class="activity-info">
             <span class="activity-title">${escapeHtml(act.title)}</span>

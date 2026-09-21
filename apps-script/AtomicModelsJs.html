@@ -1,0 +1,1340 @@
+<script>
+// "Lesson 11: Atomic Pudding — Models of the Atom" (registered as CONTENT activity id
+// 'atomic-models'). Interactive version of the "Five Models of the Atom" handout and
+// "The Atomic Model Through Time" transparency: every model is an animated SVG with
+// colour-coded, labelled parts (red = positive, blue = negative, teal = empty space).
+//
+// Same accordion + graded-quiz shape as matter-review.js / elements-review.js:
+// explore -> compare -> practice games (ungraded) -> graded "Check for Understanding".
+// Only the quiz's score is saved via ctx.saveProgress.
+//
+// Supports the shared EN/ES toggle (LANG_KEY). Grading is by the answer's
+// positional index, never by displayed text, so language can't affect correctness.
+(function () {
+  const STYLE_ID = 'pd-lesson-styles';
+  const FONT_LINK_ID = 'el-lesson-fonts'; // shared with the chapter 1/2 reviews
+  const LANG_KEY = 'ionicstorm_lang_v1';  // shared literal: keeps language in sync across activities
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function getLang() {
+    try { return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'; } catch (e) { return 'en'; }
+  }
+  function setLang(lang) {
+    try { localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en'); } catch (e) { /* ignore */ }
+  }
+  function tr(field, lang) {
+    return (field && typeof field === 'object') ? (field[lang] || field.en) : field;
+  }
+  function t(key, lang, ...args) {
+    const entry = STRINGS[key] || {};
+    const val = entry[lang] || entry.en;
+    return typeof val === 'function' ? val(...args) : val;
+  }
+
+  // ---------------------------------------------------------------- UI strings
+  const STRINGS = {
+    headerLabel: { en: 'Chapter 3 · A World of Particles · Lesson 11', es: 'Capítulo 3 · Un Mundo de Partículas · Lección 11' },
+    headerMeta: { en: 'Interactive Handout · ~30 Minutes · Hover, tap, and watch the atoms move', es: 'Folleto Interactivo · ~30 Minutos · Pasa el cursor, toca y observa los átomos moverse' },
+    langToggleAria: { en: 'Language', es: 'Idioma' },
+    progress: { en: 'Progress', es: 'Progreso' },
+    sectionCount: { en: (d, n) => `${d} / ${n} sections`, es: (d, n) => `${d} / ${n} secciones` },
+    markSectionComplete: { en: '✓ Mark Section Complete', es: '✓ Marcar Sección como Completa' },
+    sectionComplete: { en: '✓ Section Complete', es: '✓ Sección Completa' },
+    checkForUnderstanding: { en: 'Check for Understanding', es: 'Comprobación de Comprensión' },
+    quizTimeGraded: { en: '8 min · graded', es: '8 min · calificado' },
+    quizNote: {
+      en: 'Unlike the sections above, this quiz <strong>saves your score</strong> and reports it to your teacher. You can retake it any time — your most recent attempt is what\'s saved.',
+      es: 'A diferencia de las secciones anteriores, este quiz <strong>guarda tu puntaje</strong> y se lo reporta a tu maestro. Puedes volver a hacerlo en cualquier momento — se guarda tu intento más reciente.'
+    },
+    questionCount: { en: (n, total) => `Question ${n} of ${total}`, es: (n, total) => `Pregunta ${n} de ${total}` },
+    nextQuestion: { en: 'Next Question', es: 'Siguiente Pregunta' },
+    correctPrefix: { en: '✓ Correct!', es: '✓ ¡Correcto!' },
+    incorrectPrefix: { en: '✗ Not quite.', es: '✗ No exactamente.' },
+    retakeQuiz: { en: 'Retake Quiz', es: 'Repetir el Quiz' },
+    summaryText: {
+      en: 'Nice work! You can retake this any time — your most recent attempt is what\'s saved and sent to your teacher.',
+      es: '¡Buen trabajo! Puedes repetirlo en cualquier momento — se guarda y se envía a tu maestro tu intento más reciente.'
+    },
+
+    // section titles
+    s0Title: { en: 'Meet the Models', es: 'Conoce los Modelos' },
+    s1Title: { en: 'Side by Side: The Atom Through Time', es: 'Lado a Lado: El Átomo a Través del Tiempo' },
+    s2Title: { en: 'Which Model Am I?', es: '¿Qué Modelo Soy?' },
+    s3Title: { en: 'Label the Parts', es: 'Etiqueta las Partes' },
+    s0Time: { en: '10 min', es: '10 min' },
+    s1Time: { en: '6 min', es: '6 min' },
+    s2Time: { en: '6 min', es: '6 min' },
+    s3Time: { en: '5 min', es: '5 min' },
+
+    // explorer
+    s0Intro: {
+      en: 'Scientists have pictured the atom in different ways as new evidence came in. Click a model on the timeline to see it in action. <strong>Hover over (or tap) any part</strong> of the atom to learn what it is.',
+      es: 'Los científicos han imaginado el átomo de distintas maneras a medida que surgía nueva evidencia. Haz clic en un modelo de la línea de tiempo para verlo en acción. <strong>Pasa el cursor (o toca) cualquier parte</strong> del átomo para saber qué es.'
+    },
+    prev: { en: '← Earlier', es: '← Anterior' },
+    next: { en: 'Later →', es: 'Siguiente →' },
+    tour: { en: '▶ Play the timeline', es: '▶ Recorrer la línea de tiempo' },
+    tourStop: { en: '■ Stop tour', es: '■ Detener recorrido' },
+    animPause: { en: '❚❚ Pause motion', es: '❚❚ Pausar movimiento' },
+    animPlay: { en: '▶ Resume motion', es: '▶ Reanudar movimiento' },
+    highlight: { en: 'Highlight:', es: 'Resaltar:' },
+    chipPos: { en: 'Positive (+)', es: 'Positivo (+)' },
+    chipNeg: { en: 'Negative (−)', es: 'Negativo (−)' },
+    chipSpace: { en: 'Empty space', es: 'Espacio vacío' },
+    chipAll: { en: 'Show all', es: 'Mostrar todo' },
+    hoverHint: { en: 'Hover over or tap a part of the atom to see what it is.', es: 'Pasa el cursor o toca una parte del átomo para ver qué es.' },
+    noPos: { en: 'This model has no positive parts.', es: 'Este modelo no tiene partes positivas.' },
+    noNeg: { en: 'This model has no negative parts.', es: 'Este modelo no tiene partes negativas.' },
+    noSpace: { en: 'This model has no empty space.', es: 'Este modelo no tiene espacio vacío.' },
+    factDivisible: { en: 'Can it be divided?', es: '¿Se puede dividir?' },
+    factPositive: { en: 'Positive charge', es: 'Carga positiva' },
+    factElectrons: { en: 'Electrons', es: 'Electrones' },
+    factSpace: { en: 'Empty space?', es: '¿Espacio vacío?' },
+    whyLabel: { en: '🔬 What led to this model?', es: '🔬 ¿Qué llevó a este modelo?' },
+    splitBtn: { en: '🔨 Try to split it!', es: '🔨 ¡Intenta dividirlo!' },
+    splitMsgs: {
+      en: ['Still one piece! In this model, atoms have no smaller parts.', 'Nope — nothing breaks off. It’s solid all the way through.', 'It won’t budge! (In 1897, Thomson would find out that atoms actually can be divided…)'],
+      es: ['¡Sigue siendo una pieza! En este modelo, los átomos no tienen partes más pequeñas.', 'No — nada se desprende. Es sólido por completo.', '¡No cede! (En 1897, Thomson descubriría que los átomos sí se pueden dividir…)']
+    },
+    by: { en: 'by', es: 'por' },
+
+    // side by side
+    s1Intro: {
+      en: 'Here are all six models at once, drawn the same way. Notice how each new model kept some ideas and changed others — and how the evidence behind each one pushed the picture forward.',
+      es: 'Aquí están los seis modelos a la vez, dibujados de la misma manera. Observa cómo cada nuevo modelo conservó algunas ideas y cambió otras — y cómo la evidencia detrás de cada uno hizo avanzar la imagen.'
+    },
+    legendTitle: { en: 'Color key', es: 'Clave de colores' },
+    legendPos: { en: 'Positive charge', es: 'Carga positiva' },
+    legendNeg: { en: 'Negative charge (electrons)', es: 'Carga negativa (electrones)' },
+    legendNeutral: { en: 'No charge', es: 'Sin carga' },
+    legendSpace: { en: 'Empty space', es: 'Espacio vacío' },
+    cmpTitle: { en: 'Compare the models', es: 'Compara los modelos' },
+    cmpModel: { en: 'Model', es: 'Modelo' },
+    cmpCols: {
+      en: ['Has smaller parts', 'Has a nucleus', 'Nucleus made of protons', 'Electrons in set orbits', 'Mostly empty space'],
+      es: ['Tiene partes más pequeñas', 'Tiene un núcleo', 'Núcleo hecho de protones', 'Electrones en órbitas fijas', 'Mayormente espacio vacío']
+    },
+    cmpNote: {
+      en: '✓ = yes · ✗ = no · ~ = sort of. In the cloud model the electrons are spread out in a fuzzy cloud instead of drawn as dots in empty space.',
+      es: '✓ = sí · ✗ = no · ~ = más o menos. En el modelo de nube, los electrones se distribuyen en una nube difusa en vez de dibujarse como puntos en el espacio vacío.'
+    },
+    openInExplorer: { en: 'Open in explorer ↗', es: 'Abrir en el explorador ↗' },
+
+    // which model am I
+    s2Intro: {
+      en: '<strong>1.</strong> Click a clue. <strong>2.</strong> Click the model it describes. Each model is used exactly once.',
+      es: '<strong>1.</strong> Haz clic en una pista. <strong>2.</strong> Haz clic en el modelo que describe. Cada modelo se usa exactamente una vez.'
+    },
+    pickClue: { en: 'Pick a clue first 👆', es: 'Elige primero una pista 👆' },
+    tryAgain: { en: 'Not that one — re-read the clue and look at the colors.', es: 'Ese no — vuelve a leer la pista y mira los colores.' },
+    matchGood: { en: (n) => `✓ Yes — ${n}!`, es: (n) => `✓ Sí — ¡${n}!` },
+    matchDone: { en: '🎉 All six matched! Head to the next section.', es: '🎉 ¡Los seis emparejados! Pasa a la siguiente sección.' },
+    matchProgress: { en: (d) => `${d} / 6 matched`, es: (d) => `${d} / 6 emparejados` },
+
+    // label game
+    s3Intro: {
+      en: 'A part of the atom is pulsing. What is it? Pick the right label.',
+      es: 'Una parte del átomo está pulsando. ¿Qué es? Elige la etiqueta correcta.'
+    },
+    labelRound: { en: (n, total) => `Round ${n} of ${total}`, es: (n, total) => `Ronda ${n} de ${total}` },
+    labelQ: { en: (m) => `Which part is pulsing in the ${m}?`, es: (m) => `¿Qué parte está pulsando en el ${m}?` },
+    labelDone: { en: (s, n) => `You labeled ${s} of ${n} parts correctly on the first try. (This one is just practice — it isn’t graded.)`, es: (s, n) => `Etiquetaste correctamente ${s} de ${n} partes al primer intento. (Esta es solo práctica — no se califica.)` },
+    labelAgain: { en: 'Play again', es: 'Jugar de nuevo' }
+  };
+
+  // ---------------------------------------------------------------- part glossary
+  // pid -> hover caption + category (drives colour)
+  const PARTS = {
+    nucleus:  { cat: 'pos',     name: { en: 'Nucleus', es: 'Núcleo' }, desc: { en: 'The dense, positively charged center of the atom. It takes up only a tiny amount of the atom’s space.', es: 'El centro denso y con carga positiva del átomo. Ocupa solo una pequeña parte del espacio del átomo.' } },
+    protons:  { cat: 'pos',     name: { en: 'Protons', es: 'Protones' }, desc: { en: 'Positively charged particles. Together they make up the nucleus.', es: 'Partículas con carga positiva. Juntas forman el núcleo.' } },
+    neutron:  { cat: 'neutral', name: { en: 'Neutrons', es: 'Neutrones' }, desc: { en: 'Particles in the nucleus with no charge at all.', es: 'Partículas del núcleo sin ninguna carga.' } },
+    electron: { cat: 'neg',     name: { en: 'Electron', es: 'Electrón' }, desc: { en: 'A tiny, negatively charged particle.', es: 'Una partícula diminuta con carga negativa.' } },
+    fluid:    { cat: 'pos',     name: { en: 'Positive fluid (“pudding”)', es: 'Fluido positivo (“pudín”)' }, desc: { en: 'A positively charged fluid that spreads out through the whole atom. Most of the atom is made of it.', es: 'Un fluido con carga positiva que se extiende por todo el átomo. La mayor parte del átomo está hecha de él.' } },
+    sphere:   { cat: 'neutral', name: { en: 'Solid sphere', es: 'Esfera sólida' }, desc: { en: 'The whole atom: one solid piece that can’t be divided into smaller parts.', es: 'El átomo completo: una sola pieza sólida que no se puede dividir en partes más pequeñas.' } },
+    orbit:    { cat: 'neutral', name: { en: 'Orbit', es: 'Órbita' }, desc: { en: 'The path an electron follows around the nucleus.', es: 'El camino que sigue un electrón alrededor del núcleo.' } },
+    space:    { cat: 'space',   name: { en: 'Empty space', es: 'Espacio vacío' }, desc: { en: 'Nothing but empty space between the tiny nucleus and the tiny electrons. Most of the atom is here!', es: 'Solo espacio vacío entre el diminuto núcleo y los diminutos electrones. ¡Aquí está la mayor parte del átomo!' } },
+    cloud:    { cat: 'neg',     name: { en: 'Electron cloud', es: 'Nube de electrones' }, desc: { en: 'The region where electrons are likely to be found. They don’t follow one fixed path.', es: 'La región donde es probable encontrar electrones. No siguen un camino fijo.' } }
+  };
+  const CAT_COLOR = { pos: '#dc2626', neg: '#2563eb', space: '#0f766e', neutral: '#475569' };
+
+  // ---------------------------------------------------------------- drawing
+  const CX = 120, CY = 125;
+  let uidN = 0;
+
+  function electronG(id, motion, params) {
+    return `<g class="pd-el" data-part="neg" data-pid="electron" data-id="${id}" data-m="${motion}" data-p="${params}"><circle r="6.5"/><path d="M-3 0H3"/></g>`;
+  }
+  function protonG(x, y) {
+    return `<g class="pd-pr" data-part="pos" data-pid="protons" transform="translate(${x} ${y})"><circle r="5.6"/><path d="M-2.8 0H2.8M0 -2.8V2.8"/></g>`;
+  }
+  function neutronG(x, y) {
+    return `<g class="pd-ne" data-part="neutral" data-pid="neutron" transform="translate(${x} ${y})"><circle r="5.6"/></g>`;
+  }
+  function nucleusG() {
+    return `<g class="pd-nuc" data-part="pos" data-pid="nucleus"><circle cx="${CX}" cy="${CY}" r="15"/><path d="M${CX - 6} ${CY}H${CX + 6}M${CX} ${CY - 6}V${CY + 6}"/></g>`;
+  }
+  function spaceCircle(r) {
+    return `<circle class="pd-space" data-part="space" data-pid="space" cx="${CX}" cy="${CY}" r="${r}"/>`;
+  }
+  function orbitEllipse(rx, ry, rot) {
+    return `<ellipse class="pd-orbit" data-part="orbit" data-pid="orbit" cx="${CX}" cy="${CY}" rx="${rx}" ry="${ry}" transform="rotate(${rot} ${CX} ${CY})"/>`;
+  }
+  // cluster of 7 particles around the centre; kinds[i] = 'p' | 'n'
+  const CLUSTER = [[0, 0], [10.5, 0], [-10.5, 0], [5.25, 9.1], [-5.25, 9.1], [5.25, -9.1], [-5.25, -9.1]];
+  function cluster(kinds) {
+    return CLUSTER.map((pt, i) => (kinds[i] === 'n' ? neutronG : protonG)(CX + pt[0], CY + pt[1])).join('');
+  }
+  function orbitPoint(rx, ry, rot, thDeg) {
+    const th = thDeg * Math.PI / 180, a = rot * Math.PI / 180;
+    return [CX + rx * Math.cos(th) * Math.cos(a) - ry * Math.sin(th) * Math.sin(a),
+            CY + rx * Math.cos(th) * Math.sin(a) + ry * Math.sin(th) * Math.cos(a)];
+  }
+
+  // Each DRAW fn returns { body, callouts }. callout: { pid, label:{en,es}, tx, ty, ly, follow? }
+  const DRAW = {
+    solid(u) {
+      return {
+        body: `<defs><radialGradient id="${u}g" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#f3f4f6"/><stop offset=".55" stop-color="#9ca3af"/><stop offset="1" stop-color="#4b5563"/></radialGradient></defs>
+          <g class="pd-sphere" data-part="neutral" data-pid="sphere"><circle cx="${CX}" cy="${CY}" r="80" fill="url(#${u}g)" stroke="#374151" stroke-width="3"/></g>`,
+        callouts: [{ pid: 'sphere', label: { en: 'Solid\nsphere', es: 'Esfera\nsólida' }, tx: CX + 57, ty: CY - 57, ly: CY - 5 }]
+      };
+    },
+    plum(u) {
+      const base = [[-40, -45], [10, -60], [52, -30], [-62, -5], [-15, -10], [30, 10], [60, 35], [-35, 40], [8, 55]];
+      const els = base.map((b, i) => electronG('e' + i, 'jig', `${CX + b[0]} ${CY + b[1]} 5 5 ${(1.5 + i * 0.17).toFixed(2)} ${(i * 0.9).toFixed(2)}`)).join('');
+      return {
+        body: `<defs><radialGradient id="${u}g" cx=".5" cy=".5" r=".55"><stop offset="0" stop-color="#fecaca"/><stop offset="1" stop-color="#f87171" stop-opacity=".75"/></radialGradient></defs>
+          <g class="pd-fluid" data-part="pos" data-pid="fluid"><circle cx="${CX}" cy="${CY}" r="95" fill="url(#${u}g)" stroke="#dc2626" stroke-opacity=".5" stroke-width="2"/></g>${els}`,
+        callouts: [
+          { pid: 'electron', label: { en: 'Negative\nelectron (“plum”)', es: 'Electrón\nnegativo (“ciruela”)' }, follow: 'e2', tx: CX + 52, ty: CY - 30, ly: CY - 55 },
+          { pid: 'fluid', label: { en: 'Positive\nfluid (“pudding”)', es: 'Fluido positivo\n(“pudín”)' }, tx: CX + 46, ty: CY + 66, ly: CY + 50 }
+        ]
+      };
+    },
+    nuclear(u) {
+      const orbs = [[0, 6, 0.1], [60, 7.5, 0.45], [120, 5.2, 0.75]];
+      const ell = orbs.map(o => orbitEllipse(98, 34, o[0])).join('');
+      const els = orbs.map((o, i) => electronG('e' + i, 'orbit', `${CX} ${CY} 98 34 ${o[0]} ${o[1]} ${o[2]}`)).join('');
+      return {
+        body: `${spaceCircle(104)}${ell}${nucleusG()}${els}`,
+        callouts: [
+          { pid: 'electron', label: { en: 'Negative\nelectron', es: 'Electrón\nnegativo' }, follow: 'e0', tx: CX, ty: CY, ly: CY - 55 },
+          { pid: 'nucleus', label: { en: 'Positive\nnucleus', es: 'Núcleo\npositivo' }, tx: CX + 11, ty: CY + 11, ly: CY + 20 },
+          { pid: 'space', label: { en: 'Empty\nspace', es: 'Espacio\nvacío' }, tx: CX + 66, ty: CY + 68, ly: CY + 78 }
+        ]
+      };
+    },
+    proton(u) {
+      const orbs = [[0, 6, 0.1], [60, 7.5, 0.4], [120, 5.2, 0.7]];
+      const ell = orbs.map(o => orbitEllipse(98, 34, o[0])).join('');
+      const els = [[0, 0.1], [0, 0.6], [1, 0.4], [1, 0.9], [2, 0.7]].map((p, i) =>
+        electronG('e' + i, 'orbit', `${CX} ${CY} 98 34 ${orbs[p[0]][0]} ${orbs[p[0]][1]} ${p[1]}`)).join('');
+      return {
+        body: `${spaceCircle(104)}${ell}${cluster('ppppppp')}${els}`,
+        callouts: [
+          { pid: 'electron', label: { en: 'Negative\nelectron', es: 'Electrón\nnegativo' }, follow: 'e0', tx: CX, ty: CY, ly: CY - 55 },
+          { pid: 'protons', label: { en: 'Nucleus of\npositive protons', es: 'Núcleo de\nprotones positivos' }, tx: CX + 15, ty: CY + 8, ly: CY + 20 },
+          { pid: 'space', label: { en: 'Empty\nspace', es: 'Espacio\nvacío' }, tx: CX + 66, ty: CY + 68, ly: CY + 78 }
+        ]
+      };
+    },
+    solar(u) {
+      const outer = orbitPoint(90, 90, 0, 35);
+      return {
+        body: `${spaceCircle(104)}
+          <circle class="pd-orbit" data-part="orbit" data-pid="orbit" cx="${CX}" cy="${CY}" r="52"/>
+          <circle class="pd-orbit" data-part="orbit" data-pid="orbit" cx="${CX}" cy="${CY}" r="90"/>
+          ${nucleusG()}
+          ${electronG('e0', 'orbit', `${CX} ${CY} 52 52 0 3.4 0.05`)}${electronG('e1', 'orbit', `${CX} ${CY} 52 52 0 3.4 0.55`)}
+          ${electronG('e2', 'orbit', `${CX} ${CY} 90 90 0 7.6 0.1`)}${electronG('e3', 'orbit', `${CX} ${CY} 90 90 0 7.6 0.43`)}${electronG('e4', 'orbit', `${CX} ${CY} 90 90 0 7.6 0.77`)}`,
+        callouts: [
+          { pid: 'electron', label: { en: 'Negative\nelectron', es: 'Electrón\nnegativo' }, follow: 'e2', tx: CX, ty: CY, ly: CY - 65 },
+          { pid: 'orbit', label: { en: 'Orbit (set\ndistance)', es: 'Órbita (distancia\nfija)' }, tx: outer[0], ty: outer[1], ly: CY + 55 },
+          { pid: 'nucleus', label: { en: 'Positive\nnucleus', es: 'Núcleo\npositivo' }, tx: CX + 11, ty: CY + 11, ly: CY + 5 }
+        ]
+      };
+    },
+    cloud(u) {
+      const dots = [0, 1, 2, 3, 4, 5, 6, 7].map(i => electronG('e' + i, 'hop', `${i + 1}`)).join('');
+      return {
+        body: `<defs><radialGradient id="${u}g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#93c5fd" stop-opacity="0"/><stop offset=".16" stop-color="#93c5fd" stop-opacity=".15"/><stop offset=".45" stop-color="#3b82f6" stop-opacity=".5"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0"/></radialGradient></defs>
+          <g class="pd-cloud" data-part="neg" data-pid="cloud"><circle cx="${CX}" cy="${CY}" r="104" fill="url(#${u}g)"/></g>
+          ${cluster('pnpnpnp')}${dots}`,
+        callouts: [
+          { pid: 'cloud', label: { en: 'Negative electron\ncloud', es: 'Nube de electrones\nnegativa' }, tx: CX + 62, ty: CY - 50, ly: CY - 55 },
+          { pid: 'nucleus', label: { en: 'Nucleus (protons\n+ neutrons)', es: 'Núcleo (protones\n+ neutrones)' }, tx: CX + 15, ty: CY + 6, ly: CY + 40 }
+        ]
+      };
+    }
+  };
+
+  function atomSvg(modelId, opts) {
+    opts = opts || {};
+    const lang = opts.lang || 'en';
+    const m = MODEL_BY_ID[modelId];
+    const u = 'pd' + (++uidN);
+    const d = DRAW[modelId](u);
+    let callouts = '';
+    if (opts.labels) {
+      callouts = d.callouts.map(c => {
+        const part = PARTS[c.pid];
+        const col = CAT_COLOR[part.cat];
+        const follow = c.follow ? ` data-follow="${c.follow}"` : '';
+        const lines = tr(c.label, lang).split('\n');
+        const text = lines.map((ln, i) => `<tspan x="252" dy="${i === 0 ? 0 : 14}">${escapeHtml(ln)}</tspan>`).join('');
+        return `<g class="pd-callout" data-pid="${c.pid}">
+          <line x1="${c.tx}" y1="${c.ty}" x2="246" y2="${c.ly}"${follow}/>
+          <circle r="2.6" cx="${c.tx}" cy="${c.ty}"${follow ? ' data-follow-dot="' + c.follow + '"' : ''}/>
+          <text x="252" y="${c.ly + 3}" fill="${col}">${text}</text>
+        </g>`;
+      }).join('');
+    }
+    const vb = opts.labels ? '0 0 390 250' : '12 20 216 216';
+    const attrs = opts.target ? ` data-target="${opts.target}"` : '';
+    return `<svg class="pd-svg" viewBox="${vb}" role="img" aria-label="${escapeHtml(tr(m.name, lang))}"${attrs}>${d.body}${callouts}</svg>`;
+  }
+
+  // ---- animation engine: generic per-element motion, driven by one rAF loop ----
+  function hash(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+
+  function stepAtom(svg, t) {
+    const pos = {};
+    svg.querySelectorAll('[data-m]').forEach(el => {
+      const p = el.getAttribute('data-p').split(' ').map(Number);
+      const m = el.getAttribute('data-m');
+      let x, y;
+      if (m === 'orbit') {
+        const th = 2 * Math.PI * (t / p[5] + p[6]), a = p[4] * Math.PI / 180;
+        x = p[0] + p[2] * Math.cos(th) * Math.cos(a) - p[3] * Math.sin(th) * Math.sin(a);
+        y = p[1] + p[2] * Math.cos(th) * Math.sin(a) + p[3] * Math.sin(th) * Math.cos(a);
+      } else if (m === 'jig') {
+        x = p[0] + p[2] * Math.cos(p[4] * t + p[5]);
+        y = p[1] + p[3] * Math.sin(1.31 * p[4] * t + p[5] * 1.7);
+      } else { // hop: electrons blink in at a new random spot in the cloud
+        const seed = p[0], per = 1.1, tt = t / per + seed * 0.37, k = Math.floor(tt), f = tt - k;
+        const ang = hash(seed * 97 + k * 13) * 2 * Math.PI, rad = 26 + hash(seed * 31 + k * 57 + 7) * 62;
+        x = CX + rad * Math.cos(ang); y = CY + rad * Math.sin(ang);
+        el.setAttribute('opacity', (Math.sin(Math.PI * f) * 0.95).toFixed(3));
+      }
+      el.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+      const id = el.getAttribute('data-id');
+      if (id) pos[id] = [x, y];
+    });
+    svg.querySelectorAll('[data-follow]').forEach(l => { const q = pos[l.getAttribute('data-follow')]; if (q) { l.setAttribute('x1', q[0].toFixed(2)); l.setAttribute('y1', q[1].toFixed(2)); } });
+    svg.querySelectorAll('[data-follow-dot]').forEach(c => { const q = pos[c.getAttribute('data-follow-dot')]; if (q) { c.setAttribute('cx', q[0].toFixed(2)); c.setAttribute('cy', q[1].toFixed(2)); } });
+  }
+
+  function createAnimator(root) {
+    const targets = new Set();
+    let raf = 0, acc = 0, last = 0;
+    let paused = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    function frame(now) {
+      if (!root.isConnected) { raf = 0; return; }
+      if (last && !paused) acc += Math.min((now - last) / 1000, 0.1);
+      last = now;
+      targets.forEach(svg => { if (!svg.isConnected) targets.delete(svg); else stepAtom(svg, acc); });
+      raf = requestAnimationFrame(frame);
+    }
+    return {
+      add(svg) { targets.add(svg); stepAtom(svg, acc); if (!raf) raf = requestAnimationFrame(frame); },
+      setPaused(p) { paused = p; },
+      isPaused() { return paused; }
+    };
+  }
+
+  // ---------------------------------------------------------------- model data
+  const MODELS = [
+    {
+      id: 'solid', year: 1803,
+      who: { en: 'John Dalton', es: 'John Dalton' },
+      name: { en: 'Solid Sphere Model', es: 'Modelo de la Esfera Sólida' },
+      short: { en: 'Solid Sphere', es: 'Esfera Sólida' },
+      desc: {
+        en: `The atom is a <b class="c-neu">solid sphere</b> that cannot be divided up into smaller particles or pieces.`,
+        es: `El átomo es una <b class="c-neu">esfera sólida</b> que no se puede dividir en partículas o piezas más pequeñas.`
+      },
+      facts: {
+        divisible: { en: 'No — it’s one solid piece.', es: 'No — es una sola pieza sólida.' },
+        positive: { en: 'None — this model has no charged parts.', es: 'Ninguna — este modelo no tiene partes con carga.' },
+        electrons: { en: 'None — electrons haven’t been discovered yet.', es: 'Ninguno — los electrones aún no se han descubierto.' },
+        space: { en: 'None — solid all the way through.', es: 'Ninguno — es sólido por completo.' }
+      },
+      why: {
+        en: 'The starting point. Dalton pictured atoms as tiny, hard, indivisible balls — the simplest idea that explained how elements combine.',
+        es: 'El punto de partida. Dalton imaginó los átomos como bolitas diminutas, duras e indivisibles — la idea más simple para explicar cómo se combinan los elementos.'
+      },
+      big: { en: 'Atoms are indivisible balls.', es: 'Los átomos son bolas indivisibles.' },
+      cmp: ['n', 'n', 'n', 'n', 'n'],
+      noPart: { pos: { en: 'No charges in this model — it’s just a solid sphere.', es: 'No hay cargas en este modelo — es solo una esfera sólida.' }, neg: { en: 'No electrons in this model — they haven’t been discovered yet.', es: 'No hay electrones en este modelo — aún no se descubren.' }, space: { en: 'No empty space — it’s solid all the way through.', es: 'No hay espacio vacío — es sólido por completo.' } }
+    },
+    {
+      id: 'plum', year: 1897,
+      who: { en: 'J.J. Thomson', es: 'J.J. Thomson' },
+      name: { en: 'Plum Pudding Model', es: 'Modelo del Pudín de Ciruelas' },
+      short: { en: 'Plum Pudding', es: 'Pudín de Ciruelas' },
+      desc: {
+        en: `The atom can be divided into a <b class="c-pos">fluid</b> (the “pudding”) and <b class="c-neg">electrons</b> (the “plums”). The fluid spreads out in the atom and is <b class="c-pos">positively charged</b>. The electrons are very tiny and <b class="c-neg">negatively charged</b>. Most of the atom is made of fluid.`,
+        es: `El átomo se puede dividir en un <b class="c-pos">fluido</b> (el “pudín”) y <b class="c-neg">electrones</b> (las “ciruelas”). El fluido se extiende por el átomo y tiene <b class="c-pos">carga positiva</b>. Los electrones son muy pequeños y tienen <b class="c-neg">carga negativa</b>. La mayor parte del átomo está hecha de fluido.`
+      },
+      facts: {
+        divisible: { en: 'Yes — into fluid and electrons.', es: 'Sí — en fluido y electrones.' },
+        positive: { en: 'Spread out through the whole fluid.', es: 'Distribuida por todo el fluido.' },
+        electrons: { en: 'Tiny and negative — scattered through the fluid like plums.', es: 'Diminutos y negativos — dispersos en el fluido como ciruelas.' },
+        space: { en: 'Almost none — most of the atom is fluid.', es: 'Casi ninguno — la mayor parte del átomo es fluido.' }
+      },
+      why: {
+        en: 'In 1897 Thomson discovered the electron. Atoms couldn’t be indivisible after all — they had to contain tiny negative pieces, balanced by positive stuff.',
+        es: 'En 1897 Thomson descubrió el electrón. Los átomos no podían ser indivisibles — debían contener piezas negativas diminutas, equilibradas por algo positivo.'
+      },
+      big: { en: 'Electrons are stuck in positive “pudding.”', es: 'Los electrones están incrustados en un “pudín” positivo.' },
+      cmp: ['y', 'n', 'n', 'n', 'n'],
+      noPart: { space: { en: 'No empty space — the whole atom is filled with positive fluid.', es: 'No hay espacio vacío — todo el átomo está lleno de fluido positivo.' } }
+    },
+    {
+      id: 'nuclear', year: 1911,
+      who: { en: 'Ernest Rutherford', es: 'Ernest Rutherford' },
+      name: { en: 'Nuclear Model', es: 'Modelo Nuclear' },
+      short: { en: 'Nuclear', es: 'Nuclear' },
+      desc: {
+        en: `The atom can be divided into a <b class="c-pos">nucleus</b> and <b class="c-neg">electrons</b>. The nucleus occupies a small amount of space at the center of the atom. The nucleus is dense and <b class="c-pos">positively charged</b>. The electrons circle around the nucleus. The electrons are tiny and <b class="c-neg">negatively charged</b>. Most of the atom is <b class="c-spc">empty space</b>.`,
+        es: `El átomo se puede dividir en un <b class="c-pos">núcleo</b> y <b class="c-neg">electrones</b>. El núcleo ocupa una pequeña cantidad de espacio en el centro del átomo. El núcleo es denso y tiene <b class="c-pos">carga positiva</b>. Los electrones giran alrededor del núcleo. Los electrones son diminutos y tienen <b class="c-neg">carga negativa</b>. La mayor parte del átomo es <b class="c-spc">espacio vacío</b>.`
+      },
+      facts: {
+        divisible: { en: 'Yes — into a nucleus and electrons.', es: 'Sí — en un núcleo y electrones.' },
+        positive: { en: 'Packed into a small, dense nucleus at the center.', es: 'Concentrada en un núcleo pequeño y denso en el centro.' },
+        electrons: { en: 'Tiny and negative — they circle around the nucleus.', es: 'Diminutos y negativos — giran alrededor del núcleo.' },
+        space: { en: 'Most of the atom is empty space.', es: 'La mayor parte del átomo es espacio vacío.' }
+      },
+      why: {
+        en: 'In Rutherford’s gold-foil experiment, a few particles bounced straight back. That meant the positive charge wasn’t spread out like pudding — it had to be packed into a tiny, dense center.',
+        es: 'En el experimento de la lámina de oro de Rutherford, unas pocas partículas rebotaron directamente. Eso significaba que la carga positiva no estaba repartida como pudín — debía estar concentrada en un centro diminuto y denso.'
+      },
+      big: { en: 'A tiny, dense nucleus with electrons circling.', es: 'Un núcleo diminuto y denso con electrones girando.' },
+      cmp: ['y', 'y', 'n', 'n', 'y'],
+      noPart: {}
+    },
+    {
+      id: 'solar', year: 1913,
+      who: { en: 'Niels Bohr', es: 'Niels Bohr' },
+      name: { en: 'Solar System Model', es: 'Modelo del Sistema Solar' },
+      short: { en: 'Solar System', es: 'Sistema Solar' },
+      desc: {
+        en: `The atom can be divided into a <b class="c-pos">nucleus</b> and <b class="c-neg">electrons</b>. The nucleus is at the center of the atom and is <b class="c-pos">positively charged</b>. The electrons circle around the nucleus in <b>specified orbits</b>. The electrons are tiny and <b class="c-neg">negatively charged</b>. Different electrons are in orbits at different distances from the nucleus. Most of the atom is <b class="c-spc">empty space</b>.`,
+        es: `El átomo se puede dividir en un <b class="c-pos">núcleo</b> y <b class="c-neg">electrones</b>. El núcleo está en el centro del átomo y tiene <b class="c-pos">carga positiva</b>. Los electrones giran alrededor del núcleo en <b>órbitas específicas</b>. Los electrones son diminutos y tienen <b class="c-neg">carga negativa</b>. Distintos electrones están en órbitas a diferentes distancias del núcleo. La mayor parte del átomo es <b class="c-spc">espacio vacío</b>.`
+      },
+      facts: {
+        divisible: { en: 'Yes — into a nucleus and electrons.', es: 'Sí — en un núcleo y electrones.' },
+        positive: { en: 'In the nucleus at the center.', es: 'En el núcleo, en el centro.' },
+        electrons: { en: 'Circle the nucleus in specified orbits, at different distances.', es: 'Giran alrededor del núcleo en órbitas específicas, a distintas distancias.' },
+        space: { en: 'Most of the atom is empty space.', es: 'La mayor parte del átomo es espacio vacío.' }
+      },
+      why: {
+        en: 'Bohr proposed that electrons can only travel at certain, specific distances from the nucleus — a bit like planets in set orbits around the Sun. Watch how the inner electrons move faster.',
+        es: 'Bohr propuso que los electrones solo pueden viajar a ciertas distancias específicas del núcleo — algo así como planetas en órbitas fijas alrededor del Sol. Observa cómo los electrones internos se mueven más rápido.'
+      },
+      big: { en: 'Electrons travel in set orbits.', es: 'Los electrones viajan en órbitas fijas.' },
+      cmp: ['y', 'y', 'n', 'y', 'y'],
+      noPart: {}
+    },
+    {
+      id: 'proton', year: 1918,
+      who: { en: 'Ernest Rutherford', es: 'Ernest Rutherford' },
+      name: { en: 'Proton Model', es: 'Modelo del Protón' },
+      short: { en: 'Proton', es: 'Protón' },
+      desc: {
+        en: `The atom can be divided into a <b class="c-pos">nucleus</b> and <b class="c-neg">electrons</b>. The nucleus occupies a small amount of space at the center of the atom. The nucleus consists of <b class="c-pos">protons</b> that are positively charged. The electrons circle the nucleus. The electrons are tiny and <b class="c-neg">negatively charged</b>. Most of the atom is <b class="c-spc">empty space</b>.`,
+        es: `El átomo se puede dividir en un <b class="c-pos">núcleo</b> y <b class="c-neg">electrones</b>. El núcleo ocupa una pequeña cantidad de espacio en el centro del átomo. El núcleo está formado por <b class="c-pos">protones</b> con carga positiva. Los electrones giran alrededor del núcleo. Los electrones son diminutos y tienen <b class="c-neg">carga negativa</b>. La mayor parte del átomo es <b class="c-spc">espacio vacío</b>.`
+      },
+      facts: {
+        divisible: { en: 'Yes — nucleus and electrons, and the nucleus has parts too.', es: 'Sí — núcleo y electrones, y el núcleo también tiene partes.' },
+        positive: { en: 'In the nucleus, which is made of protons.', es: 'En el núcleo, que está hecho de protones.' },
+        electrons: { en: 'Tiny and negative — they circle the nucleus.', es: 'Diminutos y negativos — giran alrededor del núcleo.' },
+        space: { en: 'Most of the atom is empty space.', es: 'La mayor parte del átomo es espacio vacío.' }
+      },
+      why: {
+        en: 'In 1918 Rutherford identified the proton: the positively charged particle that makes up the nucleus. The center of the atom wasn’t one blob — it was a cluster of particles.',
+        es: 'En 1918 Rutherford identificó el protón: la partícula con carga positiva que forma el núcleo. El centro del átomo no era una masa única — era un grupo de partículas.'
+      },
+      big: { en: 'The nucleus is made of protons.', es: 'El núcleo está hecho de protones.' },
+      cmp: ['y', 'y', 'y', 'n', 'y'],
+      noPart: {}
+    },
+    {
+      id: 'cloud', year: 1932,
+      who: { en: 'Modern physics', es: 'Física moderna' },
+      name: { en: 'Cloud Model', es: 'Modelo de la Nube' },
+      short: { en: 'Cloud', es: 'Nube' },
+      desc: {
+        en: `The atom has a tiny <b class="c-pos">nucleus</b> of protons and neutrons at its center. The <b class="c-neg">electrons</b> don’t follow set paths — they are found somewhere in a fuzzy <b class="c-neg">cloud</b> around the nucleus. Watch them blink in and out: we can only say where an electron is <i>likely</i> to be.`,
+        es: `El átomo tiene un <b class="c-pos">núcleo</b> diminuto de protones y neutrones en su centro. Los <b class="c-neg">electrones</b> no siguen caminos fijos — se encuentran en algún lugar de una <b class="c-neg">nube</b> difusa alrededor del núcleo. Míralos aparecer y desaparecer: solo podemos decir dónde es <i>probable</i> que esté un electrón.`
+      },
+      facts: {
+        divisible: { en: 'Yes — and the nucleus has protons and neutrons.', es: 'Sí — y el núcleo tiene protones y neutrones.' },
+        positive: { en: 'In the nucleus (protons). Neutrons add mass but no charge.', es: 'En el núcleo (protones). Los neutrones aportan masa pero no carga.' },
+        electrons: { en: 'Found somewhere in a cloud — no single path.', es: 'Se encuentran en algún lugar de una nube — sin un camino único.' },
+        space: { en: 'The nucleus is tiny compared with the whole cloud.', es: 'El núcleo es diminuto comparado con toda la nube.' }
+      },
+      why: {
+        en: 'Later experiments showed that an electron can’t be followed along an exact path. Scientists could only map where electrons are most likely to be — which looks like a fuzzy cloud.',
+        es: 'Experimentos posteriores mostraron que no se puede seguir a un electrón por un camino exacto. Los científicos solo pudieron mapear dónde es más probable que estén los electrones — lo que parece una nube difusa.'
+      },
+      big: { en: 'Electrons live in a probability cloud.', es: 'Los electrones viven en una nube de probabilidad.' },
+      cmp: ['y', 'y', 'y', 'n', 'p'],
+      noPart: { space: { en: 'In the cloud model the region around the nucleus is filled by the electron cloud — electrons are only <i>probably</i> found there.', es: 'En el modelo de nube, la región alrededor del núcleo está llena por la nube de electrones — allí solo es <i>probable</i> encontrarlos.' } }
+    }
+  ];
+  const MODEL_BY_ID = {};
+  MODELS.forEach(m => { MODEL_BY_ID[m.id] = m; });
+
+  // ---------------------------------------------------------------- "which model am I" clues
+  const CLUES = [
+    { model: 'solid',   text: { en: 'The atom can’t be divided into smaller particles or pieces.', es: 'El átomo no se puede dividir en partículas o piezas más pequeñas.' } },
+    { model: 'plum',    text: { en: 'A positively charged fluid fills the atom, with tiny electrons scattered through it.', es: 'Un fluido con carga positiva llena el átomo, con diminutos electrones dispersos en él.' } },
+    { model: 'nuclear', text: { en: 'There’s a dense, positive nucleus at the center — but it doesn’t say what the nucleus is made of, and the electrons just “circle around.”', es: 'Hay un núcleo denso y positivo en el centro — pero no dice de qué está hecho, y los electrones simplemente “giran alrededor.”' } },
+    { model: 'solar',   text: { en: 'Electrons circle the nucleus in specified orbits, at different distances from it.', es: 'Los electrones giran alrededor del núcleo en órbitas específicas, a distintas distancias.' } },
+    { model: 'proton',  text: { en: 'The nucleus is made of individual, positively charged particles called protons.', es: 'El núcleo está hecho de partículas individuales con carga positiva llamadas protones.' } },
+    { model: 'cloud',   text: { en: 'Electrons don’t follow set paths — they’re found somewhere in a fuzzy cloud around the nucleus.', es: 'Los electrones no siguen caminos fijos — se encuentran en algún lugar de una nube difusa alrededor del núcleo.' } }
+  ];
+
+  // ---------------------------------------------------------------- label game
+  const LABEL_ROUNDS = [
+    { model: 'plum',    pid: 'fluid',    options: ['nucleus', 'fluid', 'sphere', 'orbit'], correct: 1 },
+    { model: 'nuclear', pid: 'nucleus',  options: ['fluid', 'electron', 'nucleus', 'orbit'], correct: 2 },
+    { model: 'plum',    pid: 'electron', options: ['electron', 'nucleus', 'protons', 'fluid'], correct: 0 },
+    { model: 'proton',  pid: 'protons',  options: ['electron', 'fluid', 'space', 'protons'], correct: 3 },
+    { model: 'solar',   pid: 'orbit',    options: ['space', 'orbit', 'electron', 'nucleus'], correct: 1 },
+    { model: 'nuclear', pid: 'space',    options: ['fluid', 'nucleus', 'electron', 'space'], correct: 3 },
+    { model: 'cloud',   pid: 'cloud',    options: ['cloud', 'nucleus', 'fluid', 'orbit'], correct: 0 }
+  ];
+
+  // ---------------------------------------------------------------- graded quiz
+  const QUESTIONS = [
+    {
+      id: 'q1',
+      prompt: { en: 'Which model pictures the atom as a solid sphere that can’t be divided into smaller pieces?', es: '¿Qué modelo imagina el átomo como una esfera sólida que no se puede dividir en piezas más pequeñas?' },
+      choices: [
+        { en: 'Plum pudding model', es: 'Modelo del pudín de ciruelas' },
+        { en: 'Solid sphere model', es: 'Modelo de la esfera sólida' },
+        { en: 'Solar system model', es: 'Modelo del sistema solar' },
+        { en: 'Proton model', es: 'Modelo del protón' }
+      ],
+      correct: 1,
+      explanation: { en: 'The solid sphere model (Dalton, 1803) treats the atom as one solid piece with no smaller parts.', es: 'El modelo de la esfera sólida (Dalton, 1803) trata el átomo como una sola pieza sólida sin partes más pequeñas.' }
+    },
+    {
+      id: 'q2',
+      prompt: { en: 'In the plum pudding model, what are the “plums”?', es: 'En el modelo del pudín de ciruelas, ¿qué son las “ciruelas”?' },
+      choices: [
+        { en: 'Positively charged protons', es: 'Protones con carga positiva' },
+        { en: 'The nucleus', es: 'El núcleo' },
+        { en: 'Neutral particles', es: 'Partículas neutras' },
+        { en: 'Negatively charged electrons', es: 'Electrones con carga negativa' }
+      ],
+      correct: 3,
+      explanation: { en: 'The “plums” are the tiny, negatively charged electrons scattered through the positive fluid (the “pudding”).', es: 'Las “ciruelas” son los diminutos electrones con carga negativa dispersos en el fluido positivo (el “pudín”).' }
+    },
+    {
+      id: 'q3',
+      prompt: { en: 'What is the biggest difference between the plum pudding model and the nuclear model?', es: '¿Cuál es la mayor diferencia entre el modelo del pudín de ciruelas y el modelo nuclear?' },
+      choices: [
+        { en: 'In the nuclear model, positive charge is packed into a tiny nucleus instead of spread through the whole atom', es: 'En el modelo nuclear, la carga positiva está concentrada en un núcleo diminuto en lugar de repartida por todo el átomo' },
+        { en: 'The nuclear model has no electrons', es: 'El modelo nuclear no tiene electrones' },
+        { en: 'The plum pudding model has a nucleus', es: 'El modelo del pudín de ciruelas tiene un núcleo' },
+        { en: 'There is no difference', es: 'No hay ninguna diferencia' }
+      ],
+      correct: 0,
+      explanation: { en: 'Both have electrons, but the plum pudding spreads the positive charge through the whole atom, while the nuclear model packs it into a small, dense nucleus.', es: 'Ambos tienen electrones, pero el pudín de ciruelas reparte la carga positiva por todo el átomo, mientras que el modelo nuclear la concentra en un núcleo pequeño y denso.' }
+    },
+    {
+      id: 'q4',
+      prompt: { en: 'Which statement is true for the nuclear, proton, and solar system models?', es: '¿Qué afirmación es verdadera para los modelos nuclear, del protón y del sistema solar?' },
+      choices: [
+        { en: 'The atom is completely filled with fluid', es: 'El átomo está completamente lleno de fluido' },
+        { en: 'The atom has no charged parts', es: 'El átomo no tiene partes con carga' },
+        { en: 'Electrons are found only inside the nucleus', es: 'Los electrones se encuentran solo dentro del núcleo' },
+        { en: 'Most of the atom is empty space', es: 'La mayor parte del átomo es espacio vacío' }
+      ],
+      correct: 3,
+      explanation: { en: 'All three place a tiny nucleus at the center with tiny electrons around it — so most of the atom is empty space.', es: 'Los tres colocan un núcleo diminuto en el centro con electrones diminutos a su alrededor — por lo que la mayor parte del átomo es espacio vacío.' }
+    },
+    {
+      id: 'q5',
+      prompt: { en: 'What does the proton model say about the nucleus?', es: '¿Qué dice el modelo del protón sobre el núcleo?' },
+      choices: [
+        { en: 'It is made of positively charged protons', es: 'Está hecho de protones con carga positiva' },
+        { en: 'It is made of negatively charged protons', es: 'Está hecho de protones con carga negativa' },
+        { en: 'It is a solid sphere', es: 'Es una esfera sólida' },
+        { en: 'It doesn’t exist', es: 'No existe' }
+      ],
+      correct: 0,
+      explanation: { en: 'In the proton model (Rutherford, 1918) the nucleus consists of protons, which are positively charged.', es: 'En el modelo del protón (Rutherford, 1918) el núcleo está formado por protones, que tienen carga positiva.' }
+    },
+    {
+      id: 'q6',
+      prompt: { en: 'What idea does the solar system model add?', es: '¿Qué idea agrega el modelo del sistema solar?' },
+      choices: [
+        { en: 'Electrons are found in a fuzzy cloud', es: 'Los electrones se encuentran en una nube difusa' },
+        { en: 'Electrons travel in specified orbits at different distances from the nucleus', es: 'Los electrones viajan en órbitas específicas a diferentes distancias del núcleo' },
+        { en: 'The atom is one solid piece', es: 'El átomo es una sola pieza sólida' },
+        { en: 'Atoms have no electrons', es: 'Los átomos no tienen electrones' }
+      ],
+      correct: 1,
+      explanation: { en: 'The solar system model (Bohr, 1913) puts electrons in specified orbits, each at a different distance from the nucleus.', es: 'El modelo del sistema solar (Bohr, 1913) coloca los electrones en órbitas específicas, cada una a una distancia diferente del núcleo.' }
+    },
+    {
+      id: 'q7',
+      prompt: { en: 'Which charges do the nucleus and the electrons have in the nuclear model?', es: '¿Qué cargas tienen el núcleo y los electrones en el modelo nuclear?' },
+      choices: [
+        { en: 'Nucleus negative, electrons positive', es: 'Núcleo negativo, electrones positivos' },
+        { en: 'Both positive', es: 'Ambos positivos' },
+        { en: 'Nucleus positive, electrons negative', es: 'Núcleo positivo, electrones negativos' },
+        { en: 'Both have no charge', es: 'Ninguno tiene carga' }
+      ],
+      correct: 2,
+      explanation: { en: 'The dense nucleus is positively charged and the tiny electrons are negatively charged — opposites that attract.', es: 'El núcleo denso tiene carga positiva y los diminutos electrones tienen carga negativa — cargas opuestas que se atraen.' }
+    },
+    {
+      id: 'q8',
+      prompt: { en: 'Which list shows the models in the order they were proposed, oldest first?', es: '¿Qué lista muestra los modelos en el orden en que se propusieron, del más antiguo al más reciente?' },
+      choices: [
+        { en: 'Solid sphere → plum pudding → nuclear → solar system', es: 'Esfera sólida → pudín de ciruelas → nuclear → sistema solar' },
+        { en: 'Nuclear → solid sphere → plum pudding → solar system', es: 'Nuclear → esfera sólida → pudín de ciruelas → sistema solar' },
+        { en: 'Plum pudding → solid sphere → solar system → nuclear', es: 'Pudín de ciruelas → esfera sólida → sistema solar → nuclear' },
+        { en: 'Solar system → nuclear → plum pudding → solid sphere', es: 'Sistema solar → nuclear → pudín de ciruelas → esfera sólida' }
+      ],
+      correct: 0,
+      explanation: { en: 'Dalton (1803) → Thomson (1897) → Rutherford (1911) → Bohr (1913).', es: 'Dalton (1803) → Thomson (1897) → Rutherford (1911) → Bohr (1913).' }
+    },
+    {
+      id: 'q9',
+      prompt: { en: 'In the cloud model, where are the electrons?', es: 'En el modelo de la nube, ¿dónde están los electrones?' },
+      choices: [
+        { en: 'Locked in the nucleus', es: 'Encerrados en el núcleo' },
+        { en: 'On one perfectly circular orbit each', es: 'Cada uno en una órbita perfectamente circular' },
+        { en: 'Somewhere in a fuzzy cloud around the nucleus, with no exact path', es: 'En algún lugar de una nube difusa alrededor del núcleo, sin un camino exacto' },
+        { en: 'Stuck in positive fluid', es: 'Incrustados en fluido positivo' }
+      ],
+      correct: 2,
+      explanation: { en: 'The cloud model can only say where electrons are likely to be — they don’t follow one exact path.', es: 'El modelo de la nube solo puede decir dónde es probable que estén los electrones — no siguen un camino exacto.' }
+    },
+    {
+      id: 'q10',
+      prompt: { en: 'Why did scientists keep changing the model of the atom?', es: '¿Por qué los científicos siguieron cambiando el modelo del átomo?' },
+      choices: [
+        { en: 'The old drawings wore out', es: 'Los dibujos viejos se desgastaron' },
+        { en: 'New experiments gave evidence the old model couldn’t explain', es: 'Los nuevos experimentos dieron evidencia que el modelo anterior no podía explicar' },
+        { en: 'They voted for the most popular drawing', es: 'Votaron por el dibujo más popular' },
+        { en: 'Atoms themselves changed shape over time', es: 'Los átomos mismos cambiaron de forma con el tiempo' }
+      ],
+      correct: 1,
+      explanation: { en: 'Models are updated when new evidence — like the discovery of the electron or the gold-foil experiment — doesn’t fit the old picture.', es: 'Los modelos se actualizan cuando la nueva evidencia — como el descubrimiento del electrón o el experimento de la lámina de oro — no encaja con la imagen anterior.' }
+    }
+  ];
+
+  const SECTION_COUNT = 5; // 4 static sections + graded quiz
+
+  // ---------------------------------------------------------------- styles
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.pd-lesson {
+  --navy: #0d1b2a; --navy-mid: #1b2d42; --navy-light: #253a52;
+  --teal: #2ec4b6; --teal-dim: #1a8c83; --amber: #f4a261;
+  --cream: #f7f3ec; --cream-dark: #ede8df; --text: #1a1a2e; --text-muted: #5a6475;
+  --pos: #dc2626; --neg: #2563eb; --spc: #0f766e; --neu: #475569;
+  --correct-bg: #e8f8f5; --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif; color: var(--text);
+  font-size: 17px; line-height: 1.65; background: var(--cream);
+  border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.pd-lesson * { box-sizing: border-box; }
+.pd-lesson .pd-header { background: var(--navy); color: var(--cream); padding: 2rem 1.75rem 1.6rem; position: relative; overflow: hidden; }
+.pd-lesson .pd-header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; border: 32px solid rgba(46,196,182,0.12); }
+.pd-lesson .pd-lang-toggle { position: absolute; top: 1.75rem; right: 1.75rem; z-index: 2; display: flex; gap: 0.3rem; }
+.pd-lesson .pd-lang-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.3rem 0.6rem; border-radius: 6px; background: transparent; border: 1px solid rgba(247,243,236,0.35); color: rgba(247,243,236,0.65); cursor: pointer; }
+.pd-lesson .pd-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.pd-lesson .pd-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
+.pd-lesson .pd-header-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem; position: relative; max-width: calc(100% - 100px); }
+.pd-lesson .pd-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; line-height: 1.2; margin: 0 0 0.4rem; position: relative; color: var(--cream); background: none; -webkit-text-fill-color: var(--cream); }
+.pd-lesson .pd-header-meta { font-size: 0.82rem; color: rgba(247,243,236,0.65); font-family: 'JetBrains Mono', monospace; position: relative; }
+.pd-lesson .pd-progress-wrap { background: var(--navy-mid); padding: 0.7rem 1.75rem; display: flex; align-items: center; gap: 0.9rem; position: sticky; top: 0; z-index: 10; }
+.pd-lesson .pd-progress-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+.pd-lesson .pd-progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; }
+.pd-lesson .pd-progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber)); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+.pd-lesson .pd-progress-count { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(247,243,236,0.55); white-space: nowrap; }
+.pd-lesson main { padding: 1.5rem 1.25rem 2.5rem; }
+.pd-lesson .section-card { background: white; border-radius: 12px; margin-bottom: 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+.pd-lesson .section-header { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.2rem; cursor: pointer; user-select: none; }
+.pd-lesson .section-header:hover { background: #fbfaf7; }
+.pd-lesson .section-num { width: 2rem; height: 2rem; border-radius: 50%; background: var(--navy); color: var(--cream); display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; flex-shrink: 0; }
+.pd-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.pd-lesson .section-title { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.1rem; flex: 1; color: var(--navy); }
+.pd-lesson .section-time { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; }
+.pd-lesson .section-arrow { font-size: 0.65rem; color: var(--text-muted); transition: transform 0.2s; }
+.pd-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.pd-lesson .section-body { display: none; padding: 1.3rem; border-top: 1px solid var(--cream-dark); }
+.pd-lesson .section-body.open { display: block; animation: pdFade 0.25s ease; }
+@keyframes pdFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.pd-lesson .pd-intro { margin: 0 0 1rem; color: var(--text-muted); }
+.pd-lesson button { font-family: inherit; }
+.pd-lesson .pd-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 600; padding: 0.5rem 0.9rem; border-radius: 8px; border: 1.5px solid var(--navy-light); background: white; color: var(--navy); cursor: pointer; }
+.pd-lesson .pd-btn:hover { background: var(--navy); color: var(--cream); }
+.pd-lesson .pd-btn:disabled { opacity: 0.4; cursor: default; background: white; color: var(--navy); }
+.pd-lesson .pd-btn.on { background: var(--navy); color: var(--cream); }
+.pd-lesson .mark-done-btn { margin-top: 1.2rem; background: var(--teal); color: var(--navy); border: none; padding: 0.6rem 1.1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.pd-lesson .mark-done-btn:hover:not(:disabled) { background: var(--teal-dim); color: white; }
+.pd-lesson .mark-done-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.pd-lesson b.c-pos, .pd-lesson .c-pos { color: var(--pos); }
+.pd-lesson b.c-neg, .pd-lesson .c-neg { color: var(--neg); }
+.pd-lesson b.c-spc, .pd-lesson .c-spc { color: var(--spc); }
+.pd-lesson b.c-neu, .pd-lesson .c-neu { color: var(--neu); }
+
+/* ---- timeline ---- */
+.pd-lesson .pd-timeline { display: flex; position: relative; margin: 0.4rem 0 1.1rem; }
+.pd-lesson .pd-timeline::before { content: ''; position: absolute; left: 8%; right: 8%; top: 1.05rem; height: 3px; background: var(--cream-dark); border-radius: 2px; }
+.pd-lesson .pd-tl-btn { flex: 1; position: relative; background: none; border: none; cursor: pointer; padding: 0 2px; text-align: center; color: var(--text-muted); }
+.pd-lesson .pd-tl-dot { display: block; width: 1.5rem; height: 1.5rem; margin: 0.3rem auto 0.35rem; border-radius: 50%; background: white; border: 3px solid var(--cream-dark); transition: all 0.2s; position: relative; z-index: 1; }
+.pd-lesson .pd-tl-btn:hover .pd-tl-dot { border-color: var(--teal); }
+.pd-lesson .pd-tl-btn.active .pd-tl-dot { background: var(--teal); border-color: var(--navy); transform: scale(1.2); }
+.pd-lesson .pd-tl-btn.seen .pd-tl-dot { border-color: var(--teal); }
+.pd-lesson .pd-tl-year { display: block; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 600; }
+.pd-lesson .pd-tl-name { display: block; font-size: 0.72rem; line-height: 1.2; }
+.pd-lesson .pd-tl-btn.active { color: var(--navy); }
+.pd-lesson .pd-tl-btn.active .pd-tl-name { font-weight: 600; }
+
+/* ---- explorer ---- */
+.pd-lesson .pd-explorer { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1.1rem; align-items: start; }
+@media (max-width: 760px) { .pd-lesson .pd-explorer { grid-template-columns: 1fr; } }
+.pd-lesson .pd-stage { background: radial-gradient(circle at 50% 40%, #ffffff, #f1efe9); border: 1px solid var(--cream-dark); border-radius: 12px; padding: 0.6rem 0.6rem 0.8rem; }
+.pd-lesson .pd-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.pd-lesson .pd-stage .pd-svg { max-height: 380px; }
+.pd-lesson .pd-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.5rem 0.3rem 0; }
+.pd-lesson .pd-chips-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.pd-lesson .pd-chip { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; padding: 0.28rem 0.65rem; border-radius: 999px; border: 2px solid currentColor; background: white; cursor: pointer; }
+.pd-lesson .pd-chip[data-hl="pos"] { color: var(--pos); } .pd-lesson .pd-chip[data-hl="neg"] { color: var(--neg); } .pd-lesson .pd-chip[data-hl="space"] { color: var(--spc); } .pd-lesson .pd-chip[data-hl="all"] { color: var(--navy); border-color: var(--navy-light); }
+.pd-lesson .pd-chip.active[data-hl="pos"] { background: var(--pos); color: white; } .pd-lesson .pd-chip.active[data-hl="neg"] { background: var(--neg); color: white; } .pd-lesson .pd-chip.active[data-hl="space"] { background: var(--spc); color: white; } .pd-lesson .pd-chip.active[data-hl="all"] { background: var(--navy); color: white; }
+.pd-lesson .pd-caption { margin: 0.6rem 0.3rem 0; min-height: 3.1rem; font-size: 0.92rem; padding: 0.5rem 0.75rem; border-radius: 8px; background: white; border-left: 5px solid var(--cream-dark); color: var(--text-muted); }
+.pd-lesson .pd-caption strong { display: block; }
+.pd-lesson .pd-caption.cat-pos { border-left-color: var(--pos); color: var(--text); } .pd-lesson .pd-caption.cat-pos strong { color: var(--pos); }
+.pd-lesson .pd-caption.cat-neg { border-left-color: var(--neg); color: var(--text); } .pd-lesson .pd-caption.cat-neg strong { color: var(--neg); }
+.pd-lesson .pd-caption.cat-space { border-left-color: var(--spc); color: var(--text); } .pd-lesson .pd-caption.cat-space strong { color: var(--spc); }
+.pd-lesson .pd-caption.cat-neutral { border-left-color: var(--neu); color: var(--text); } .pd-lesson .pd-caption.cat-neutral strong { color: var(--neu); }
+.pd-lesson .pd-info h3 { font-family: 'Playfair Display', serif; font-size: 1.35rem; margin: 0 0 0.1rem; color: var(--navy); background: none; -webkit-text-fill-color: var(--navy); }
+.pd-lesson .pd-info .pd-who { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--teal-dim); margin-bottom: 0.6rem; }
+.pd-lesson .pd-desc { font-size: 0.98rem; margin: 0 0 0.8rem; }
+.pd-lesson .pd-facts { margin: 0 0 0.8rem; border: 1px solid var(--cream-dark); border-radius: 10px; overflow: hidden; }
+.pd-lesson .pd-fact { display: grid; grid-template-columns: 8.2rem 1fr; gap: 0.6rem; padding: 0.45rem 0.7rem; font-size: 0.86rem; }
+.pd-lesson .pd-fact:nth-child(odd) { background: #faf8f4; }
+.pd-lesson .pd-fact dt { font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; padding-top: 0.15rem; }
+.pd-lesson .pd-fact dd { margin: 0; }
+.pd-lesson .pd-why { background: #fff8e7; border-left: 4px solid var(--amber); border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.9rem; }
+.pd-lesson .pd-why strong { display: block; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #b45309; margin-bottom: 0.15rem; }
+.pd-lesson .pd-controls { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.9rem; }
+.pd-lesson .pd-splitmsg { margin-top: 0.5rem; font-size: 0.9rem; color: var(--neu); min-height: 1.4rem; }
+
+/* ---- svg parts ---- */
+.pd-lesson .pd-el circle { fill: #2563eb; stroke: #fff; stroke-width: 1.3; }
+.pd-lesson .pd-el path { stroke: #fff; stroke-width: 1.7; stroke-linecap: round; }
+.pd-lesson .pd-pr circle { fill: #dc2626; stroke: #fff; stroke-width: 1; }
+.pd-lesson .pd-pr path { stroke: #fff; stroke-width: 1.5; stroke-linecap: round; }
+.pd-lesson .pd-ne circle { fill: #94a3b8; stroke: #fff; stroke-width: 1; }
+.pd-lesson .pd-nuc circle { fill: #dc2626; stroke: #7f1d1d; stroke-width: 1.5; }
+.pd-lesson .pd-nuc path { stroke: #fff; stroke-width: 2.4; stroke-linecap: round; }
+.pd-lesson .pd-orbit { fill: none; stroke: #94a3b8; stroke-width: 1.5; }
+.pd-lesson .pd-space { fill: #2ec4b6; fill-opacity: 0.07; stroke: #0f766e; stroke-opacity: 0.35; stroke-width: 1.3; stroke-dasharray: 5 5; }
+.pd-lesson .pd-callout line { stroke: #64748b; stroke-width: 1.2; }
+.pd-lesson .pd-callout circle { fill: #64748b; }
+.pd-lesson .pd-callout text { font-family: 'Source Serif 4', Georgia, serif; font-size: 13.5px; font-weight: 600; }
+.pd-lesson [data-pid] { cursor: help; }
+.pd-lesson .pd-svg [data-part], .pd-lesson .pd-svg .pd-callout { transition: opacity 0.25s; }
+.pd-lesson [data-hl="pos"] [data-part]:not([data-part="pos"]),
+.pd-lesson [data-hl="neg"] [data-part]:not([data-part="neg"]),
+.pd-lesson [data-hl="space"] [data-part]:not([data-part="space"]) { opacity: 0.13; }
+.pd-lesson [data-hl="pos"] .pd-callout:not(:has([fill="#dc2626"])),
+.pd-lesson [data-hl="neg"] .pd-callout:not(:has([fill="#2563eb"])),
+.pd-lesson [data-hl="space"] .pd-callout:not(:has([fill="#0f766e"])) { opacity: 0.25; }
+.pd-lesson [data-hl="space"] .pd-space { fill-opacity: 0.4; stroke-opacity: 1; stroke-width: 2.4; }
+.pd-lesson [data-hl="pos"] [data-part="pos"] , .pd-lesson [data-hl="neg"] [data-part="neg"] { filter: drop-shadow(0 0 5px rgba(245,158,11,0.9)); }
+.pd-lesson .pd-shake { animation: pdShake 0.5s; transform-origin: 120px 125px; }
+@keyframes pdShake { 0%,100% { transform: translate(0,0); } 15% { transform: translate(-6px,2px) rotate(-2deg); } 30% { transform: translate(6px,-2px) rotate(2deg); } 45% { transform: translate(-5px,1px); } 60% { transform: translate(5px,-1px); } 75% { transform: translate(-2px,0); } }
+.pd-lesson .pd-target { animation: pdPulse 1s ease-in-out infinite; }
+@keyframes pdPulse { 0%,100% { filter: drop-shadow(0 0 0 rgba(245,158,11,0)); } 50% { filter: drop-shadow(0 0 6px #f59e0b) drop-shadow(0 0 3px #f59e0b); } }
+.pd-lesson .pd-svg [data-target-active] { stroke: #f59e0b; }
+@media (prefers-reduced-motion: reduce) { .pd-lesson .pd-target, .pd-lesson .pd-shake { animation: none; } }
+
+/* ---- side by side ---- */
+.pd-lesson .pd-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; align-items: center; background: #faf8f4; border: 1px solid var(--cream-dark); border-radius: 10px; padding: 0.55rem 0.8rem; margin-bottom: 1rem; font-size: 0.85rem; }
+.pd-lesson .pd-legend strong { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+.pd-lesson .pd-key { display: inline-flex; align-items: center; gap: 0.35rem; }
+.pd-lesson .pd-key i { display: inline-block; width: 0.85rem; height: 0.85rem; border-radius: 50%; }
+.pd-lesson .pd-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.9rem; margin-bottom: 1.3rem; }
+@media (max-width: 760px) { .pd-lesson .pd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .pd-lesson .pd-grid { grid-template-columns: 1fr; } }
+.pd-lesson .pd-card { border: 1px solid var(--cream-dark); border-radius: 12px; padding: 0.6rem 0.7rem 0.8rem; background: radial-gradient(circle at 50% 30%, #fff, #f6f3ec); display: flex; flex-direction: column; }
+.pd-lesson .pd-card .pd-svg { max-height: 170px; margin: 0 auto; }
+.pd-lesson .pd-card-year { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--teal-dim); font-weight: 600; margin-top: 0.3rem; }
+.pd-lesson .pd-card-name { font-family: 'Playfair Display', serif; font-weight: 700; color: var(--navy); font-size: 1rem; line-height: 1.2; }
+.pd-lesson .pd-card-big { font-size: 0.85rem; margin: 0.25rem 0 0.3rem; font-style: italic; }
+.pd-lesson .pd-card-why { font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; flex: 1; }
+.pd-lesson .pd-card .pd-btn { margin-top: 0.55rem; align-self: flex-start; font-size: 0.65rem; padding: 0.3rem 0.6rem; }
+.pd-lesson .pd-table-wrap { overflow-x: auto; }
+.pd-lesson table.pd-cmp { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.pd-lesson table.pd-cmp th, .pd-lesson table.pd-cmp td { border: 1px solid var(--cream-dark); padding: 0.4rem 0.55rem; text-align: center; }
+.pd-lesson table.pd-cmp th { background: var(--navy); color: var(--cream); font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.pd-lesson table.pd-cmp td:first-child, .pd-lesson table.pd-cmp th:first-child { text-align: left; }
+.pd-lesson table.pd-cmp td:first-child { font-weight: 600; color: var(--navy); }
+.pd-lesson .pd-y { color: #15803d; font-weight: 700; background: #ecfdf5; } .pd-lesson .pd-n { color: #b91c1c; background: #fef2f2; } .pd-lesson .pd-p { color: #b45309; font-weight: 700; background: #fffbeb; }
+.pd-lesson .pd-note { font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0 0; }
+.pd-lesson h4.pd-h4 { font-family: 'Playfair Display', serif; color: var(--navy); font-size: 1.05rem; margin: 1.2rem 0 0.5rem; }
+
+/* ---- which model am I ---- */
+.pd-lesson .pd-bank { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
+@media (max-width: 760px) { .pd-lesson .pd-bank { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.pd-lesson .pd-tile { border: 2px solid var(--cream-dark); background: white; border-radius: 10px; padding: 0.3rem 0.3rem 0.4rem; cursor: pointer; text-align: center; font-size: 0.72rem; line-height: 1.15; color: var(--navy); font-weight: 600; }
+.pd-lesson .pd-tile .pd-svg { max-height: 84px; margin: 0 auto; }
+.pd-lesson .pd-tile:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.pd-lesson .pd-tile:disabled { cursor: default; opacity: 0.45; border-color: var(--correct-border); }
+.pd-lesson .pd-tile.wrong { animation: pdShakeX 0.4s; border-color: #dc2626; background: #fef2f2; }
+@keyframes pdShakeX { 0%,100% { transform: none; } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.pd-lesson .pd-clue { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.9rem; border: 2px solid var(--cream-dark); border-radius: 10px; margin-bottom: 0.55rem; cursor: pointer; background: white; font-size: 0.95rem; }
+.pd-lesson .pd-clue:hover:not(.solved) { border-color: var(--teal); }
+.pd-lesson .pd-clue.selected { border-color: var(--navy); background: #f3f8ff; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+.pd-lesson .pd-clue.solved { border-color: var(--correct-border); background: var(--correct-bg); cursor: default; }
+.pd-lesson .pd-clue-num { width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--navy); color: white; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.pd-lesson .pd-clue.solved .pd-clue-num { background: var(--teal-dim); }
+.pd-lesson .pd-clue-text { flex: 1; }
+.pd-lesson .pd-clue-ans { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; color: var(--teal-dim); white-space: nowrap; }
+.pd-lesson .pd-status { min-height: 1.6rem; margin: 0.4rem 0; font-size: 0.92rem; font-weight: 600; color: var(--navy); }
+.pd-lesson .pd-status.bad { color: #b91c1c; } .pd-lesson .pd-status.good { color: var(--teal-dim); }
+
+/* ---- label game ---- */
+.pd-lesson .pd-lg { max-width: 520px; margin: 0 auto; }
+.pd-lesson .pd-lg .pd-stagebox { background: radial-gradient(circle at 50% 40%, #fff, #f1efe9); border: 1px solid var(--cream-dark); border-radius: 12px; padding: 0.5rem; }
+.pd-lesson .pd-lg .pd-svg { max-height: 300px; margin: 0 auto; }
+.pd-lesson .pd-opt { display: block; width: 100%; text-align: left; margin-bottom: 0.45rem; padding: 0.6rem 0.9rem; border: 2px solid var(--cream-dark); border-radius: 10px; background: white; cursor: pointer; font-size: 0.95rem; color: var(--text); }
+.pd-lesson .pd-opt:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.pd-lesson .pd-opt:disabled { cursor: default; }
+.pd-lesson .pd-opt.ok { border-color: var(--correct-border); background: var(--correct-bg); }
+.pd-lesson .pd-opt.no { border-color: #dc2626; background: #fef2f2; }
+
+/* ---- quiz ---- */
+.pd-lesson .quiz-note { background: #fff8e7; border-left: 4px solid var(--amber); padding: 0.7rem 0.9rem; border-radius: 8px; font-size: 0.9rem; margin-bottom: 1rem; }
+.pd-lesson .quiz-progress-bar { height: 6px; background: var(--cream-dark); border-radius: 3px; overflow: hidden; margin: 0.3rem 0 1rem; }
+.pd-lesson .quiz-progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber)); }
+.pd-lesson .quiz-question-count { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.pd-lesson .quiz-prompt { font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 700; color: var(--navy); margin: 0 0 0.9rem; }
+.pd-lesson .pd-choice { display: block; width: 100%; text-align: left; margin-bottom: 0.5rem; padding: 0.7rem 1rem; border: 2px solid var(--cream-dark); border-radius: 10px; background: white; cursor: pointer; font-size: 0.97rem; color: var(--text); }
+.pd-lesson .pd-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.pd-lesson .pd-choice:disabled { cursor: default; }
+.pd-lesson .pd-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.pd-lesson .pd-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.pd-lesson .pd-feedback { margin: 0.8rem 0; padding: 0.7rem 0.9rem; border-radius: 8px; font-size: 0.92rem; }
+.pd-lesson .pd-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.pd-lesson .pd-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.pd-lesson .pd-next-btn, .pd-lesson .pd-retake-btn { background: var(--navy); color: var(--cream); border: none; padding: 0.65rem 1.2rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.pd-lesson .pd-next-btn:hover, .pd-lesson .pd-retake-btn:hover { background: var(--navy-light); }
+.pd-lesson .pd-summary { text-align: center; padding: 1rem 0.5rem; }
+.pd-lesson .pd-score { font-family: 'Playfair Display', serif; font-size: 3rem; font-weight: 700; color: var(--teal-dim); }
+@media (max-width: 560px) {
+  .pd-lesson .pd-header h1 { font-size: 1.5rem; }
+  .pd-lesson .pd-fact { grid-template-columns: 1fr; gap: 0; }
+  .pd-lesson .section-time { display: none; }
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  // ---------------------------------------------------------------- main render
+  let lastModel = 0; // explorer selection survives language re-renders
+
+  function render(host, ctx) {
+    ensureStylesInjected();
+    const lang = getLang();
+
+    const titles = [t('s0Title', lang), t('s1Title', lang), t('s2Title', lang), t('s3Title', lang)];
+    const times = [t('s0Time', lang), t('s1Time', lang), t('s2Time', lang), t('s3Time', lang)];
+    const sectionsHtml = titles.map((title, i) => `
+      <div class="section-card" id="pd-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
+          <span class="section-title">${escapeHtml(title)}</span>
+          <span class="section-time">${escapeHtml(times[i])}</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          <div class="pd-mount" id="pd-mount-${i}"></div>
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">${escapeHtml(t('markSectionComplete', lang))}</button>
+        </div>
+      </div>`).join('');
+
+    host.innerHTML = `
+      <div class="pd-lesson">
+        <div class="pd-header">
+          <div class="pd-lang-toggle" role="group" aria-label="${escapeHtml(t('langToggleAria', lang))}">
+            <button type="button" class="pd-lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="pd-lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="pd-header-label">${escapeHtml(t('headerLabel', lang))}</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="pd-header-meta">${escapeHtml(t('headerMeta', lang))}</div>
+        </div>
+        <div class="pd-progress-wrap">
+          <span class="pd-progress-label">${escapeHtml(t('progress', lang))}</span>
+          <div class="pd-progress-track"><div class="pd-progress-fill" id="pd-progress-fill"></div></div>
+          <span class="pd-progress-count" id="pd-progress-count">${escapeHtml(t('sectionCount', lang, 0, SECTION_COUNT))}</span>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="pd-sec-${SECTION_COUNT - 1}" data-section="${SECTION_COUNT - 1}">
+            <div class="section-header" data-toggle="${SECTION_COUNT - 1}">
+              <span class="section-num">✓</span>
+              <span class="section-title">${escapeHtml(t('checkForUnderstanding', lang))}</span>
+              <span class="section-time">${escapeHtml(t('quizTimeGraded', lang))}</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">${t('quizNote', lang)}</div>
+              <div id="pd-quiz-mount"></div>
+            </div>
+          </div>
+        </main>
+      </div>`;
+
+    const root = host.querySelector('.pd-lesson');
+    const quizIndex = SECTION_COUNT - 1;
+    const completed = new Array(SECTION_COUNT).fill(false);
+    const anim = createAnimator(root);
+
+    function updateProgress() {
+      const done = completed.filter(Boolean).length;
+      root.querySelector('#pd-progress-fill').style.width = Math.round((done / SECTION_COUNT) * 100) + '%';
+      root.querySelector('#pd-progress-count').textContent = t('sectionCount', lang, done, SECTION_COUNT);
+    }
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#pd-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function toggleSection(i) {
+      const card = root.querySelector(`#pd-sec-${i}`);
+      const open = !card.querySelector('.section-body').classList.contains('open');
+      card.querySelector('.section-body').classList.toggle('open', open);
+      card.querySelector('.section-header').classList.toggle('open', open);
+    }
+    root.querySelectorAll('[data-toggle]').forEach(el => el.addEventListener('click', () => toggleSection(Number(el.getAttribute('data-toggle')))));
+    root.querySelectorAll('[data-mark-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-mark-done'));
+        if (completed[i]) return;
+        completed[i] = true;
+        root.querySelector(`#pd-sec-${i}`).classList.add('done');
+        btn.textContent = t('sectionComplete', lang);
+        btn.disabled = true;
+        updateProgress();
+        setTimeout(() => openSection(i + 1, true), 250);
+      });
+    });
+    root.querySelectorAll('[data-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newLang = btn.getAttribute('data-lang');
+        if (newLang === lang) return;
+        setLang(newLang);
+        render(host, ctx); // full re-render; graded progress lives in ctx.getProgress()
+      });
+    });
+
+    // Interactive sections
+    const explorer = mountExplorer(root.querySelector('#pd-mount-0'), lang, anim);
+    mountSideBySide(root.querySelector('#pd-mount-1'), lang, anim, (i) => { // "Open in explorer" on the cards
+      openSection(0, false);
+      explorer.openFromOutside(i);
+    });
+    mountMatchGame(root.querySelector('#pd-mount-2'), lang);
+    mountLabelGame(root.querySelector('#pd-mount-3'), lang, anim);
+
+    // Quiz (final section) — graded, saved via ctx.saveProgress.
+    renderQuiz(root.querySelector('#pd-quiz-mount'), ctx);
+
+    const progress = ctx.getProgress();
+    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
+      if (progress.status === 'completed') completed[quizIndex] = true;
+      openSection(quizIndex, false);
+    } else {
+      openSection(0, false);
+    }
+    updateProgress();
+  }
+
+  // ---------------------------------------------------------------- section 0: explorer
+  function mountExplorer(mount, lang, anim) {
+    let sel = lastModel, hl = 'all', tourTimer = null, splitCount = 0;
+    const seen = new Set([sel]);
+
+    mount.innerHTML = `
+      <p class="pd-intro">${t('s0Intro', lang)}</p>
+      <div class="pd-timeline" role="tablist">
+        ${MODELS.map((m, i) => `
+          <button type="button" class="pd-tl-btn" role="tab" data-i="${i}">
+            <span class="pd-tl-dot"></span>
+            <span class="pd-tl-year">${m.year}</span>
+            <span class="pd-tl-name">${escapeHtml(tr(m.short, lang))}</span>
+          </button>`).join('')}
+      </div>
+      <div class="pd-controls">
+        <button type="button" class="pd-btn" data-act="prev">${escapeHtml(t('prev', lang))}</button>
+        <button type="button" class="pd-btn" data-act="next">${escapeHtml(t('next', lang))}</button>
+        <button type="button" class="pd-btn" data-act="tour">${escapeHtml(t('tour', lang))}</button>
+        <button type="button" class="pd-btn" data-act="pause">${escapeHtml(anim.isPaused() ? t('animPlay', lang) : t('animPause', lang))}</button>
+      </div>
+      <div class="pd-explorer">
+        <div>
+          <div class="pd-stage" id="pd-stage" data-hl="all"></div>
+          <div class="pd-chips">
+            <span class="pd-chips-label">${escapeHtml(t('highlight', lang))}</span>
+            <button type="button" class="pd-chip" data-hl="pos">${escapeHtml(t('chipPos', lang))}</button>
+            <button type="button" class="pd-chip" data-hl="neg">${escapeHtml(t('chipNeg', lang))}</button>
+            <button type="button" class="pd-chip" data-hl="space">${escapeHtml(t('chipSpace', lang))}</button>
+            <button type="button" class="pd-chip active" data-hl="all">${escapeHtml(t('chipAll', lang))}</button>
+          </div>
+          <div class="pd-caption" id="pd-caption"></div>
+        </div>
+        <div class="pd-info" id="pd-info"></div>
+      </div>`;
+
+    const stage = mount.querySelector('#pd-stage');
+    const caption = mount.querySelector('#pd-caption');
+    const info = mount.querySelector('#pd-info');
+
+    function setCaption(pid) {
+      if (!pid || !PARTS[pid]) {
+        caption.className = 'pd-caption';
+        caption.textContent = t('hoverHint', lang);
+        return;
+      }
+      const p = PARTS[pid];
+      caption.className = 'pd-caption cat-' + p.cat;
+      caption.innerHTML = `<strong>${escapeHtml(tr(p.name, lang))}</strong>${escapeHtml(tr(p.desc, lang))}`;
+    }
+
+    function applyHighlight() {
+      stage.setAttribute('data-hl', hl);
+      mount.querySelectorAll('.pd-chip').forEach(c => c.classList.toggle('active', c.getAttribute('data-hl') === hl));
+      const m = MODELS[sel];
+      if (hl !== 'all' && !stage.querySelector(`[data-part="${hl}"]`)) {
+        const note = (m.noPart && m.noPart[hl]) || t(hl === 'pos' ? 'noPos' : hl === 'neg' ? 'noNeg' : 'noSpace', lang);
+        caption.className = 'pd-caption cat-' + (hl === 'space' ? 'space' : hl);
+        caption.innerHTML = tr(note, lang);
+      } else {
+        setCaption(null);
+      }
+    }
+
+    function show(i) {
+      sel = ((i % MODELS.length) + MODELS.length) % MODELS.length;
+      lastModel = sel;
+      seen.add(sel);
+      splitCount = 0;
+      const m = MODELS[sel];
+      mount.querySelectorAll('.pd-tl-btn').forEach((b, k) => {
+        b.classList.toggle('active', k === sel);
+        b.classList.toggle('seen', seen.has(k));
+        b.setAttribute('aria-selected', k === sel ? 'true' : 'false');
+      });
+      stage.innerHTML = atomSvg(m.id, { labels: true, lang });
+      anim.add(stage.querySelector('svg'));
+      const factKeys = ['divisible', 'positive', 'electrons', 'space'];
+      const factLabel = { divisible: 'factDivisible', positive: 'factPositive', electrons: 'factElectrons', space: 'factSpace' };
+      info.innerHTML = `
+        <h3>${escapeHtml(tr(m.name, lang))}</h3>
+        <div class="pd-who">${m.year} · ${escapeHtml(tr(m.who, lang))}</div>
+        <p class="pd-desc">${tr(m.desc, lang)}</p>
+        <dl class="pd-facts">
+          ${factKeys.map(k => `<div class="pd-fact"><dt>${escapeHtml(t(factLabel[k], lang))}</dt><dd>${escapeHtml(tr(m.facts[k], lang))}</dd></div>`).join('')}
+        </dl>
+        <div class="pd-why"><strong>${escapeHtml(t('whyLabel', lang))}</strong>${escapeHtml(tr(m.why, lang))}</div>
+        ${m.id === 'solid' ? `<div style="margin-top:.8rem"><button type="button" class="pd-btn" data-act="split">${escapeHtml(t('splitBtn', lang))}</button><div class="pd-splitmsg" id="pd-splitmsg"></div></div>` : ''}`;
+      applyHighlight();
+    }
+
+    // events
+    mount.querySelectorAll('.pd-tl-btn').forEach(b => b.addEventListener('click', () => { stopTour(); show(Number(b.getAttribute('data-i'))); }));
+    mount.querySelectorAll('.pd-chip').forEach(c => c.addEventListener('click', () => { hl = c.getAttribute('data-hl'); applyHighlight(); }));
+
+    function stopTour() {
+      if (tourTimer) { clearInterval(tourTimer); tourTimer = null; }
+      const b = mount.querySelector('[data-act="tour"]');
+      if (b) { b.textContent = t('tour', lang); b.classList.remove('on'); }
+    }
+    mount.querySelector('[data-act="prev"]').addEventListener('click', () => { stopTour(); show(sel - 1); });
+    mount.querySelector('[data-act="next"]').addEventListener('click', () => { stopTour(); show(sel + 1); });
+    mount.querySelector('[data-act="tour"]').addEventListener('click', (e) => {
+      if (tourTimer) { stopTour(); return; }
+      e.currentTarget.textContent = t('tourStop', lang);
+      e.currentTarget.classList.add('on');
+      show(0);
+      tourTimer = setInterval(() => {
+        if (!mount.isConnected) { stopTour(); return; }
+        if (sel >= MODELS.length - 1) { stopTour(); return; }
+        show(sel + 1);
+      }, 6500);
+    });
+    mount.querySelector('[data-act="pause"]').addEventListener('click', (e) => {
+      anim.setPaused(!anim.isPaused());
+      e.currentTarget.textContent = anim.isPaused() ? t('animPlay', lang) : t('animPause', lang);
+    });
+
+    // hover/tap any labelled part -> caption
+    stage.addEventListener('mouseover', (e) => {
+      const el = e.target.closest('[data-pid]');
+      if (el && hl === 'all') setCaption(el.getAttribute('data-pid'));
+    });
+    stage.addEventListener('mouseleave', () => { if (hl === 'all') setCaption(null); });
+    stage.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-pid]');
+      if (el) setCaption(el.getAttribute('data-pid'));
+    });
+
+    // solid-sphere "try to split it"
+    info.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-act="split"]');
+      if (!btn) return;
+      const g = stage.querySelector('.pd-sphere');
+      if (g) { g.classList.remove('pd-shake'); void g.getBoundingClientRect(); g.classList.add('pd-shake'); }
+      const msgs = STRINGS.splitMsgs[lang];
+      const box = info.querySelector('#pd-splitmsg');
+      if (box) box.textContent = msgs[Math.min(splitCount, msgs.length - 1)];
+      splitCount++;
+    });
+
+    show(sel);
+    return {
+      show,
+      openFromOutside(i) { stopTour(); show(i); mount.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    };
+  }
+
+  // ---------------------------------------------------------------- section 1: side by side
+  function mountSideBySide(mount, lang, anim, onOpen) {
+    const sym = { y: '✓', n: '✗', p: '~' };
+    mount.innerHTML = `
+      <p class="pd-intro">${t('s1Intro', lang)}</p>
+      <div class="pd-legend">
+        <strong>${escapeHtml(t('legendTitle', lang))}</strong>
+        <span class="pd-key"><i style="background:#dc2626"></i>${escapeHtml(t('legendPos', lang))}</span>
+        <span class="pd-key"><i style="background:#2563eb"></i>${escapeHtml(t('legendNeg', lang))}</span>
+        <span class="pd-key"><i style="background:#94a3b8"></i>${escapeHtml(t('legendNeutral', lang))}</span>
+        <span class="pd-key"><i style="background:#2ec4b6;opacity:.5"></i>${escapeHtml(t('legendSpace', lang))}</span>
+      </div>
+      <div class="pd-grid">
+        ${MODELS.map((m, i) => `
+          <div class="pd-card">
+            ${atomSvg(m.id, { lang })}
+            <div class="pd-card-year">${m.year} · ${escapeHtml(tr(m.who, lang))}</div>
+            <div class="pd-card-name">${escapeHtml(tr(m.name, lang))}</div>
+            <div class="pd-card-big">${escapeHtml(tr(m.big, lang))}</div>
+            <div class="pd-card-why">${escapeHtml(tr(m.why, lang))}</div>
+            <button type="button" class="pd-btn" data-open="${i}">${escapeHtml(t('openInExplorer', lang))}</button>
+          </div>`).join('')}
+      </div>
+      <h4 class="pd-h4">${escapeHtml(t('cmpTitle', lang))}</h4>
+      <div class="pd-table-wrap">
+        <table class="pd-cmp">
+          <thead><tr><th>${escapeHtml(t('cmpModel', lang))}</th>${STRINGS.cmpCols[lang].map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${MODELS.map(m => `<tr><td>${escapeHtml(tr(m.short, lang))} <span style="font-weight:400;color:#5a6475">(${m.year})</span></td>${m.cmp.map(v => `<td class="pd-${v}">${sym[v]}</td>`).join('')}</tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="pd-note">${escapeHtml(t('cmpNote', lang))}</p>`;
+    mount.querySelectorAll('svg.pd-svg').forEach(svg => anim.add(svg));
+    mount.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => onOpen(Number(b.getAttribute('data-open')))));
+  }
+
+  // ---------------------------------------------------------------- section 2: which model am I
+  function mountMatchGame(mount, lang) {
+    // Deterministic shuffle of clue order so it isn't just chronological.
+    const order = [3, 0, 5, 1, 4, 2];
+    let selected = null;
+    const solved = {}; // clueIndex -> true
+
+    mount.innerHTML = `
+      <p class="pd-intro">${t('s2Intro', lang)}</p>
+      <div class="pd-bank">
+        ${MODELS.map((m, i) => `<button type="button" class="pd-tile" data-model="${m.id}">${atomSvg(m.id, { lang })}<span>${escapeHtml(tr(m.short, lang))}</span></button>`).join('')}
+      </div>
+      <div class="pd-status" id="pd-match-status">${escapeHtml(t('pickClue', lang))}</div>
+      <div id="pd-clues">
+        ${order.map((ci, n) => `<div class="pd-clue" data-clue="${ci}"><span class="pd-clue-num">${n + 1}</span><span class="pd-clue-text">${escapeHtml(tr(CLUES[ci].text, lang))}</span><span class="pd-clue-ans"></span></div>`).join('')}
+      </div>`;
+    mount.querySelectorAll('.pd-tile svg').forEach(svg => stepAtom(svg, 1.3)); // static thumbnails, frozen at a pleasant pose
+
+    const status = mount.querySelector('#pd-match-status');
+    function setStatus(txt, cls) { status.textContent = txt; status.className = 'pd-status' + (cls ? ' ' + cls : ''); }
+    function doneCount() { return Object.keys(solved).length; }
+
+    mount.querySelectorAll('.pd-clue').forEach(el => el.addEventListener('click', () => {
+      const ci = Number(el.getAttribute('data-clue'));
+      if (solved[ci]) return;
+      selected = ci;
+      mount.querySelectorAll('.pd-clue').forEach(c => c.classList.toggle('selected', c === el));
+      setStatus(t('matchProgress', lang, doneCount()));
+    }));
+    mount.querySelectorAll('.pd-tile').forEach(tile => tile.addEventListener('click', () => {
+      if (selected === null) { setStatus(t('pickClue', lang), 'bad'); return; }
+      const mid = tile.getAttribute('data-model');
+      if (CLUES[selected].model === mid) {
+        solved[selected] = true;
+        const row = mount.querySelector(`.pd-clue[data-clue="${selected}"]`);
+        row.classList.remove('selected'); row.classList.add('solved');
+        row.querySelector('.pd-clue-ans').textContent = '✓ ' + tr(MODEL_BY_ID[mid].name, lang);
+        tile.disabled = true;
+        selected = null;
+        setStatus(doneCount() === CLUES.length ? t('matchDone', lang) : t('matchGood', lang, tr(MODEL_BY_ID[mid].name, lang)), 'good');
+      } else {
+        tile.classList.remove('wrong'); void tile.offsetWidth; tile.classList.add('wrong');
+        setStatus(t('tryAgain', lang), 'bad');
+      }
+    }));
+  }
+
+  // ---------------------------------------------------------------- section 3: label the parts
+  function mountLabelGame(mount, lang, anim) {
+    let round = 0, firstTry = 0, tried = false;
+
+    function renderRound() {
+      if (round >= LABEL_ROUNDS.length) {
+        mount.innerHTML = `
+          <div class="pd-lg pd-summary">
+            <div class="pd-score">${firstTry} / ${LABEL_ROUNDS.length}</div>
+            <p>${escapeHtml(t('labelDone', lang, firstTry, LABEL_ROUNDS.length))}</p>
+            <button type="button" class="pd-next-btn" id="pd-lg-again">${escapeHtml(t('labelAgain', lang))}</button>
+          </div>`;
+        mount.querySelector('#pd-lg-again').addEventListener('click', () => { round = 0; firstTry = 0; renderRound(); });
+        return;
+      }
+      const r = LABEL_ROUNDS[round];
+      const m = MODEL_BY_ID[r.model];
+      tried = false;
+      mount.innerHTML = `
+        <p class="pd-intro">${t('s3Intro', lang)}</p>
+        <div class="pd-lg">
+          <div class="quiz-question-count">${escapeHtml(t('labelRound', lang, round + 1, LABEL_ROUNDS.length))}</div>
+          <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${Math.round(round / LABEL_ROUNDS.length * 100)}%"></div></div>
+          <p class="quiz-prompt">${escapeHtml(t('labelQ', lang, tr(m.name, lang)))}</p>
+          <div class="pd-stagebox">${atomSvg(r.model, { lang })}</div>
+          <div style="margin-top:.8rem" id="pd-opts">
+            ${r.options.map((pid, i) => `<button type="button" class="pd-opt" data-i="${i}">${escapeHtml(tr(PARTS[pid].name, lang))}</button>`).join('')}
+          </div>
+          <div class="pd-feedback" id="pd-lg-fb" style="display:none"></div>
+          <button type="button" class="pd-next-btn" id="pd-lg-next" style="display:none">${escapeHtml(t('nextQuestion', lang))}</button>
+        </div>`;
+      const svg = mount.querySelector('svg.pd-svg');
+      anim.add(svg);
+      svg.querySelectorAll(`[data-pid="${r.pid}"]`).forEach(el => el.classList.add('pd-target'));
+      const fb = mount.querySelector('#pd-lg-fb');
+      const nextBtn = mount.querySelector('#pd-lg-next');
+      mount.querySelectorAll('.pd-opt').forEach(btn => btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-i'));
+        if (i === r.correct) {
+          if (!tried) firstTry++;
+          mount.querySelectorAll('.pd-opt').forEach(b => { b.disabled = true; });
+          btn.classList.add('ok');
+          const p = PARTS[r.pid];
+          fb.style.display = 'block'; fb.className = 'pd-feedback correct';
+          fb.innerHTML = `${escapeHtml(t('correctPrefix', lang))} <strong>${escapeHtml(tr(p.name, lang))}</strong> — ${escapeHtml(tr(p.desc, lang))}`;
+          nextBtn.style.display = 'inline-block';
+        } else {
+          tried = true;
+          btn.classList.add('no'); btn.disabled = true;
+        }
+      }));
+      nextBtn.addEventListener('click', () => { round++; renderRound(); });
+    }
+    renderRound();
+  }
+
+  // ---------------------------------------------------------------- quiz (graded)
+  function renderQuiz(mount, ctx) {
+    const progress = ctx.getProgress();
+    if (progress && progress.status === 'completed') { renderQuizSummary(mount, ctx); return; }
+    const answers = (progress && progress.answers) || [];
+    if (answers.length >= QUESTIONS.length) { finishQuiz(mount, ctx, answers); return; }
+    renderQuizQuestion(mount, ctx, answers, answers.length);
+  }
+
+  function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const lang = getLang();
+    const q = QUESTIONS[index];
+    const pct = Math.round((index / QUESTIONS.length) * 100);
+    mount.innerHTML = `
+      <div class="quiz-question-count">${escapeHtml(t('questionCount', lang, index + 1, QUESTIONS.length))}</div>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <p class="quiz-prompt">${escapeHtml(tr(q.prompt, lang))}</p>
+      <div id="pd-answer-area"></div>
+      <div id="pd-feedback-area"></div>
+      <button type="button" class="pd-next-btn" id="pd-next-btn" style="display:none;">${escapeHtml(t('nextQuestion', lang))}</button>`;
+    const answerArea = mount.querySelector('#pd-answer-area');
+    const feedbackArea = mount.querySelector('#pd-feedback-area');
+    const nextBtn = mount.querySelector('#pd-next-btn');
+    let submitted = false;
+
+    answerArea.innerHTML = q.choices.map((c, i) => `<button type="button" class="pd-choice" data-choice="${i}">${escapeHtml(tr(c, lang))}</button>`).join('');
+
+    function submit(response, btnEl) {
+      if (submitted) return;
+      submitted = true;
+      const correct = response === q.correct;
+      answerArea.querySelectorAll('.pd-choice').forEach(el => {
+        el.disabled = true;
+        const val = Number(el.getAttribute('data-choice'));
+        if (val === q.correct) el.classList.add('selected-correct');
+        else if (el === btnEl) el.classList.add('selected-incorrect');
+      });
+      feedbackArea.innerHTML = `<div class="pd-feedback ${correct ? 'correct' : 'incorrect'}">${correct ? escapeHtml(t('correctPrefix', lang)) : escapeHtml(t('incorrectPrefix', lang))} ${escapeHtml(tr(q.explanation, lang))}</div>`;
+      nextBtn.style.display = 'inline-block';
+      const answers = answersSoFar.concat([{ questionId: q.id, response, correct }]);
+      ctx.saveProgress({ status: 'in_progress', score: answers.filter(a => a.correct).length, totalQuestions: QUESTIONS.length, answers });
+    }
+    answerArea.querySelectorAll('.pd-choice').forEach(btn => btn.addEventListener('click', () => submit(Number(btn.getAttribute('data-choice')), btn)));
+    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
+  }
+
+  async function finishQuiz(mount, ctx, answers) {
+    await ctx.saveProgress({ status: 'completed', score: answers.filter(a => a.correct).length, totalQuestions: QUESTIONS.length, answers });
+    renderQuizSummary(mount, ctx);
+  }
+
+  function renderQuizSummary(mount, ctx) {
+    const lang = getLang();
+    const progress = ctx.getProgress();
+    const score = progress ? progress.score : 0;
+    mount.innerHTML = `
+      <div class="pd-summary">
+        <div class="pd-score">${score} / ${QUESTIONS.length}</div>
+        <p>${escapeHtml(t('summaryText', lang))}</p>
+        <button type="button" class="pd-retake-btn" id="pd-retake-btn">${escapeHtml(t('retakeQuiz', lang))}</button>
+      </div>`;
+    mount.querySelector('#pd-retake-btn').addEventListener('click', async () => {
+      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: QUESTIONS.length, answers: [] });
+      renderQuiz(mount, ctx);
+    });
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['atomic-models'] = { render };
+})();
+
+</script>

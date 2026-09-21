@@ -37,6 +37,7 @@ JS_FILES = [
     ('StorageJs.html', 'js/storage.js'),
     ('MatterReviewJs.html', 'js/activities/matter-review.js'),
     ('ElementsReviewJs.html', 'js/activities/elements-review.js'),
+    ('AtomicModelsJs.html', 'js/activities/atomic-models.js'),
     ('CrossMultiplyDensityJs.html', 'js/activities/cross-multiply-density.js'),
     ('AppJs.html', 'js/app.js'),
 ]
@@ -72,6 +73,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <?!= include('StorageJs'); ?>
   <?!= include('MatterReviewJs'); ?>
   <?!= include('ElementsReviewJs'); ?>
+  <?!= include('AtomicModelsJs'); ?>
   <?!= include('CrossMultiplyDensityJs'); ?>
   <?!= include('AppJs'); ?>
 </body>
