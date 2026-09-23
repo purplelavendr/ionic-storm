@@ -31,13 +31,15 @@
 <script src="../js/activities/matter-review.js"></script>
 <script src="../js/activities/elements-review.js"></script>
 <script src="../js/activities/atomic-models.js"></script>
+<script src="../js/activities/particles-review.js"></script>
 <script>
-  const ACTIVITY_ID = new URLSearchParams(location.search).get('a') || 'elements-review'; // or ?a=matter-review / ?a=atomic-models
+  const ACTIVITY_ID = new URLSearchParams(location.search).get('a') || 'elements-review'; // or ?a=matter-review / ?a=atomic-models / ?a=particles-review
 
   const ACTIVITY_META = {
     'matter-review': { title: 'Chapter 1 Review: Defining Matter', unitId: 'unit1-alchemy' },
     'elements-review': { title: 'Chapter 2 Review: Basic Building Materials', unitId: 'unit1-alchemy' },
-    'atomic-models': { title: 'Lesson 11: Atomic Pudding — Models of the Atom', unitId: 'unit1-alchemy' }
+    'atomic-models': { title: 'Lesson 11: Atomic Pudding — Models of the Atom', unitId: 'unit1-alchemy' },
+    'particles-review': { title: 'Chapter 3 Review: A World of Particles', unitId: 'unit1-alchemy' }
   };
 
   let progress = null; // in-memory, mimics one activity's saved record
