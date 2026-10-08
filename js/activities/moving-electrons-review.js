@@ -1,0 +1,1973 @@
+// "Chapter 4 Review: Moving Electrons" (registered as CONTENT activity id
+// 'moving-electrons-review'). Same accordion + graded-quiz shape as
+// matter-review.js / elements-review.js / particles-review.js, plus two
+// hands-on interactive widgets this chapter specifically calls for:
+//   - a flame-test simulator (Section 1)
+//   - a shell (Bohr) model builder, for a neutral atom AND its ion (Sections 2-3)
+// Only the quiz's score is saved via ctx.saveProgress; the simulators and
+// practice problems are an ungraded warm-up, same as they'd be worked
+// through in class.
+//
+// Supports an EN/ES language toggle (see LANG_KEY below). This only affects
+// this activity's own display text -- grading is always based on the
+// answer's positional index (QUESTIONS[i].correct), never on which
+// language's text is shown, so translation can never affect correctness.
+(function () {
+  const STYLE_ID = 'me-lesson-styles';
+  const FONT_LINK_ID = 'el-lesson-fonts'; // shared Google Fonts <link>, same font family as every other review
+  const LANG_KEY = 'ionicstorm_lang_v1';  // shared literal: keeps language in sync across all activities
+  const SECTION_COUNT = 9; // sections 0-8 (8 content sections + the graded quiz)
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function getLang() {
+    return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en';
+  }
+  function setLang(lang) {
+    localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en');
+  }
+  function tr(field, lang) {
+    return (field && typeof field === 'object') ? (field[lang] || field.en) : field;
+  }
+  function t(key, lang, ...args) {
+    const entry = STRINGS[key] || {};
+    const val = entry[lang] || entry.en;
+    return typeof val === 'function' ? val(...args) : val;
+  }
+
+  const DIFF_LABELS = {
+    en: { basic: 'Basic', medium: 'Medium', challenge: 'Challenge' },
+    es: { basic: 'Básico', medium: 'Medio', challenge: 'Desafío' }
+  };
+
+  const STRINGS = {
+    headerLabel: { en: 'Chapter 4 · Moving Electrons', es: 'Capítulo 4 · Electrones en Movimiento' },
+    headerMeta: { en: 'Self-Paced Review · ~55 Minutes · Good prep for Quiz A/B', es: 'Repaso a tu Propio Ritmo · ~55 Minutos · Buena preparación para el Quiz A/B' },
+    langToggleAria: { en: 'Language', es: 'Idioma' },
+    progress: { en: 'Progress', es: 'Progreso' },
+    sectionCount: { en: (done, total) => `${done} / ${total} sections`, es: (done, total) => `${done} / ${total} secciones` },
+    checkForUnderstanding: { en: 'Check for Understanding', es: 'Comprobación de Comprensión' },
+    quizTimeGraded: { en: '23 min · graded', es: '23 min · calificado' },
+    quizNote: {
+      en: 'Unlike the sections above, this quiz <strong>saves your score</strong> and reports it to your teacher. You can retake it any time — your most recent attempt is what\'s saved.',
+      es: 'A diferencia de las secciones anteriores, este quiz <strong>guarda tu puntaje</strong> y se lo reporta a tu maestro. Puedes volver a hacerlo en cualquier momento — se guarda tu intento más reciente.'
+    },
+    markSectionComplete: { en: '✓ Mark Section Complete', es: '✓ Marcar Sección como Completa' },
+    sectionComplete: { en: '✓ Section Complete', es: '✓ Sección Completa' },
+    hintShow: { en: '💡 Hint', es: '💡 Pista' },
+    hintHide: { en: '▲ Hide Hint', es: '▲ Ocultar Pista' },
+    revealAnswer: { en: 'Reveal Answer', es: 'Mostrar Respuesta' },
+    hideAnswer: { en: 'Hide Answer', es: 'Ocultar Respuesta' },
+    answerLabel: { en: '✓ Answer', es: '✓ Respuesta' },
+    questionCount: { en: (n, total) => `Question ${n} of ${total}`, es: (n, total) => `Pregunta ${n} de ${total}` },
+    nextQuestion: { en: 'Next Question', es: 'Siguiente Pregunta' },
+    correctPrefix: { en: '✓ Correct!', es: '✓ ¡Correcto!' },
+    incorrectPrefix: { en: '✗ Not quite.', es: '✗ No exactamente.' },
+    retakeQuiz: { en: 'Retake Quiz', es: 'Repetir el Quiz' },
+    summaryText: {
+      en: 'Nice work! You can retake this any time — your most recent attempt is what\'s saved and sent to your teacher.',
+      es: '¡Buen trabajo! Puedes repetirlo en cualquier momento — se guarda y se envía a tu maestro tu intento más reciente.'
+    },
+    // Flame test simulator
+    flamePickSample: { en: 'Pick a sample:', es: 'Elige una muestra:' },
+    flameTestBtn: { en: '🔥 Test in the Flame', es: '🔥 Probar en la Llama' },
+    flameResetBtn: { en: 'Try Another Sample', es: 'Probar Otra Muestra' },
+    flameUnlitHint: { en: 'Pick a sample above, then test it in the flame.', es: 'Elige una muestra arriba, y luego pruébala en la llama.' },
+    flameResultLabel: { en: 'Flame color', es: 'Color de la llama' },
+    flameIdentityLabel: { en: 'Metal identified', es: 'Metal identificado' },
+    // Shell / Bohr model builder
+    shellPickElement: { en: 'Pick an element to build:', es: 'Elige un elemento para construir:' },
+    shellAddElectron: { en: '+ Add Electron', es: '+ Agregar Electrón' },
+    shellRemoveElectron: { en: '– Remove Electron', es: '– Quitar Electrón' },
+    shellElectronsPlaced: { en: (n, total) => `Electrons placed: ${n} / ${total}`, es: (n, total) => `Electrones colocados: ${n} / ${total}` },
+    shellBreakdownLabel: { en: 'Shells', es: 'Capas' },
+    shellCheckModel: { en: 'Check My Model', es: 'Revisar Mi Modelo' },
+    shellCorrect: { en: '✓ Correct! That\'s a complete, neutral atom.', es: '✓ ¡Correcto! Ese es un átomo neutro completo.' },
+    shellIncomplete: { en: 'Keep going — add more electrons until you reach the atomic number.', es: 'Sigue — agrega más electrones hasta llegar al número atómico.' },
+    shellValenceLabel: { en: 'Valence electrons (outermost shell)', es: 'Electrones de valencia (capa externa)' },
+    shellCoreLabel: { en: 'Core electrons (all other shells)', es: 'Electrones del núcleo interno (las demás capas)' },
+    ionPrompt: {
+      en: (sym) => `Now make it an ion! Use the buttons below to add or remove electrons from ${sym} until it matches the electron arrangement of the nearest noble gas.`,
+      es: (sym) => `¡Ahora conviértelo en un ion! Usa los botones de abajo para agregar o quitar electrones de ${sym} hasta que coincida con el arreglo de electrones del gas noble más cercano.`
+    },
+    ionAddElectron: { en: '+ Add Electron (more negative)', es: '+ Agregar Electrón (más negativo)' },
+    ionRemoveElectron: { en: '– Remove Electron (more positive)', es: '– Quitar Electrón (más positivo)' },
+    ionChargeLabel: { en: 'Charge', es: 'Carga' },
+    ionCheckBtn: { en: 'Check My Ion', es: 'Revisar Mi Ion' },
+    ionCorrect: { en: (charge) => `✓ Correct! This ion has a charge of ${charge}, matching the nearest noble gas.`, es: (charge) => `✓ ¡Correcto! Este ion tiene una carga de ${charge}, igual al gas noble más cercano.` },
+    ionIncorrect: { en: 'Not quite that arrangement yet — keep adjusting the electron count.', es: 'Todavía no es ese arreglo — sigue ajustando el número de electrones.' },
+    buildAnotherBtn: { en: 'Build Another Element', es: 'Construir Otro Elemento' },
+    shellRowLabel: { en: (n, cap) => `Shell ${n} (max ${cap})`, es: (n, cap) => `Capa ${n} (máx ${cap})` },
+    shellLockedHint: { en: (s) => `Fill Shell ${s} first`, es: (s) => `Llena primero la Capa ${s}` },
+    shellWrongDistribution: {
+      en: 'That\'s the right total, but not in the correct shells — remember each shell must fill before the next.',
+      es: 'Ese es el total correcto, pero no está en las capas correctas — recuerda que cada capa debe llenarse antes de la siguiente.'
+    },
+    guidedModeLabel: { en: 'Guided Example', es: 'Ejemplo Guiado' },
+    independentModeLabel: { en: 'Your Turn — Independent', es: 'Tu Turno — Independiente' },
+    guidedAtomIntro: {
+      en: 'Fill the shells yourself, one electron at a time — but each shell must be completely full before the next one unlocks (Shell 1 first, max 2; then Shell 2, max 8; and so on).',
+      es: 'Llena las capas tú mismo, un electrón a la vez — pero cada capa debe estar completamente llena antes de que se desbloquee la siguiente (primero la Capa 1, máx 2; luego la Capa 2, máx 8; y así sucesivamente).'
+    },
+    guidedIonIntro: {
+      en: 'For this guided example, only the outermost (valence) shell is unlocked — forming an ion only ever changes the valence shell.',
+      es: 'Para este ejemplo guiado, solo la capa más externa (de valencia) está desbloqueada — formar un ion solo cambia la capa de valencia.'
+    },
+    ionLockedHint: { en: 'Locked for this guided example', es: 'Bloqueada para este ejemplo guiado' },
+    // Electron configuration tool
+    ecPick: { en: 'Click an element on the periodic table, then fill in its subshells:', es: 'Haz clic en un elemento de la tabla periódica, y luego llena sus subcapas:' },
+    ecLegendS: { en: 's-block', es: 'bloque s' },
+    ecLegendP: { en: 'p-block', es: 'bloque p' },
+    ecLegendD: { en: 'd-block', es: 'bloque d' },
+    ecExceptNote: { en: 'Cr and Cu are real-world exceptions (a half-full or full d subshell is extra stable) and go beyond this course, so the tool skips them.', es: 'Cr y Cu son excepciones reales (una subcapa d medio llena o llena es extra estable) y van más allá de este curso, así que la herramienta los omite.' },
+    ecCrossNote: { en: 'An element gets crossed off once you have placed enough electrons in the right subshells to build its configuration — so if the order is wrong, the table stops crossing off.', es: 'Un elemento se tacha cuando has colocado suficientes electrones en las subcapas correctas para construir su configuración — así que si el orden es incorrecto, la tabla deja de tachar.' },
+    ecGuidedOn: { en: 'Guided: ON', es: 'Guiado: SÍ' },
+    ecGuidedOff: { en: 'Guided: OFF', es: 'Guiado: NO' },
+    ecTitle: { en: (sym, z) => `Build the configuration for ${sym} (${z} electrons)`, es: (sym, z) => `Construye la configuración de ${sym} (${z} electrones)` },
+    ecPlaced: { en: (n, z) => `Electrons placed: ${n} / ${z}`, es: (n, z) => `Electrones colocados: ${n} / ${z}` },
+    ecLive: { en: 'Your configuration (in filling order)', es: 'Tu configuración (en orden de llenado)' },
+    ecRowLabel: { en: (name, cap) => `${name} (max ${cap})`, es: (name, cap) => `${name} (máx ${cap})` },
+    ecLocked: { en: (name) => `Fill ${name} first`, es: (name) => `Llena primero ${name}` },
+    ecTipNext: { en: (name, cap) => `Next up: ${name} (holds up to ${cap}).${name === '4s' ? ' Yes — 4s fills before 3d!' : ''}`, es: (name, cap) => `Sigue: ${name} (tiene hasta ${cap}).${name === '4s' ? ' ¡Sí — la 4s se llena antes que la 3d!' : ''}` },
+    ecTipDone: { en: 'All electrons are placed — click Check My Configuration.', es: 'Todos los electrones están colocados — haz clic en Revisar Mi Configuración.' },
+    ecCheck: { en: 'Check My Configuration', es: 'Revisar Mi Configuración' },
+    ecWrong: { en: 'Right number of electrons, but not the right subshells. Each subshell has a maximum, and they fill in a set order.', es: 'El número de electrones es correcto, pero no las subcapas. Cada subcapa tiene un máximo, y se llenan en un orden fijo.' },
+    ecWrong4s: { en: 'Right number of electrons, but check the order: the 4s subshell fills before the 3d subshell.', es: 'El número de electrones es correcto, pero revisa el orden: la subcapa 4s se llena antes que la subcapa 3d.' },
+    ecCorrect: { en: '✓ Correct configuration!', es: '✓ ¡Configuración correcta!' },
+    ecExplain: {
+      en: (sym, sub, block, n, v, short) => `The last electron lands in the ${sub} subshell, so ${sym} sits in the ${block}-block of the periodic table. Its outermost shell is n = ${n} (period ${n}) and holds ${v} valence electron${v === 1 ? '' : 's'}.${short ? ` Noble-gas shorthand: ${short}` : ''}`,
+      es: (sym, sub, block, n, v, short) => `El último electrón llega a la subcapa ${sub}, así que ${sym} está en el bloque ${block} de la tabla periódica. Su capa más externa es n = ${n} (período ${n}) y tiene ${v} electrón${v === 1 ? '' : 'es'} de valencia.${short ? ` Notación abreviada con gas noble: ${short}` : ''}`
+    },
+    // Charge balancer (rule of zero charge)
+    balPick: { en: 'Pick a pair of ions to combine:', es: 'Elige un par de iones para combinar:' },
+    balPositive: { en: 'Total positive charge', es: 'Carga positiva total' },
+    balNegative: { en: 'Total negative charge', es: 'Carga negativa total' },
+    balNet: { en: 'Net charge', es: 'Carga neta' },
+    balAdd: { en: '+ Add', es: '+ Agregar' },
+    balRemove: { en: '– Remove', es: '– Quitar' },
+    balEmpty: { en: 'Add at least one of each ion to start.', es: 'Agrega al menos uno de cada ion para empezar.' },
+    balTooPositive: { en: 'Too much positive charge — add more of the negative ion, or remove some of the positive ion.', es: 'Demasiada carga positiva — agrega más del ion negativo, o quita algo del ion positivo.' },
+    balTooNegative: { en: 'Too much negative charge — add more of the positive ion, or remove some of the negative ion.', es: 'Demasiada carga negativa — agrega más del ion positivo, o quita algo del ion negativo.' },
+    balNotSmallest: { en: 'Balanced to zero — but it\'s not the smallest whole-number ratio yet. Can you use fewer ions?', es: 'Equilibrado a cero — pero todavía no es la proporción entera más pequeña. ¿Puedes usar menos iones?' },
+    balDone: { en: (formula, name) => `✓ Balanced at zero! Formula: ${formula} · Name: ${name}`, es: (formula, name) => `✓ ¡Equilibrado en cero! Fórmula: ${formula} · Nombre: ${name}` },
+    balDoneFormula: { en: (formula) => `✓ Balanced at zero! Formula: ${formula}`, es: (formula) => `✓ ¡Equilibrado en cero! Fórmula: ${formula}` },
+    balGuidedIntro: { en: 'Guided example: the rule of zero charge says total + and total − must cancel. Watch the net charge as you add ions, and follow the tip below.', es: 'Ejemplo guiado: la regla de carga cero dice que el total + y el total − deben cancelarse. Observa la carga neta al agregar iones, y sigue la sugerencia de abajo.' },
+    balGuidedTip: { en: (net) => net === 0 ? 'Net is 0 — now check you used the smallest numbers.' : (net < 0 ? 'Net is negative: the negative ions outweigh the positive. Add a positive ion.' : 'Net is positive: the positive ions outweigh the negative. Add a negative ion.'), es: (net) => net === 0 ? 'La neta es 0 — ahora verifica que usaste los números más pequeños.' : (net < 0 ? 'La neta es negativa: los iones negativos pesan más. Agrega un ion positivo.' : 'La neta es positiva: los iones positivos pesan más. Agrega un ion negativo.') }
+  };
+
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.me-lesson {
+  --navy: #0d1b2a; --navy-mid: #1b2d42; --navy-light: #253a52;
+  --teal: #2ec4b6; --teal-dim: #1a8c83; --amber: #f4a261;
+  --cream: #f7f3ec; --cream-dark: #ede8df;
+  --text: #1a1a2e; --text-muted: #5a6475;
+  --note-bg: #fff8e7; --note-border: #f4a261;
+  --correct-bg: #e8f8f5; --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text); font-size: 17px; line-height: 1.7;
+  background: var(--cream); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.me-lesson * { box-sizing: border-box; }
+.me-lesson .me-header { background: var(--navy); color: var(--cream); padding: 2rem 1.75rem 1.6rem; position: relative; overflow: hidden; }
+.me-lesson .me-header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; border: 32px solid rgba(46,196,182,0.12); }
+.me-lesson .me-lang-toggle { position: absolute; top: 1.75rem; right: 1.75rem; z-index: 2; display: flex; gap: 0.3rem; }
+.me-lesson .me-lang-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.3rem 0.6rem; border-radius: 6px; background: transparent; border: 1px solid rgba(247,243,236,0.35); color: rgba(247,243,236,0.65); cursor: pointer; }
+.me-lesson .me-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.me-lesson .me-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
+.me-lesson .me-header-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem; position: relative; }
+.me-lesson .me-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; line-height: 1.2; margin: 0 0 0.4rem; position: relative; }
+.me-lesson .me-header-meta { font-size: 0.82rem; color: rgba(247,243,236,0.65); font-family: 'JetBrains Mono', monospace; position: relative; }
+.me-lesson .me-progress-wrap { background: var(--navy-mid); padding: 0.7rem 1.75rem; display: flex; align-items: center; gap: 0.9rem; position: sticky; top: 0; z-index: 10; }
+.me-lesson .me-progress-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+.me-lesson .me-progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; }
+.me-lesson .me-progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber)); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+.me-lesson .me-progress-count { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(247,243,236,0.55); white-space: nowrap; }
+.me-lesson main { padding: 1.5rem 1.25rem 2.5rem; }
+.me-lesson .section-card { background: white; border-radius: 12px; margin-bottom: 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+.me-lesson .section-header { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.2rem; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; }
+.me-lesson .section-header:hover { background: #fafafa; }
+.me-lesson .section-header.open { border-bottom-color: var(--cream-dark); }
+.me-lesson .section-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; color: white; background: var(--navy); border-radius: 6px; padding: 0.22rem 0.5rem; flex-shrink: 0; }
+.me-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.me-lesson .section-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; flex: 1; }
+.me-lesson .section-time { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); }
+.me-lesson .section-arrow { font-size: 0.9rem; color: var(--text-muted); transition: transform 0.25s; flex-shrink: 0; }
+.me-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.me-lesson .section-body { display: none; padding: 1.3rem; }
+.me-lesson .section-body.open { display: block; animation: meFadeIn 0.25s ease; }
+@keyframes meFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.me-lesson h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--navy); margin: 0 0 0.6rem; }
+.me-lesson h3 { font-size: 0.95rem; font-weight: 600; color: var(--navy-mid); margin: 1.1rem 0 0.5rem; }
+.me-lesson p { margin: 0 0 0.85rem; }
+.me-lesson p:last-child { margin-bottom: 0; }
+.me-lesson .note-box { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin: 1.1rem 0; display: flex; gap: 0.7rem; font-size: 0.9rem; }
+.me-lesson .note-box .note-icon { font-size: 1.15rem; flex-shrink: 0; }
+.me-lesson .concept-box { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%); color: var(--cream); border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.1rem 0; }
+.me-lesson .concept-box .concept-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--teal); margin-bottom: 0.4rem; }
+.me-lesson .concept-box p { color: rgba(247,243,236,0.92); margin-bottom: 0; }
+.me-lesson .info-panel { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 0.9rem 1.1rem; margin: 1.1rem 0; font-size: 0.9rem; }
+.me-lesson .info-panel .panel-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.14em; color: #0369a1; margin-bottom: 0.35rem; }
+.me-lesson table { width: 100%; border-collapse: collapse; margin: 0.9rem 0; font-size: 0.85rem; }
+.me-lesson th { background: var(--navy); color: var(--cream); font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; text-align: left; }
+.me-lesson td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cream-dark); }
+.me-lesson tr:nth-child(even) td { background: #fafafa; }
+.me-lesson ul, .me-lesson ol { padding-left: 1.3rem; margin: 0 0 0.85rem; }
+.me-lesson li { margin-bottom: 0.3rem; font-size: 0.93rem; }
+.me-lesson .objectives-list { list-style: none; padding: 0; margin: 0.4rem 0; }
+.me-lesson .objectives-list li { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.4rem 0; font-size: 0.92rem; border-bottom: 1px solid var(--cream-dark); }
+.me-lesson .objectives-list li:last-child { border-bottom: none; }
+.me-lesson .obj-check { color: var(--teal); flex-shrink: 0; }
+.me-lesson .practice-problem { border: 1.5px solid var(--cream-dark); border-radius: 10px; margin-bottom: 1.1rem; overflow: hidden; }
+.me-lesson .pp-header { display: flex; align-items: center; gap: 0.65rem; padding: 0.85rem 1.1rem; background: #fafafa; border-bottom: 1px solid var(--cream-dark); }
+.me-lesson .pp-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700; color: white; background: var(--amber); border-radius: 6px; padding: 0.18rem 0.45rem; flex-shrink: 0; }
+.me-lesson .pp-difficulty { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; margin-left: auto; }
+.me-lesson .diff-basic { color: #16a34a; }
+.me-lesson .diff-medium { color: #d97706; }
+.me-lesson .diff-challenge { color: #dc2626; }
+.me-lesson .pp-body { padding: 0.95rem 1.1rem; }
+.me-lesson .pp-body p { font-size: 0.92rem; }
+.me-lesson .hint-btn, .me-lesson .reveal-btn, .me-lesson .mark-done-btn, .me-lesson .me-choice, .me-lesson .me-next-btn, .me-lesson .me-retake-btn, .me-lesson .me-flame-btn, .me-lesson .me-builder-btn {
+  font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none;
+}
+.me-lesson .hint-btn, .me-lesson .reveal-btn { border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.me-lesson .hint-btn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; margin-right: 0.5rem; }
+.me-lesson .hint-btn:hover { background: #fde68a; }
+.me-lesson .reveal-btn { background: var(--navy); color: white; }
+.me-lesson .reveal-btn:hover { background: var(--navy-light); }
+.me-lesson .hint-box, .me-lesson .answer-box { border-radius: 7px; padding: 0.75rem 0.95rem; margin-top: 0.7rem; font-size: 0.87rem; display: none; }
+.me-lesson .hint-box.open, .me-lesson .answer-box.open { display: block; animation: meFadeIn 0.2s ease; }
+.me-lesson .hint-box { background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; }
+.me-lesson .answer-box { background: var(--correct-bg); border: 1px solid var(--correct-border); color: #065f46; }
+.me-lesson .answer-box .answer-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim); margin-bottom: 0.35rem; font-weight: 700; }
+.me-lesson .mark-done-btn { display: block; width: 100%; margin-top: 1.2rem; background: var(--navy); color: var(--cream); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; transition: background 0.2s; }
+.me-lesson .mark-done-btn:hover:not(:disabled) { background: var(--teal-dim); }
+.me-lesson .mark-done-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.me-lesson .quiz-note { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin-bottom: 1.1rem; font-size: 0.88rem; }
+.me-lesson .quiz-progress-bar { height: 6px; background: var(--cream-dark); border-radius: 999px; overflow: hidden; margin: 0.6rem 0 0.9rem; }
+.me-lesson .quiz-progress-fill { height: 100%; background: linear-gradient(90deg, var(--navy), var(--teal)); transition: width 0.2s ease; }
+.me-lesson .quiz-question-count { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+.me-lesson .quiz-prompt { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--navy); margin: 0.5rem 0 1rem; }
+.me-lesson .me-choice { display: block; width: 100%; text-align: left; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem; font-size: 0.93rem; color: var(--text); font-family: 'Source Serif 4', serif; transition: border-color 0.15s, background 0.15s; }
+.me-lesson .me-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.me-lesson .me-choice:disabled { cursor: default; }
+.me-lesson .me-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.me-lesson .me-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.me-lesson .me-feedback { border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600; }
+.me-lesson .me-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.me-lesson .me-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.me-lesson .me-next-btn, .me-lesson .me-retake-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem; }
+.me-lesson .me-next-btn:hover, .me-lesson .me-retake-btn:hover { background: var(--navy-light); }
+.me-lesson .me-summary { text-align: center; padding: 1rem 0.5rem; }
+.me-lesson .me-score { font-family: 'JetBrains Mono', monospace; font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0; }
+
+/* ---- Flame test simulator ---- */
+.me-lesson .me-flame-widget { background: var(--cream-dark); border-radius: 12px; padding: 1.2rem; margin: 1rem 0; }
+.me-lesson .me-flame-samples { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.6rem 0 1rem; }
+.me-lesson .me-flame-sample { background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.5rem 0.8rem; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; cursor: pointer; text-align: left; }
+.me-lesson .me-flame-sample:hover { border-color: var(--teal); }
+.me-lesson .me-flame-sample.selected { border-color: var(--navy); background: var(--navy); color: white; }
+.me-lesson .me-flame-stage-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+.me-lesson .me-flame-stage { width: 140px; height: 190px; position: relative; }
+.me-lesson .me-flame-svg path { fill: var(--flame-fill, #9ca3af); transition: fill 0.7s ease, filter 0.7s ease; filter: none; }
+.me-lesson .me-flame-stage.lit .me-flame-svg path { filter: drop-shadow(0 0 14px var(--flame-fill)); animation: meFlicker 1.6s ease-in-out infinite; }
+@keyframes meFlicker { 0%,100% { transform: scaleY(1) scaleX(1); } 50% { transform: scaleY(1.04) scaleX(0.98); } }
+.me-lesson .me-burner-base { width: 70px; height: 16px; background: var(--navy-light); border-radius: 4px; margin-top: -8px; }
+.me-lesson .me-flame-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.6rem 1.1rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.me-lesson .me-flame-btn:hover:not(:disabled) { background: var(--navy-light); }
+.me-lesson .me-flame-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.me-lesson .me-flame-result { text-align: center; font-size: 0.9rem; min-height: 1.2em; }
+.me-lesson .me-flame-result .me-flame-result-box { background: var(--correct-bg); border: 1px solid var(--correct-border); border-radius: 8px; padding: 0.7rem 1rem; display: inline-block; }
+.me-lesson .me-flame-hint { color: var(--text-muted); font-size: 0.85rem; font-style: italic; }
+
+/* ---- Shell (Bohr) model builder ---- */
+.me-lesson .me-builder-widget { background: var(--cream-dark); border-radius: 12px; padding: 1.2rem; margin: 1rem 0; }
+.me-lesson .me-builder-elements { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.6rem 0 1rem; }
+.me-lesson .me-builder-el-btn { background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.5rem 0.8rem; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; cursor: pointer; }
+.me-lesson .me-builder-el-btn:hover { border-color: var(--teal); }
+.me-lesson .me-builder-el-btn.selected { border-color: var(--navy); background: var(--navy); color: white; }
+.me-lesson .me-builder-stage-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
+.me-lesson .me-shell-svg { max-width: 260px; width: 100%; height: auto; }
+.me-lesson .me-eslot-empty { fill: white; stroke: #cbd5e1; stroke-width: 1.5; stroke-dasharray: 2.5 2; }
+.me-lesson .me-eslot-filled { fill: var(--teal); stroke: var(--teal-dim); stroke-width: 1.5; }
+.me-lesson .me-shell-ring { fill: none; stroke: var(--navy-light); stroke-width: 1.5; opacity: 0.5; }
+.me-lesson .me-nucleus { fill: var(--navy); }
+.me-lesson .me-nucleus-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: white; font-weight: 700; text-anchor: middle; }
+.me-lesson .me-builder-controls { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; justify-content: center; }
+.me-lesson .me-builder-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.55rem 1rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.me-lesson .me-builder-btn:hover:not(:disabled) { background: var(--navy-light); }
+.me-lesson .me-builder-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.me-lesson .me-builder-btn.secondary { background: white; color: var(--navy); border: 1.5px solid var(--navy-light); }
+.me-lesson .me-builder-count { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--navy-mid); text-align: center; }
+.me-lesson .me-shell-breakdown { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-muted); text-align: center; }
+.me-lesson .me-builder-feedback { text-align: center; font-size: 0.88rem; font-weight: 600; min-height: 1.3em; }
+.me-lesson .me-builder-feedback.ok { color: var(--teal-dim); }
+.me-lesson .me-builder-feedback.bad { color: var(--text-muted); }
+.me-lesson .me-ion-panel { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1.5px dashed var(--cream-dark); width: 100%; text-align: center; }
+.me-lesson .me-ion-prompt { font-size: 0.88rem; margin-bottom: 0.8rem; }
+.me-lesson .me-charge-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; background: white; border: 2px solid var(--navy-light); border-radius: 999px; padding: 0.3rem 0.9rem; margin: 0.5rem 0; }
+.me-lesson .me-mode-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 999px; background: var(--cream-dark); color: var(--navy-mid); margin-bottom: 0.5rem; }
+.me-lesson .me-mode-badge.guided { background: var(--amber); color: white; }
+.me-lesson .me-guided-intro { font-size: 0.85rem; font-style: italic; color: var(--text-muted); margin: 0 0 0.7rem; max-width: 420px; text-align: center; }
+.me-lesson .me-shell-rows { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; max-width: 440px; margin: 0.4rem 0 0.8rem; }
+.me-lesson .me-shell-row { display: flex; align-items: center; gap: 0.5rem; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.45rem 0.65rem; flex-wrap: wrap; }
+.me-lesson .me-shell-row-label { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 600; color: var(--navy-mid); flex: 0 0 auto; min-width: 88px; }
+.me-lesson .me-shell-row-count { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); flex: 0 0 auto; min-width: 44px; }
+.me-lesson .me-shell-row .me-builder-btn { padding: 0.3rem 0.55rem; font-size: 0.72rem; }
+.me-lesson .me-shell-row-lock { font-size: 0.68rem; color: var(--amber); font-style: italic; margin-left: auto; }
+
+/* ---- Electron configuration tool ---- */
+.me-lesson .me-ec-legend { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.3rem 0 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; }
+.me-lesson .me-ec-chip { padding: 0.15rem 0.55rem; border-radius: 999px; border: 1.5px solid; }
+.me-lesson .me-ec-chip.s, .me-lesson .me-ec-cell.s { border-color: var(--teal-dim); color: var(--teal-dim); background: #e8f8f5; }
+.me-lesson .me-ec-chip.p, .me-lesson .me-ec-cell.p { border-color: #d98a3c; color: #a9611a; background: #fff3e2; }
+.me-lesson .me-ec-chip.d, .me-lesson .me-ec-cell.d { border-color: #5b6b86; color: #3f4d66; background: #eceff5; }
+.me-lesson .me-ec-table-wrap { overflow-x: auto; padding-bottom: 0.3rem; }
+.me-lesson .me-ec-table { display: grid; grid-template-columns: repeat(18, minmax(26px, 1fr)); grid-template-rows: repeat(4, 38px); gap: 2px; min-width: 500px; }
+.me-lesson .me-ec-cell { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 700; border: 1.5px solid; border-radius: 6px; padding: 0; cursor: pointer; line-height: 1.1; }
+.me-lesson .me-ec-cell small { display: block; font-size: 0.5rem; font-weight: 400; opacity: 0.75; }
+.me-lesson .me-ec-cell { position: relative; overflow: hidden; transition: opacity 0.3s; }
+.me-lesson .me-ec-cell::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top right, transparent calc(50% - 1.5px), var(--navy) calc(50% - 1.5px), var(--navy) calc(50% + 1.5px), transparent calc(50% + 1.5px)); transform: scale(0); transform-origin: bottom left; transition: transform 0.35s ease; pointer-events: none; }
+.me-lesson .me-ec-cell.crossed { opacity: 0.5; }
+.me-lesson .me-ec-cell.crossed::after { transform: scale(1); }
+.me-lesson .me-ec-cell.active.s { background: var(--teal-dim); color: white; }
+.me-lesson .me-ec-cell.active.p { background: #d98a3c; color: white; }
+.me-lesson .me-ec-cell.active.d { background: #3f4d66; color: white; }
+.me-lesson .me-ec-cell.sel { outline: 3px solid var(--navy); outline-offset: 1px; }
+.me-lesson .me-ec-cell.skip { opacity: 0.35; cursor: not-allowed; }
+.me-lesson .me-ec-note { font-size: 0.75rem; color: var(--text-muted); font-style: italic; margin: 0.3rem 0 0.6rem; }
+.me-lesson .me-ec-live { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 700; color: var(--navy); background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.4rem 0.8rem; min-height: 2.2rem; text-align: center; }
+.me-lesson .me-ec-tip { font-size: 0.85rem; font-style: italic; color: var(--text-muted); text-align: center; min-height: 1.3em; margin: 0; }
+
+/* ---- Charge balancer ---- */
+.me-lesson .me-bal-cols { display: flex; gap: 0.8rem; width: 100%; max-width: 480px; justify-content: center; }
+.me-lesson .me-bal-col { flex: 1; background: white; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.7rem 0.5rem; text-align: center; }
+.me-lesson .me-bal-col-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+.me-lesson .me-bal-rig-wrap { width: 100%; max-width: 480px; padding-top: 0.4rem; }
+.me-lesson .me-bal-rig { transform-origin: 50% 100%; transition: transform 0.5s ease; }
+.me-lesson .me-bal-pans { display: flex; justify-content: space-between; align-items: flex-end; gap: 0.5rem; height: 118px; }
+.me-lesson .me-bal-pan { width: 49%; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end; align-content: flex-end; gap: 3px; padding-bottom: 2px; }
+.me-lesson .me-bal-ball { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: white; flex: 0 0 auto; box-shadow: inset -3px -3px 6px rgba(0,0,0,0.18); }
+.me-lesson .me-bal-ball.pos { background: var(--teal-dim); }
+.me-lesson .me-bal-ball.neg { background: var(--amber); }
+.me-lesson .me-bal-count { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; margin: 0.2rem 0; }
+.me-lesson .me-bal-beam { height: 7px; background: var(--navy-light); border-radius: 4px; transition: background 0.3s; }
+.me-lesson .me-bal-beam.balanced { background: var(--teal); }
+.me-lesson .me-bal-pivot { width: 0; height: 0; margin: 0 auto; border-left: 14px solid transparent; border-right: 14px solid transparent; border-bottom: 26px solid var(--navy); }
+.me-lesson .me-bal-tally { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--navy-mid); text-align: center; }
+.me-lesson .me-bal-net { display: inline-block; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; background: white; border: 2px solid var(--navy-light); border-radius: 999px; padding: 0.25rem 0.9rem; }
+.me-lesson .me-bal-net.zero { border-color: var(--teal); background: var(--correct-bg); color: var(--teal-dim); }
+`;
+    document.head.appendChild(style);
+  }
+
+  // ---- Chemistry data ----
+
+  const FLAME_SAMPLES = [
+    { formula: 'LiCl', name: { en: 'Lithium chloride', es: 'Cloruro de litio' }, metal: { en: 'Lithium (Li)', es: 'Litio (Li)' }, color: '#e8384f', colorName: { en: 'crimson red', es: 'rojo carmesí' } },
+    { formula: 'NaCl', name: { en: 'Sodium chloride', es: 'Cloruro de sodio' }, metal: { en: 'Sodium (Na)', es: 'Sodio (Na)' }, color: '#ffc300', colorName: { en: 'bright yellow-orange', es: 'amarillo-anaranjado brillante' } },
+    { formula: 'KCl', name: { en: 'Potassium chloride', es: 'Cloruro de potasio' }, metal: { en: 'Potassium (K)', es: 'Potasio (K)' }, color: '#b07cf2', colorName: { en: 'lilac (pale violet)', es: 'lila (violeta pálido)' } },
+    { formula: 'CaCl₂', name: { en: 'Calcium chloride', es: 'Cloruro de calcio' }, metal: { en: 'Calcium (Ca)', es: 'Calcio (Ca)' }, color: '#ff7849', colorName: { en: 'orange-red (brick red)', es: 'rojo anaranjado (rojo ladrillo)' } },
+    { formula: 'SrCl₂', name: { en: 'Strontium chloride', es: 'Cloruro de estroncio' }, metal: { en: 'Strontium (Sr)', es: 'Estroncio (Sr)' }, color: '#ff3b5c', colorName: { en: 'deep red', es: 'rojo intenso' } },
+    { formula: 'BaCl₂', name: { en: 'Barium chloride', es: 'Cloruro de bario' }, metal: { en: 'Barium (Ba)', es: 'Bario (Ba)' }, color: '#7ed957', colorName: { en: 'apple green', es: 'verde manzana' } },
+    { formula: 'CuCl₂', name: { en: 'Copper(II) chloride', es: 'Cloruro de cobre(II)' }, metal: { en: 'Copper (Cu)', es: 'Cobre (Cu)' }, color: '#17d3c2', colorName: { en: 'blue-green', es: 'verde azulado' } }
+  ];
+
+  function shellsFor(n) {
+    const caps = [2, 8, 8, 8];
+    const shells = [];
+    let remaining = n;
+    for (const cap of caps) {
+      if (remaining <= 0) break;
+      shells.push(Math.min(cap, remaining));
+      remaining -= Math.min(cap, remaining);
+    }
+    return shells;
+  }
+  const SHELL_CAPS = [2, 8, 8, 8];
+
+  // Elements used in the "build the atom" practice (section 2). Deliberately
+  // avoids potassium and chlorine -- the two elements the real paper quiz
+  // uses for its own shell-model fill-in-the-blank question -- so this
+  // practice can't hand a student that quiz's answer.
+  const ATOM_BUILD_ELEMENTS = [
+    { z: 6, symbol: 'C', name: { en: 'Carbon', es: 'Carbono' } },
+    { z: 9, symbol: 'F', name: { en: 'Fluorine', es: 'Flúor' } },
+    { z: 15, symbol: 'P', name: { en: 'Phosphorus', es: 'Fósforo' } },
+    { z: 20, symbol: 'Ca', name: { en: 'Calcium', es: 'Calcio' } }
+  ];
+
+  // Elements used in the "build the ion" practice (section 3) -- two metals
+  // (form cations by losing electrons) and two nonmetals (form anions by
+  // gaining electrons), again avoiding K/Cl.
+  const ION_BUILD_ELEMENTS = [
+    { z: 12, symbol: 'Mg', name: { en: 'Magnesium', es: 'Magnesio' }, ionCharge: 2 },
+    { z: 13, symbol: 'Al', name: { en: 'Aluminum', es: 'Aluminio' }, ionCharge: 3 },
+    { z: 8, symbol: 'O', name: { en: 'Oxygen', es: 'Oxígeno' }, ionCharge: -2 },
+    { z: 9, symbol: 'F', name: { en: 'Fluorine', es: 'Flúor' }, ionCharge: -1 }
+  ];
+
+  const QUESTIONS = [
+    {
+      id: 'q1', type: 'mc',
+      prompt: { en: 'What actually causes the distinctive color in a flame test?', es: '¿Qué causa realmente el color distintivo en una prueba de llama?' },
+      choices: [
+        { en: 'The metal atoms physically burn up and disappear', es: 'Los átomos del metal se queman físicamente y desaparecen' },
+        { en: 'Electrons absorb energy from the flame and release it as light as they move within the atom', es: 'Los electrones absorben energía de la llama y la liberan como luz al moverse dentro del átomo' },
+        { en: 'The chlorine in the compound always burns that color', es: 'El cloro del compuesto siempre se quema de ese color' },
+        { en: 'It\'s just the color of the flame itself, unrelated to the sample', es: 'Es solo el color de la llama en sí, sin relación con la muestra' }
+      ],
+      correct: 1,
+      explanation: { en: 'The flame color comes from electrons moving within the metal atom — absorbing energy from the flame, then releasing it as light. Different metals release different colors.', es: 'El color de la llama proviene del movimiento de los electrones dentro del átomo metálico — absorben energía de la llama y luego la liberan como luz. Metales diferentes liberan colores diferentes.' }
+    },
+    {
+      id: 'q2', type: 'mc',
+      prompt: { en: 'Which flame color is characteristic of sodium compounds?', es: '¿Qué color de llama es característico de los compuestos de sodio?' },
+      choices: [
+        { en: 'Bright yellow-orange', es: 'Amarillo-anaranjado brillante' },
+        { en: 'Blue-green', es: 'Verde azulado' },
+        { en: 'Lilac (pale violet)', es: 'Lila (violeta pálido)' },
+        { en: 'Apple green', es: 'Verde manzana' }
+      ],
+      correct: 0,
+      explanation: { en: 'Sodium compounds produce a bright yellow-orange flame.', es: 'Los compuestos de sodio producen una llama amarillo-anaranjada brillante.' }
+    },
+    {
+      id: 'q3', type: 'mc',
+      prompt: { en: 'A sample burns with a blue-green flame. Which metal is most likely present?', es: 'Una muestra se quema con una llama verde azulada. ¿Qué metal es más probable que esté presente?' },
+      choices: [
+        { en: 'Lithium', es: 'Litio' },
+        { en: 'Copper', es: 'Cobre' },
+        { en: 'Barium', es: 'Bario' },
+        { en: 'Potassium', es: 'Potasio' }
+      ],
+      correct: 1,
+      explanation: { en: 'Copper compounds produce a characteristic blue-green flame.', es: 'Los compuestos de cobre producen una llama azul-verdosa característica.' }
+    },
+    {
+      id: 'q4', type: 'mc',
+      prompt: { en: 'What is the electron shell arrangement (configuration) for an atom with atomic number 12?', es: '¿Cuál es el arreglo de capas de electrones (configuración) para un átomo con número atómico 12?' },
+      choices: [
+        { en: '2, 8, 2', es: '2, 8, 2' },
+        { en: '2, 10', es: '2, 10' },
+        { en: '8, 2, 2', es: '8, 2, 2' },
+        { en: '2, 8, 8, 2', es: '2, 8, 8, 2' }
+      ],
+      correct: 0,
+      explanation: { en: 'Shell 1 fills first (max 2), then shell 2 (max 8), then shell 3: 12 = 2 + 8 + 2, so the arrangement is 2, 8, 2 (this is magnesium).', es: 'La capa 1 se llena primero (máx 2), luego la capa 2 (máx 8), luego la capa 3: 12 = 2 + 8 + 2, así que el arreglo es 2, 8, 2 (esto es magnesio).' }
+    },
+    {
+      id: 'q5', type: 'mc',
+      prompt: { en: 'What is a "valence electron"?', es: '¿Qué es un "electrón de valencia"?' },
+      choices: [
+        { en: 'Any electron in the nucleus', es: 'Cualquier electrón en el núcleo' },
+        { en: 'An electron in the outermost occupied shell', es: 'Un electrón en la capa ocupada más externa' },
+        { en: 'The first electron added to an atom', es: 'El primer electrón agregado a un átomo' },
+        { en: 'An electron that has been removed from the atom', es: 'Un electrón que ha sido removido del átomo' }
+      ],
+      correct: 1,
+      explanation: { en: 'Valence electrons are the electrons in the outermost (valence) shell of an atom.', es: 'Los electrones de valencia son los electrones en la capa más externa (de valencia) de un átomo.' }
+    },
+    {
+      id: 'q6', type: 'mc',
+      prompt: { en: 'What is a "core electron"?', es: '¿Qué es un "electrón del núcleo interno"?' },
+      choices: [
+        { en: 'An electron located inside the nucleus itself', es: 'Un electrón ubicado dentro del núcleo mismo' },
+        { en: 'Any electron that is not in the outermost (valence) shell', es: 'Cualquier electrón que no esté en la capa más externa (de valencia)' },
+        { en: 'An electron that has been gained to form an anion', es: 'Un electrón que se ha ganado para formar un anión' },
+        { en: 'The heaviest electron in the atom', es: 'El electrón más pesado del átomo' }
+      ],
+      correct: 1,
+      explanation: { en: 'Core electrons are all the electrons besides the valence electrons — every electron in an inner, filled shell.', es: 'Los electrones del núcleo interno son todos los electrones excepto los de valencia — cada electrón en una capa interna y llena.' }
+    },
+    {
+      id: 'q7', type: 'mc',
+      prompt: { en: 'For a main-group element, what does the group number on the periodic table tell you?', es: 'Para un elemento del grupo principal, ¿qué te dice el número de grupo en la tabla periódica?' },
+      choices: [
+        { en: 'The number of electron shells', es: 'El número de capas de electrones' },
+        { en: 'The number of valence electrons', es: 'El número de electrones de valencia' },
+        { en: 'The atomic mass', es: 'La masa atómica' },
+        { en: 'The number of neutrons', es: 'El número de neutrones' }
+      ],
+      correct: 1,
+      explanation: { en: 'For main-group elements, the group number equals the number of valence electrons.', es: 'Para los elementos del grupo principal, el número de grupo es igual al número de electrones de valencia.' }
+    },
+    {
+      id: 'q8', type: 'mc',
+      prompt: { en: 'What does the period (row) number of an element tell you?', es: '¿Qué te dice el número de período (fila) de un elemento?' },
+      choices: [
+        { en: 'The number of valence electrons', es: 'El número de electrones de valencia' },
+        { en: 'The number of electron shells', es: 'El número de capas de electrones' },
+        { en: 'The charge of its ion', es: 'La carga de su ion' },
+        { en: 'The number of protons only', es: 'Solo el número de protones' }
+      ],
+      correct: 1,
+      explanation: { en: 'The period number equals the number of electron shells in that element\'s atoms.', es: 'El número de período es igual al número de capas de electrones en los átomos de ese elemento.' }
+    },
+    {
+      id: 'q9', type: 'mc',
+      prompt: { en: 'What is an ion?', es: '¿Qué es un ion?' },
+      choices: [
+        { en: 'An atom with extra neutrons', es: 'Un átomo con neutrones adicionales' },
+        { en: 'An atom (or group of atoms) with a positive or negative charge, from losing or gaining electrons', es: 'Un átomo (o grupo de átomos) con carga positiva o negativa, por haber perdido o ganado electrones' },
+        { en: 'Any atom with more than one electron shell', es: 'Cualquier átomo con más de una capa de electrones' },
+        { en: 'Two atoms sharing electrons', es: 'Dos átomos que comparten electrones' }
+      ],
+      correct: 1,
+      explanation: { en: 'An ion is an atom (or group of atoms) carrying a net charge because it has lost or gained electrons.', es: 'Un ion es un átomo (o grupo de átomos) que lleva una carga neta porque ha perdido o ganado electrones.' }
+    },
+    {
+      id: 'q10', type: 'mc',
+      prompt: { en: 'What is a cation?', es: '¿Qué es un catión?' },
+      choices: [
+        { en: 'An ion with a negative charge, usually from a nonmetal', es: 'Un ion con carga negativa, generalmente de un no metal' },
+        { en: 'An ion with a positive charge, usually from a metal', es: 'Un ion con carga positiva, generalmente de un metal' },
+        { en: 'A neutral atom', es: 'Un átomo neutro' },
+        { en: 'A group of two or more bonded atoms', es: 'Un grupo de dos o más átomos enlazados' }
+      ],
+      correct: 1,
+      explanation: { en: 'A cation is an ion with a net positive charge, usually formed when a metal atom loses electrons.', es: 'Un catión es un ion con carga neta positiva, generalmente formado cuando un átomo metálico pierde electrones.' }
+    },
+    {
+      id: 'q11', type: 'mc',
+      prompt: { en: 'What is an anion?', es: '¿Qué es un anión?' },
+      choices: [
+        { en: 'An ion with a positive charge, usually from a metal', es: 'Un ion con carga positiva, generalmente de un metal' },
+        { en: 'An ion with a negative charge, usually from a nonmetal', es: 'Un ion con carga negativa, generalmente de un no metal' },
+        { en: 'An atom that has gained a proton', es: 'Un átomo que ha ganado un protón' },
+        { en: 'The same thing as a cation', es: 'Lo mismo que un catión' }
+      ],
+      correct: 1,
+      explanation: { en: 'An anion is an ion with a net negative charge, usually formed when a nonmetal atom gains electrons.', es: 'Un anión es un ion con carga neta negativa, generalmente formado cuando un átomo no metálico gana electrones.' }
+    },
+    {
+      id: 'q12', type: 'mc',
+      prompt: { en: 'Why do atoms gain or lose electrons to form ions?', es: '¿Por qué los átomos ganan o pierden electrones para formar iones?' },
+      choices: [
+        { en: 'To become radioactive', es: 'Para volverse radiactivos' },
+        { en: 'To match the electron arrangement of the nearest noble gas', es: 'Para igualar el arreglo de electrones del gas noble más cercano' },
+        { en: 'To increase their atomic mass', es: 'Para aumentar su masa atómica' },
+        { en: 'There is no particular reason — it happens randomly', es: 'No hay una razón en particular — sucede al azar' }
+      ],
+      correct: 1,
+      explanation: { en: 'Atoms gain or lose electrons to attain an electron arrangement like a noble gas — a full outermost shell, which is especially stable.', es: 'Los átomos ganan o pierden electrones para alcanzar un arreglo de electrones como el de un gas noble — una capa externa completa, que es especialmente estable.' }
+    },
+    {
+      id: 'q13', type: 'mc',
+      prompt: { en: 'An aluminum atom (3 valence electrons) most likely forms an ion by:', es: 'Un átomo de aluminio (3 electrones de valencia) más probablemente forma un ion al:' },
+      choices: [
+        { en: 'Gaining 3 electrons to form Al³⁻', es: 'Ganar 3 electrones para formar Al³⁻' },
+        { en: 'Losing 3 electrons to form Al³⁺', es: 'Perder 3 electrones para formar Al³⁺' },
+        { en: 'Gaining 5 electrons to form Al⁵⁻', es: 'Ganar 5 electrones para formar Al⁵⁻' },
+        { en: 'Losing 1 electron to form Al⁺', es: 'Perder 1 electrón para formar Al⁺' }
+      ],
+      correct: 1,
+      explanation: { en: 'It\'s easier for aluminum to lose its 3 valence electrons (reaching the noble gas configuration of neon) than to gain 5, so it forms Al³⁺.', es: 'Es más fácil para el aluminio perder sus 3 electrones de valencia (alcanzando la configuración de gas noble del neón) que ganar 5, así que forma Al³⁺.' }
+    },
+    {
+      id: 'q14', type: 'mc',
+      prompt: { en: 'Using the rule of zero charge, what is the correct formula for the compound formed from Ca²⁺ and Cl⁻?', es: 'Usando la regla de carga cero, ¿cuál es la fórmula correcta para el compuesto formado por Ca²⁺ y Cl⁻?' },
+      choices: [
+        { en: 'CaCl', es: 'CaCl' },
+        { en: 'CaCl₂', es: 'CaCl₂' },
+        { en: 'Ca₂Cl', es: 'Ca₂Cl' },
+        { en: 'Ca₂Cl₃', es: 'Ca₂Cl₃' }
+      ],
+      correct: 1,
+      explanation: { en: 'One Ca²⁺ needs two Cl⁻ to balance its +2 charge: +2 + (−1) + (−1) = 0, giving CaCl₂.', es: 'Un Ca²⁺ necesita dos Cl⁻ para equilibrar su carga +2: +2 + (−1) + (−1) = 0, dando CaCl₂.' }
+    },
+    {
+      id: 'q18', type: 'mc',
+      prompt: { en: 'Which pair of elements is most likely to form a binary ionic compound?', es: '¿Qué par de elementos es más probable que forme un compuesto iónico binario?' },
+      choices: [
+        { en: 'A metal and a nonmetal', es: 'Un metal y un no metal' },
+        { en: 'Two different metals', es: 'Dos metales diferentes' },
+        { en: 'Two different nonmetals', es: 'Dos no metales diferentes' },
+        { en: 'A noble gas and a metal', es: 'Un gas noble y un metal' }
+      ],
+      correct: 0,
+      explanation: { en: 'A binary ionic compound forms between a metal (which loses electrons to become a cation) and a nonmetal (which gains electrons to become an anion).', es: 'Un compuesto iónico binario se forma entre un metal (que pierde electrones para convertirse en catión) y un no metal (que gana electrones para convertirse en anión).' }
+    },
+    {
+      id: 'q19', type: 'mc',
+      prompt: { en: 'What is the correct name for the compound formed between potassium (K) and sulfur (S)?', es: '¿Cuál es el nombre correcto del compuesto formado entre potasio (K) y azufre (S)?' },
+      choices: [
+        { en: 'Potassium sulfur', es: 'Potasio azufre' },
+        { en: 'Potassium sulfate', es: 'Potasio sulfato' },
+        { en: 'Potassium sulfide', es: 'Sulfuro de potasio' },
+        { en: 'Dipotassium sulfur', es: 'Dipotasio azufre' }
+      ],
+      correct: 2,
+      explanation: { en: 'Potassium (K⁺) and sulfur (S²⁻, needing two K⁺ to balance) form K₂S. The metal name stays the same, and the nonmetal ending changes to "-ide": potassium sulfide.', es: 'El potasio (K⁺) y el azufre (S²⁻, que necesita dos K⁺ para equilibrarse) forman K₂S. El nombre del metal no cambia, y la terminación del no metal cambia a "-uro": sulfuro de potasio.' }
+    },
+    {
+      id: 'q20', type: 'mc',
+      prompt: { en: 'Which of these formulas is NOT likely to form, based on valence electrons?', es: '¿Cuál de estas fórmulas probablemente NO se forme, según los electrones de valencia?' },
+      choices: [
+        { en: 'MgO', es: 'MgO' },
+        { en: 'KCl', es: 'KCl' },
+        { en: 'NaO', es: 'NaO' },
+        { en: 'CaBr₂', es: 'CaBr₂' }
+      ],
+      correct: 2,
+      explanation: { en: 'Sodium is always +1 and oxygen is always −2, so a 1:1 ratio (NaO) leaves a charge of −1, not zero. The correct formula is Na₂O.', es: 'El sodio siempre es +1 y el oxígeno siempre es −2, así que una proporción de 1:1 (NaO) deja una carga de −1, no cero. La fórmula correcta es Na₂O.' }
+    },
+    {
+      id: 'q21', type: 'mc',
+      prompt: { en: 'What is a polyatomic ion?', es: '¿Qué es un ion poliatómico?' },
+      choices: [
+        { en: 'An ion made of a single atom that has gained or lost several electrons', es: 'Un ion hecho de un solo átomo que ha ganado o perdido varios electrones' },
+        { en: 'A group of atoms bonded together, carrying an overall positive or negative charge', es: 'Un grupo de átomos enlazados entre sí, que lleva una carga neta positiva o negativa' },
+        { en: 'Any ion with a charge greater than 2', es: 'Cualquier ion con una carga mayor que 2' },
+        { en: 'An ion found only in metals', es: 'Un ion que se encuentra solo en los metales' }
+      ],
+      correct: 1,
+      explanation: { en: 'A polyatomic ion is a group of atoms bonded together that together carry a net charge — for example, NO₃⁻ (nitrate) or NH₄⁺ (ammonium).', es: 'Un ion poliatómico es un grupo de átomos enlazados entre sí que en conjunto llevan una carga neta — por ejemplo, NO₃⁻ (nitrato) o NH₄⁺ (amonio).' }
+    },
+    {
+      id: 'q22', type: 'mc',
+      prompt: { en: 'Which formula represents the hydroxide ion?', es: '¿Qué fórmula representa el ion hidróxido?' },
+      choices: [
+        { en: 'OH⁻', es: 'OH⁻' },
+        { en: 'O²⁻', es: 'O²⁻' },
+        { en: 'H⁺', es: 'H⁺' },
+        { en: 'HO₂⁻', es: 'HO₂⁻' }
+      ],
+      correct: 0,
+      explanation: { en: 'Hydroxide is OH⁻ — one oxygen and one hydrogen bonded together, carrying a −1 charge.', es: 'El hidróxido es OH⁻ — un oxígeno y un hidrógeno enlazados entre sí, con una carga de −1.' }
+    },
+    {
+      id: 'q23', type: 'mc',
+      prompt: { en: 'What is the correct name for the compound Na₂SO₄?', es: '¿Cuál es el nombre correcto del compuesto Na₂SO₄?' },
+      choices: [
+        { en: 'Sodium sulfide', es: 'Sulfuro de sodio' },
+        { en: 'Sodium sulfate', es: 'Sulfato de sodio' },
+        { en: 'Disodium sulfur oxide', es: 'Óxido de disodio azufre' },
+        { en: 'Sodium sulfite', es: 'Sulfito de sodio' }
+      ],
+      correct: 1,
+      explanation: { en: 'SO₄²⁻ is the polyatomic sulfate ion. Two Na⁺ balance its −2 charge, giving sodium sulfate — the polyatomic ion\'s name is used as-is, never changed to "-ide."', es: 'SO₄²⁻ es el ion poliatómico sulfato. Dos Na⁺ equilibran su carga −2, dando sulfato de sodio — el nombre del ion poliatómico se usa tal cual, nunca se cambia a "-uro."' }
+    },
+    {
+      id: 'q24', type: 'mc',
+      prompt: { en: 'In the electron configuration 2p⁴, what does the superscript (4) represent?', es: 'En la configuración electrónica 2p⁴, ¿qué representa el superíndice (4)?' },
+      choices: [
+        { en: 'The shell number', es: 'El número de capa' },
+        { en: 'The number of electrons in that subshell', es: 'El número de electrones en esa subcapa' },
+        { en: 'The group number on the periodic table', es: 'El número de grupo en la tabla periódica' },
+        { en: 'The atomic number of the element', es: 'El número atómico del elemento' }
+      ],
+      correct: 1,
+      explanation: { en: 'The superscript in an electron configuration shows how many electrons occupy that specific subshell.', es: 'El superíndice en una configuración electrónica muestra cuántos electrones ocupan esa subcapa específica.' }
+    },
+    {
+      id: 'q25', type: 'mc',
+      prompt: { en: 'Which subshell holds a maximum of 6 electrons?', es: '¿Qué subcapa tiene un máximo de 6 electrones?' },
+      choices: [
+        { en: 's', es: 's' },
+        { en: 'p', es: 'p' },
+        { en: 'd', es: 'd' },
+        { en: 'f', es: 'f' }
+      ],
+      correct: 1,
+      explanation: { en: 'The s subshell holds up to 2 electrons, p holds up to 6, d holds up to 10, and f holds up to 14.', es: 'La subcapa s tiene hasta 2 electrones, la p hasta 6, la d hasta 10, y la f hasta 14.' }
+    },
+    {
+      id: 'q26', type: 'mc',
+      prompt: { en: 'What element has the electron configuration 1s²2s²2p⁶3s²3p⁴?', es: '¿Qué elemento tiene la configuración electrónica 1s²2s²2p⁶3s²3p⁴?' },
+      choices: [
+        { en: 'Oxygen', es: 'Oxígeno' },
+        { en: 'Silicon', es: 'Silicio' },
+        { en: 'Sulfur', es: 'Azufre' },
+        { en: 'Chlorine', es: 'Cloro' }
+      ],
+      correct: 2,
+      explanation: { en: 'Adding up the superscripts: 2 + 2 + 6 + 2 + 4 = 16 electrons, which matches sulfur\'s atomic number.', es: 'Sumando los superíndices: 2 + 2 + 6 + 2 + 4 = 16 electrones, que coincide con el número atómico del azufre.' }
+    }
+  ];
+
+  function practiceProblem(lang, idSuffix, prompt, difficulty, hint, answer) {
+    const diffClass = { basic: 'diff-basic', medium: 'diff-medium', challenge: 'diff-challenge' }[difficulty] || 'diff-basic';
+    const diffLabel = (DIFF_LABELS[lang] || DIFF_LABELS.en)[difficulty] || difficulty;
+    return `
+      <div class="practice-problem">
+        <div class="pp-header">
+          <span class="pp-num">Q</span>
+          <span class="pp-difficulty ${diffClass}">● ${escapeHtml(diffLabel)}</span>
+        </div>
+        <div class="pp-body">
+          <p><strong>${prompt}</strong></p>
+          <button type="button" class="hint-btn" data-hint-target="hint-${idSuffix}">${escapeHtml(t('hintShow', lang))}</button>
+          <button type="button" class="reveal-btn" data-answer-target="ans-${idSuffix}">${escapeHtml(t('revealAnswer', lang))}</button>
+          <div class="hint-box" id="hint-${idSuffix}">${hint}</div>
+          <div class="answer-box" id="ans-${idSuffix}">
+            <div class="answer-label">${escapeHtml(t('answerLabel', lang))}</div>
+            ${answer}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ---- Flame test simulator widget ----
+
+  function flameSvg() {
+    return `
+      <svg class="me-flame-svg" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50,135 C22,112 16,72 36,46 C40,62 50,56 48,36 C66,56 85,76 80,100 C76,122 65,135 50,135 Z"/>
+      </svg>`;
+  }
+
+  function renderFlameWidget(mount, lang) {
+    mount.innerHTML = `
+      <div class="me-flame-widget">
+        <p style="margin-bottom:0.4rem;"><strong>${escapeHtml(t('flamePickSample', lang))}</strong></p>
+        <div class="me-flame-samples">
+          ${FLAME_SAMPLES.map((s, i) => `<button type="button" class="me-flame-sample" data-idx="${i}">${escapeHtml(tr(s.name, lang))} (${s.formula})</button>`).join('')}
+        </div>
+        <div class="me-flame-stage-wrap">
+          <div class="me-flame-stage" id="me-flame-stage">
+            ${flameSvg()}
+          </div>
+          <div class="me-burner-base"></div>
+          <button type="button" class="me-flame-btn" id="me-flame-test-btn" disabled>${escapeHtml(t('flameTestBtn', lang))}</button>
+          <div class="me-flame-result" id="me-flame-result"><span class="me-flame-hint">${escapeHtml(t('flameUnlitHint', lang))}</span></div>
+        </div>
+      </div>
+    `;
+
+    let selected = null;
+    const stage = mount.querySelector('#me-flame-stage');
+    const testBtn = mount.querySelector('#me-flame-test-btn');
+    const resultArea = mount.querySelector('#me-flame-result');
+
+    mount.querySelectorAll('.me-flame-sample').forEach(btn => {
+      btn.addEventListener('click', () => {
+        mount.querySelectorAll('.me-flame-sample').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selected = FLAME_SAMPLES[Number(btn.getAttribute('data-idx'))];
+        stage.classList.remove('lit');
+        stage.style.removeProperty('--flame-fill');
+        testBtn.disabled = false;
+        resultArea.innerHTML = `<span class="me-flame-hint">${escapeHtml(t('flameUnlitHint', lang))}</span>`;
+      });
+    });
+
+    testBtn.addEventListener('click', () => {
+      if (!selected) return;
+      stage.style.setProperty('--flame-fill', selected.color);
+      stage.classList.add('lit');
+      resultArea.innerHTML = `
+        <div class="me-flame-result-box">
+          <div>${escapeHtml(t('flameResultLabel', lang))}: <strong>${escapeHtml(tr(selected.colorName, lang))}</strong></div>
+          <div>${escapeHtml(t('flameIdentityLabel', lang))}: <strong>${escapeHtml(tr(selected.metal, lang))}</strong></div>
+        </div>
+      `;
+    });
+  }
+
+  // ---- Shell (Bohr) model builder widget ----
+  // Electrons always auto-place into the chemically correct next slot (the
+  // lowest shell with room), so the model is always valid by construction --
+  // the student's job is deciding WHEN to add/remove, not where to place.
+
+  // Takes the student's own per-shell counts directly (not auto-computed),
+  // since shell placement is now a manual, per-shell decision the student
+  // makes -- this function only draws whatever they've actually placed.
+  function shellDiagramSvg(shellCounts, totalShells, symbol) {
+    const radii = [34, 58, 82, 106];
+    const CX = 130, CY = 130;
+    let svg = `<svg class="me-shell-svg" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg">`;
+    for (let s = 0; s < totalShells; s++) {
+      svg += `<circle class="me-shell-ring" cx="${CX}" cy="${CY}" r="${radii[s]}"/>`;
+      const cap = SHELL_CAPS[s];
+      const have = shellCounts[s] || 0;
+      for (let i = 0; i < cap; i++) {
+        const angle = (Math.PI * 2 * i) / cap - Math.PI / 2;
+        const x = CX + radii[s] * Math.cos(angle);
+        const y = CY + radii[s] * Math.sin(angle);
+        const isFilled = i < have;
+        svg += `<circle class="${isFilled ? 'me-eslot-filled' : 'me-eslot-empty'}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"/>`;
+      }
+    }
+    svg += `<circle class="me-nucleus" cx="${CX}" cy="${CY}" r="20"/>`;
+    svg += `<text class="me-nucleus-label" x="${CX}" y="${CY + 4}">${escapeHtml(symbol)}</text>`;
+    svg += `</svg>`;
+    return svg;
+  }
+
+  // Shared engine for both "build the atom" (section 2, no ion step) and
+  // "build the atom + its ion" (section 3, ion step appears after the atom
+  // is complete). `elements` entries without `ionCharge` skip the ion step.
+  function renderShellBuilder(mount, lang, elements, withIon) {
+    // Every id below is namespaced with `uid` (derived from the mount's own
+    // id) because this function is called twice on the same page (once for
+    // the plain atom builder, once for the atom+ion builder) -- without a
+    // unique suffix the two instances would emit duplicate DOM ids.
+    const uid = mount.id || Math.random().toString(36).slice(2);
+
+    mount.innerHTML = `
+      <div class="me-builder-widget">
+        <p style="margin-bottom:0.4rem;"><strong>${escapeHtml(t('shellPickElement', lang))}</strong></p>
+        <div class="me-builder-elements">
+          ${elements.map((el, i) => `<button type="button" class="me-builder-el-btn" data-idx="${i}">${escapeHtml(tr(el.name, lang))} (${el.symbol}, Z=${el.z})</button>`).join('')}
+        </div>
+        <div class="me-builder-stage-wrap" id="me-builder-stage-wrap-${uid}"></div>
+      </div>
+    `;
+
+    const elBtns = mount.querySelectorAll('.me-builder-el-btn');
+    const stageWrap = mount.querySelector(`#me-builder-stage-wrap-${uid}`);
+
+    elBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        elBtns.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        const idx = Number(btn.getAttribute('data-idx'));
+        // The first element in each builder's list is a guided walkthrough
+        // (shells unlock strictly in order / only the valence shell is
+        // editable for the ion step); every other element is fully
+        // independent -- the student picks which shell to place each
+        // electron in, with only that shell's own capacity (2/8/8/8) as a
+        // guardrail, and is told right/wrong only when they click Check.
+        mountElementBuilder(elements[idx], idx === 0);
+      });
+    });
+
+    function shellRowsHtml(shellCounts) {
+      return SHELL_CAPS.map((cap, s) => `
+        <div class="me-shell-row" data-shell-idx="${s}">
+          <span class="me-shell-row-label">${escapeHtml(t('shellRowLabel', lang, s + 1, cap))}</span>
+          <span class="me-shell-row-count">${shellCounts[s]} / ${cap}</span>
+          <button type="button" class="me-builder-btn secondary me-shell-remove">–</button>
+          <button type="button" class="me-builder-btn me-shell-add">+</button>
+          <span class="me-shell-row-lock"></span>
+        </div>
+      `).join('');
+    }
+
+    function wireShellRows(rowsHost, shellCounts, onChange) {
+      const rows = [...rowsHost.querySelectorAll('.me-shell-row')];
+      rows.forEach((row, s) => {
+        row.querySelector('.me-shell-add').addEventListener('click', () => {
+          if (shellCounts[s] < SHELL_CAPS[s]) { shellCounts[s]++; onChange(); }
+        });
+        row.querySelector('.me-shell-remove').addEventListener('click', () => {
+          if (shellCounts[s] > 0) { shellCounts[s]--; onChange(); }
+        });
+      });
+      return rows;
+    }
+
+    function mountElementBuilder(el, isGuided) {
+      const target = el.z;
+      const shellCounts = [0, 0, 0, 0];
+
+      stageWrap.innerHTML = `
+        <div class="me-mode-badge${isGuided ? ' guided' : ''}">${escapeHtml(t(isGuided ? 'guidedModeLabel' : 'independentModeLabel', lang))}</div>
+        ${isGuided ? `<p class="me-guided-intro">${escapeHtml(t('guidedAtomIntro', lang))}</p>` : ''}
+        <div id="me-shell-svg-host-${uid}"></div>
+        <div class="me-builder-count" id="me-builder-count-${uid}"></div>
+        <div class="me-shell-rows" id="me-shell-rows-${uid}">${shellRowsHtml(shellCounts)}</div>
+        <div class="me-builder-controls">
+          <button type="button" class="me-builder-btn secondary" id="me-check-atom-${uid}" disabled>${escapeHtml(t('shellCheckModel', lang))}</button>
+        </div>
+        <div class="me-builder-feedback" id="me-atom-feedback-${uid}"></div>
+        <div id="me-ion-panel-${uid}"></div>
+      `;
+
+      const svgHost = stageWrap.querySelector(`#me-shell-svg-host-${uid}`);
+      const countEl = stageWrap.querySelector(`#me-builder-count-${uid}`);
+      const rowsHost = stageWrap.querySelector(`#me-shell-rows-${uid}`);
+      const checkBtn = stageWrap.querySelector(`#me-check-atom-${uid}`);
+      const feedbackEl = stageWrap.querySelector(`#me-atom-feedback-${uid}`);
+      const ionPanel = stageWrap.querySelector(`#me-ion-panel-${uid}`);
+      const rows = wireShellRows(rowsHost, shellCounts, redraw);
+
+      function redraw() {
+        const total = shellCounts.reduce((a, b) => a + b, 0);
+        svgHost.innerHTML = shellDiagramSvg(shellCounts, SHELL_CAPS.length, el.symbol);
+        countEl.textContent = t('shellElectronsPlaced', lang, total, target);
+        rows.forEach((row, s) => {
+          const cap = SHELL_CAPS[s];
+          const prevFull = s === 0 || shellCounts[s - 1] >= SHELL_CAPS[s - 1];
+          const locked = isGuided && !prevFull;
+          row.querySelector('.me-shell-row-count').textContent = `${shellCounts[s]} / ${cap}`;
+          row.querySelector('.me-shell-add').disabled = shellCounts[s] >= cap || locked || total >= target;
+          row.querySelector('.me-shell-remove').disabled = shellCounts[s] <= 0 || locked;
+          row.querySelector('.me-shell-row-lock').textContent = locked ? t('shellLockedHint', lang, s) : '';
+        });
+        checkBtn.disabled = total !== target;
+        if (total !== target) {
+          feedbackEl.className = 'me-builder-feedback';
+          feedbackEl.textContent = '';
+          ionPanel.innerHTML = '';
+        }
+      }
+
+      checkBtn.addEventListener('click', () => {
+        const total = shellCounts.reduce((a, b) => a + b, 0);
+        const correctShells = shellsFor(target);
+        const correctPadded = SHELL_CAPS.map((_, i) => correctShells[i] || 0);
+        const matches = total === target && shellCounts.every((c, i) => c === correctPadded[i]);
+        if (matches) {
+          feedbackEl.className = 'me-builder-feedback ok';
+          feedbackEl.textContent = t('shellCorrect', lang);
+          const valence = correctShells[correctShells.length - 1];
+          const core = target - valence;
+          feedbackEl.innerHTML += `<div style="font-weight:400; font-size:0.82rem; margin-top:0.3rem;">${escapeHtml(t('shellValenceLabel', lang))}: ${valence} · ${escapeHtml(t('shellCoreLabel', lang))}: ${core}</div>`;
+          if (withIon && typeof el.ionCharge === 'number') mountIonStep(el, shellCounts.slice(), isGuided);
+        } else {
+          feedbackEl.className = 'me-builder-feedback bad';
+          feedbackEl.textContent = total === target ? t('shellWrongDistribution', lang) : t('shellIncomplete', lang);
+        }
+      });
+
+      redraw();
+    }
+
+    function mountIonStep(el, neutralShellCounts, isGuided) {
+      const neutralCount = neutralShellCounts.reduce((a, b) => a + b, 0);
+      const valenceIdx = neutralShellCounts.reduce((hi, c, i) => (c > 0 ? i : hi), 0);
+      const shellCounts = neutralShellCounts.slice();
+
+      ionPanelFor().innerHTML = `
+        <div class="me-ion-panel">
+          <p class="me-ion-prompt">${escapeHtml(t('ionPrompt', lang, el.symbol))}</p>
+          ${isGuided ? `<p class="me-guided-intro">${escapeHtml(t('guidedIonIntro', lang))}</p>` : ''}
+          <div id="me-ion-svg-host-${uid}"></div>
+          <div class="me-charge-badge" id="me-ion-charge-${uid}">${t('ionChargeLabel', lang)}: 0</div>
+          <div class="me-shell-rows" id="me-ion-shell-rows-${uid}">${shellRowsHtml(shellCounts)}</div>
+          <div class="me-builder-controls">
+            <button type="button" class="me-builder-btn" id="me-ion-check-${uid}">${escapeHtml(t('ionCheckBtn', lang))}</button>
+          </div>
+          <div class="me-builder-feedback" id="me-ion-feedback-${uid}"></div>
+        </div>
+      `;
+
+      const ionPanel = ionPanelFor();
+      const ionSvgHost = ionPanel.querySelector(`#me-ion-svg-host-${uid}`);
+      const chargeEl = ionPanel.querySelector(`#me-ion-charge-${uid}`);
+      const rowsHost = ionPanel.querySelector(`#me-ion-shell-rows-${uid}`);
+      const ionCheckBtn = ionPanel.querySelector(`#me-ion-check-${uid}`);
+      const ionFeedback = ionPanel.querySelector(`#me-ion-feedback-${uid}`);
+      const rows = wireShellRows(rowsHost, shellCounts, redrawIon);
+
+      function redrawIon() {
+        const total = shellCounts.reduce((a, b) => a + b, 0);
+        const charge = neutralCount - total;
+        ionSvgHost.innerHTML = shellDiagramSvg(shellCounts, SHELL_CAPS.length, el.symbol);
+        chargeEl.textContent = `${t('ionChargeLabel', lang)}: ${charge > 0 ? '+' + charge : charge}`;
+        rows.forEach((row, s) => {
+          const cap = SHELL_CAPS[s];
+          const locked = isGuided && s !== valenceIdx;
+          row.querySelector('.me-shell-row-count').textContent = `${shellCounts[s]} / ${cap}`;
+          row.querySelector('.me-shell-add').disabled = shellCounts[s] >= cap || locked;
+          row.querySelector('.me-shell-remove').disabled = shellCounts[s] <= 0 || locked;
+          row.querySelector('.me-shell-row-lock').textContent = locked ? t('ionLockedHint', lang) : '';
+        });
+      }
+
+      ionCheckBtn.addEventListener('click', () => {
+        const total = shellCounts.reduce((a, b) => a + b, 0);
+        const charge = neutralCount - total;
+        const expectedTotal = neutralCount - el.ionCharge;
+        const expectedShells = shellsFor(expectedTotal);
+        const expectedPadded = SHELL_CAPS.map((_, i) => expectedShells[i] || 0);
+        const matches = shellCounts.every((c, i) => c === expectedPadded[i]);
+        if (matches) {
+          ionFeedback.className = 'me-builder-feedback ok';
+          ionFeedback.textContent = t('ionCorrect', lang, charge > 0 ? '+' + charge : charge);
+        } else {
+          ionFeedback.className = 'me-builder-feedback bad';
+          ionFeedback.textContent = t('ionIncorrect', lang);
+        }
+      });
+
+      redrawIon();
+    }
+
+    function ionPanelFor() {
+      return stageWrap.querySelector(`#me-ion-panel-${uid}`);
+    }
+
+    // Auto-select the first element so the widget isn't empty on open.
+    if (elBtns.length) elBtns[0].click();
+  }
+
+  // ---- Electron configuration tool ----
+  // Click an element on a (periods 1-4) periodic table, then place its electrons
+  // into subshells yourself. Rows are shown in numeric order (so the 4s/3d quirk
+  // is something to discover); guided mode locks them to the real filling order.
+  // The row you last worked on lights up the matching block on the table.
+  const EC_ORDER = [
+    { name: '1s', n: 1, l: 's', cap: 2 }, { name: '2s', n: 2, l: 's', cap: 2 }, { name: '2p', n: 2, l: 'p', cap: 6 },
+    { name: '3s', n: 3, l: 's', cap: 2 }, { name: '3p', n: 3, l: 'p', cap: 6 }, { name: '4s', n: 4, l: 's', cap: 2 },
+    { name: '3d', n: 3, l: 'd', cap: 10 }, { name: '4p', n: 4, l: 'p', cap: 6 }
+  ];
+  const EC_DISPLAY_NAMES = ['1s', '2s', '2p', '3s', '3p', '3d', '4s', '4p'];
+  const EC_SYMBOLS = 'H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr'.split(' ');
+  const EC_NOBLE = { 2: 'He', 10: 'Ne', 18: 'Ar', 36: 'Kr' };
+  const SUPD = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+  const supNum = (n) => String(n).split('').map(d => SUPD[d]).join('');
+
+  function ecPosition(z) {
+    if (z === 1) return { period: 1, group: 1 };
+    if (z === 2) return { period: 1, group: 18 };
+    if (z <= 4) return { period: 2, group: z - 2 };
+    if (z <= 10) return { period: 2, group: z + 8 };
+    if (z <= 12) return { period: 3, group: z - 10 };
+    if (z <= 18) return { period: 3, group: z };
+    return { period: 4, group: z - 18 };
+  }
+  function ecFill(z) {
+    let left = z;
+    return EC_ORDER.map(sub => { const c = Math.min(sub.cap, left); left -= c; return c; });
+  }
+  function ecLastIdx(z) { const f = ecFill(z); let last = 0; f.forEach((c, i) => { if (c > 0) last = i; }); return last; }
+  function ecString(counts, from) {
+    return counts.map((c, i) => (c > 0 && i >= (from || 0) ? `${EC_ORDER[i].name}${supNum(c)}` : '')).filter(Boolean).join('');
+  }
+  function ecShorthand(z) {
+    const ngZ = [36, 18, 10, 2].find(g => g < z);
+    if (!ngZ) return '';
+    const base = ecFill(ngZ), full = ecFill(z);
+    const rest = full.map((c, i) => c - base[i]);
+    return `[${EC_NOBLE[ngZ]}]${ecString(rest)}`;
+  }
+
+  function renderConfigTool(mount, lang) {
+    const uid = mount.id || Math.random().toString(36).slice(2);
+    const cells = EC_SYMBOLS.map((sym, i) => {
+      const z = i + 1, pos = ecPosition(z), blockL = EC_ORDER[ecLastIdx(z)].l;
+      const skip = z === 24 || z === 29;
+      return `<button type="button" class="me-ec-cell ${blockL}${skip ? ' skip' : ''}" data-z="${z}" title="${sym} (Z=${z})" style="grid-column:${pos.group};grid-row:${pos.period}"${skip ? ' disabled' : ''}><small>${z}</small>${sym}</button>`;
+    }).join('');
+    mount.innerHTML = `
+      <div class="me-builder-widget">
+        <p style="margin-bottom:0.3rem;"><strong>${escapeHtml(t('ecPick', lang))}</strong></p>
+        <div class="me-ec-legend"><span class="me-ec-chip s">${escapeHtml(t('ecLegendS', lang))}</span><span class="me-ec-chip p">${escapeHtml(t('ecLegendP', lang))}</span><span class="me-ec-chip d">${escapeHtml(t('ecLegendD', lang))}</span></div>
+        <div class="me-ec-table-wrap"><div class="me-ec-table" id="me-ec-table-${uid}">${cells}</div></div>
+        <p class="me-ec-note">${escapeHtml(t('ecExceptNote', lang))} ${escapeHtml(t('ecCrossNote', lang))}</p>
+        <div class="me-builder-stage-wrap" id="me-ec-stage-${uid}"></div>
+      </div>`;
+    const table = mount.querySelector(`#me-ec-table-${uid}`);
+    const stage = mount.querySelector(`#me-ec-stage-${uid}`);
+    const cellEls = [...table.querySelectorAll('.me-ec-cell')];
+    const lastName = (z) => EC_ORDER[ecLastIdx(z)].name;
+
+    function highlight(selZ, activeName, counts) {
+      cellEls.forEach(c => {
+        const z = Number(c.getAttribute('data-z'));
+        c.classList.toggle('sel', z === selZ);
+        // crossed off once the student's subshells contain at least this element's whole configuration
+        c.classList.toggle('crossed', !!counts && counts.some(n => n > 0) && ecFill(z).every((need, i) => counts[i] >= need));
+        c.classList.toggle('active', !!activeName && lastName(z) === activeName);
+      });
+    }
+
+    function mountElement(z, guided) {
+      const sym = EC_SYMBOLS[z - 1];
+      const target = ecFill(z);
+      const counts = [0, 0, 0, 0, 0, 0, 0, 0]; // indexed in filling order (EC_ORDER)
+      let clickedName = null;
+      stage.innerHTML = `
+        <div class="me-mode-badge${guided ? ' guided' : ''}">${escapeHtml(t(guided ? 'guidedModeLabel' : 'independentModeLabel', lang))}</div>
+        <div class="me-builder-controls"><button type="button" class="me-builder-btn secondary" data-guide-toggle>${escapeHtml(t(guided ? 'ecGuidedOn' : 'ecGuidedOff', lang))}</button></div>
+        <p style="margin:0.4rem 0 0;text-align:center;"><strong>${escapeHtml(t('ecTitle', lang, sym, z))}</strong></p>
+        <p class="me-ec-tip" data-tip></p>
+        <div class="me-builder-count" data-count></div>
+        <div style="font-size:0.7rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${escapeHtml(t('ecLive', lang))}</div>
+        <div class="me-ec-live" data-live style="min-width:60%;"></div>
+        <div class="me-shell-rows" data-rows>
+          ${EC_DISPLAY_NAMES.map(name => {
+            const idx = EC_ORDER.findIndex(o => o.name === name);
+            return `<div class="me-shell-row" data-sub="${idx}"><span class="me-shell-row-label">${escapeHtml(t('ecRowLabel', lang, name, EC_ORDER[idx].cap))}</span><span class="me-shell-row-count"></span><button type="button" class="me-builder-btn secondary me-shell-remove">–</button><button type="button" class="me-builder-btn me-shell-add">+</button><span class="me-shell-row-lock"></span></div>`;
+          }).join('')}
+        </div>
+        <div class="me-builder-controls"><button type="button" class="me-builder-btn secondary" data-check disabled>${escapeHtml(t('ecCheck', lang))}</button></div>
+        <div class="me-builder-feedback" data-fb></div>
+        <div class="info-panel" data-explain style="display:none;max-width:480px;"></div>`;
+      const $ = (sel) => stage.querySelector(sel);
+      const rows = [...stage.querySelectorAll('.me-shell-row')];
+
+      function redraw() {
+        const total = counts.reduce((a, b) => a + b, 0);
+        const nextIdx = counts.findIndex((c, i) => c < EC_ORDER[i].cap);
+        $('[data-count]').textContent = t('ecPlaced', lang, total, z);
+        $('[data-live]').textContent = ecString(counts) || '—';
+        $('[data-tip]').textContent = guided ? (total >= z ? t('ecTipDone', lang) : t('ecTipNext', lang, EC_ORDER[nextIdx].name, EC_ORDER[nextIdx].cap)) : '';
+        rows.forEach(row => {
+          const i = Number(row.getAttribute('data-sub'));
+          const sub = EC_ORDER[i];
+          const blocker = guided ? counts.findIndex((c, j) => j < i && c < EC_ORDER[j].cap) : -1;
+          row.querySelector('.me-shell-row-count').textContent = `${counts[i]} / ${sub.cap}`;
+          row.querySelector('.me-shell-add').disabled = counts[i] >= sub.cap || total >= z || blocker !== -1;
+          row.querySelector('.me-shell-remove').disabled = counts[i] <= 0;
+          row.querySelector('.me-shell-row-lock').textContent = blocker !== -1 ? t('ecLocked', lang, EC_ORDER[blocker].name) : '';
+        });
+        $('[data-check]').disabled = total !== z;
+        if (total !== z) { $('[data-fb]').textContent = ''; $('[data-fb]').className = 'me-builder-feedback'; $('[data-explain]').style.display = 'none'; }
+        highlight(z, guided ? (nextIdx === -1 ? null : EC_ORDER[nextIdx].name) : clickedName, counts);
+      }
+
+      rows.forEach(row => {
+        const i = Number(row.getAttribute('data-sub'));
+        row.querySelector('.me-shell-add').addEventListener('click', () => { if (counts[i] < EC_ORDER[i].cap) { counts[i]++; clickedName = EC_ORDER[i].name; redraw(); } });
+        row.querySelector('.me-shell-remove').addEventListener('click', () => { if (counts[i] > 0) { counts[i]--; clickedName = EC_ORDER[i].name; redraw(); } });
+      });
+      $('[data-guide-toggle]').addEventListener('click', () => mountElement(z, !guided));
+      $('[data-check]').addEventListener('click', () => {
+        const fb = $('[data-fb]'), ex = $('[data-explain]');
+        if (counts.every((c, i) => c === target[i])) {
+          fb.className = 'me-builder-feedback ok';
+          fb.textContent = t('ecCorrect', lang);
+          const maxN = Math.max(...EC_ORDER.filter((o, i) => target[i] > 0).map(o => o.n));
+          const valence = EC_ORDER.reduce((a, o, i) => a + (o.n === maxN ? target[i] : 0), 0);
+          const last = EC_ORDER[ecLastIdx(z)];
+          ex.style.display = 'block';
+          ex.textContent = t('ecExplain', lang, sym, last.name, last.l, maxN, valence, ecShorthand(z));
+        } else {
+          fb.className = 'me-builder-feedback bad';
+          fb.textContent = z >= 19 && counts[6] > 0 && counts[5] < 2 ? t('ecWrong4s', lang) : t('ecWrong', lang);
+          ex.style.display = 'none';
+        }
+      });
+      redraw();
+    }
+
+    cellEls.forEach(c => c.addEventListener('click', () => {
+      if (c.disabled) return;
+      const z = Number(c.getAttribute('data-z'));
+      mountElement(z, false);
+    }));
+    mountElement(15, true); // phosphorus: guided starter
+  }
+
+  // ---- Charge balancer (rule of zero charge) ----
+  // The student adds copies of a cation and an anion until total + and total -
+  // cancel. The first pair in each list is guided (live tip on which side to
+  // add); the rest are independent. Pairs avoid Mg/Cl and K/NO3, which the
+  // real paper quiz uses.
+
+  const SUB = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉' };
+  const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³' };
+  const subNum = (n) => String(n).split('').map(d => SUB[d]).join('');
+  const chargeLabel = (c) => (Math.abs(c) === 1 ? '' : SUP[Math.abs(c)]) + (c > 0 ? '⁺' : '⁻');
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+
+  const BINARY_PAIRS = [
+    { cat: { sym: 'K', charge: 1 }, an: { sym: 'O', charge: -2 }, name: { en: 'potassium oxide', es: 'óxido de potasio' } },
+    { cat: { sym: 'Ca', charge: 2 }, an: { sym: 'Br', charge: -1 }, name: { en: 'calcium bromide', es: 'bromuro de calcio' } },
+    { cat: { sym: 'Al', charge: 3 }, an: { sym: 'F', charge: -1 }, name: { en: 'aluminum fluoride', es: 'fluoruro de aluminio' } },
+    { cat: { sym: 'Li', charge: 1 }, an: { sym: 'N', charge: -3 }, name: { en: 'lithium nitride', es: 'nitruro de litio' } },
+    { cat: { sym: 'Al', charge: 3 }, an: { sym: 'S', charge: -2 }, name: { en: 'aluminum sulfide', es: 'sulfuro de aluminio' } }
+  ];
+  const POLY_PAIRS = [
+    { cat: { sym: 'K', charge: 1 }, an: { sym: 'CO₃', charge: -2, poly: true }, name: { en: 'potassium carbonate', es: 'carbonato de potasio' } },
+    { cat: { sym: 'Ca', charge: 2 }, an: { sym: 'NO₃', charge: -1, poly: true }, name: { en: 'calcium nitrate', es: 'nitrato de calcio' } },
+    { cat: { sym: 'NH₄', charge: 1, poly: true }, an: { sym: 'SO₄', charge: -2, poly: true }, name: { en: 'ammonium sulfate', es: 'sulfato de amonio' } },
+    { cat: { sym: 'Al', charge: 3 }, an: { sym: 'OH', charge: -1, poly: true }, name: { en: 'aluminum hydroxide', es: 'hidróxido de aluminio' } },
+    { cat: { sym: 'Al', charge: 3 }, an: { sym: 'CO₃', charge: -2, poly: true }, name: { en: 'aluminum carbonate', es: 'carbonato de aluminio' } }
+  ];
+
+  function renderChargeBalancer(mount, lang, pairs, showName) {
+    const uid = mount.id || Math.random().toString(36).slice(2);
+    const ionLabel = (ion) => `${ion.sym}${chargeLabel(ion.charge)}`;
+    mount.innerHTML = `
+      <div class="me-builder-widget">
+        <p style="margin-bottom:0.4rem;"><strong>${escapeHtml(t('balPick', lang))}</strong></p>
+        <div class="me-builder-elements">
+          ${pairs.map((p, i) => `<button type="button" class="me-builder-el-btn" data-idx="${i}">${escapeHtml(ionLabel(p.cat))} + ${escapeHtml(ionLabel(p.an))}</button>`).join('')}
+        </div>
+        <div class="me-builder-stage-wrap" id="me-bal-stage-${uid}"></div>
+      </div>`;
+    const stage = mount.querySelector(`#me-bal-stage-${uid}`);
+    const btns = mount.querySelectorAll('.me-builder-el-btn');
+
+    function mountPair(pair, isGuided) {
+      let nCat = 0, nAn = 0;
+      stage.innerHTML = `
+        <div class="me-mode-badge${isGuided ? ' guided' : ''}">${escapeHtml(t(isGuided ? 'guidedModeLabel' : 'independentModeLabel', lang))}</div>
+        ${isGuided ? `<p class="me-guided-intro">${escapeHtml(t('balGuidedIntro', lang))}</p>` : ''}
+        <div class="me-bal-rig-wrap">
+          <div class="me-bal-rig" data-rig>
+            <div class="me-bal-pans"><div class="me-bal-pan" data-tiles="cat"></div><div class="me-bal-pan" data-tiles="an"></div></div>
+            <div class="me-bal-beam" data-beam></div>
+          </div>
+          <div class="me-bal-pivot"></div>
+        </div>
+        <div class="me-bal-cols">
+          <div class="me-bal-col"><div class="me-bal-col-label">${escapeHtml(ionLabel(pair.cat))}</div><div class="me-bal-count" data-count="cat"></div>
+            <div class="me-builder-controls"><button type="button" class="me-builder-btn secondary" data-act="cat-rem">${escapeHtml(t('balRemove', lang))}</button><button type="button" class="me-builder-btn" data-act="cat-add">${escapeHtml(t('balAdd', lang))}</button></div></div>
+          <div class="me-bal-col"><div class="me-bal-col-label">${escapeHtml(ionLabel(pair.an))}</div><div class="me-bal-count" data-count="an"></div>
+            <div class="me-builder-controls"><button type="button" class="me-builder-btn secondary" data-act="an-rem">${escapeHtml(t('balRemove', lang))}</button><button type="button" class="me-builder-btn" data-act="an-add">${escapeHtml(t('balAdd', lang))}</button></div></div>
+        </div>
+        <div class="me-bal-tally" data-tally></div>
+        <div><span class="me-bal-net" data-net></span></div>
+        <div class="me-builder-feedback" data-feedback></div>`;
+      const $ = (sel) => stage.querySelector(sel);
+      const MAX = 6;
+
+      function redraw() {
+        const pos = nCat * pair.cat.charge;
+        const neg = nAn * pair.an.charge;
+        const net = pos + neg;
+        // Ball area is proportional to |charge|, so a +3 ion visibly "weighs" 3x a +1 ion.
+        const ball = (ion, cls) => {
+          const d = Math.round(24 * Math.sqrt(Math.abs(ion.charge)));
+          return `<span class="me-bal-ball ${cls}" style="width:${d}px;height:${d}px;font-size:${Math.max(11, Math.round(d * 0.4))}px">${ion.charge > 0 ? '+' : '−'}${Math.abs(ion.charge)}</span>`;
+        };
+        $('[data-tiles="cat"]').innerHTML = Array.from({ length: nCat }, () => ball(pair.cat, 'pos')).join('');
+        $('[data-tiles="an"]').innerHTML = Array.from({ length: nAn }, () => ball(pair.an, 'neg')).join('');
+        $('[data-count="cat"]').textContent = `× ${nCat}`;
+        $('[data-count="an"]').textContent = `× ${nAn}`;
+        $('[data-tally]').textContent = `${t('balPositive', lang)}: +${pos} · ${t('balNegative', lang)}: ${neg}`;
+        const netEl = $('[data-net]');
+        netEl.textContent = `${t('balNet', lang)}: ${net > 0 ? '+' + net : net}`;
+        const balanced = nCat > 0 && nAn > 0 && net === 0;
+        netEl.className = 'me-bal-net' + (balanced ? ' zero' : '');
+        $('[data-rig]').style.transform = `rotate(${-Math.max(-8, Math.min(8, net * 3))}deg)`;
+        const beam = $('[data-beam]');
+        beam.className = 'me-bal-beam' + (balanced ? ' balanced' : '');
+        stage.querySelector('[data-act="cat-add"]').disabled = nCat >= MAX;
+        stage.querySelector('[data-act="an-add"]').disabled = nAn >= MAX;
+        stage.querySelector('[data-act="cat-rem"]').disabled = nCat <= 0;
+        stage.querySelector('[data-act="an-rem"]').disabled = nAn <= 0;
+
+        const fb = $('[data-feedback]');
+        if (nCat === 0 || nAn === 0) {
+          fb.className = 'me-builder-feedback bad';
+          fb.textContent = t('balEmpty', lang);
+        } else if (!balanced) {
+          fb.className = 'me-builder-feedback bad';
+          fb.textContent = isGuided ? t('balGuidedTip', lang, net) : '';
+        } else if (gcd(nCat, nAn) > 1) {
+          fb.className = 'me-builder-feedback bad';
+          fb.textContent = t('balNotSmallest', lang);
+        } else {
+          const part = (ion, n) => (n === 1 ? ion.sym : (ion.poly ? `(${ion.sym})` : ion.sym) + subNum(n));
+          fb.className = 'me-builder-feedback ok';
+          fb.textContent = showName ? t('balDone', lang, part(pair.cat, nCat) + part(pair.an, nAn), tr(pair.name, lang)) : t('balDoneFormula', lang, part(pair.cat, nCat) + part(pair.an, nAn));
+        }
+      }
+
+      stage.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
+        const act = b.getAttribute('data-act');
+        if (act === 'cat-add' && nCat < MAX) nCat++;
+        else if (act === 'cat-rem' && nCat > 0) nCat--;
+        else if (act === 'an-add' && nAn < MAX) nAn++;
+        else if (act === 'an-rem' && nAn > 0) nAn--;
+        redraw();
+      }));
+      redraw();
+    }
+
+    btns.forEach(b => b.addEventListener('click', () => {
+      btns.forEach(x => x.classList.remove('selected'));
+      b.classList.add('selected');
+      const idx = Number(b.getAttribute('data-idx'));
+      mountPair(pairs[idx], idx === 0);
+    }));
+    if (btns.length) btns[0].click();
+  }
+
+  const STATIC_SECTIONS = [
+    {
+      title: { en: 'Before You Begin', es: 'Antes de Empezar' },
+      time: { en: '2 min', es: '2 min' },
+      bodyHtml: {
+        en: `
+        <p>This review pulls together <strong>Lessons 17–24</strong> — flame tests, shell models, ions, ionic compound formulas, polyatomic ions, and electron configurations — to get you ready for <strong>Chapter 4 Quiz A/B</strong>.</p>
+        <p><strong>How this works:</strong></p>
+        <ul>
+          <li>Click a section header to open it and read through the content.</li>
+          <li>Sections 2 and 3 are hands-on: a flame-test simulator and a shell-model builder. Try the real thing before reading the explanation.</li>
+          <li>Work through each practice problem yourself before clicking <em>Reveal Answer</em>.</li>
+          <li>Click <strong>Mark Complete</strong> at the bottom of each section to move to the next.</li>
+          <li>The last section is a <strong>graded Check for Understanding</strong> — that one saves your score for your teacher.</li>
+        </ul>
+        <p><strong>By the end of this review, you should be able to:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Explain how a flame test reveals which metal is in a compound, and predict flame colors for common metals</li>
+          <li><span class="obj-check">◎</span> Build a shell (Bohr) model for a given element, filling shells in the correct order</li>
+          <li><span class="obj-check">◎</span> Identify valence electrons vs. core electrons, and connect them to group/period number</li>
+          <li><span class="obj-check">◎</span> Explain what an ion is, and build the shell model of an element's ion by gaining or losing electrons to reach a noble gas arrangement</li>
+          <li><span class="obj-check">◎</span> Use the rule of zero charge to predict ionic compound formulas, including binary and polyatomic-ion compounds</li>
+          <li><span class="obj-check">◎</span> Recognize and name common polyatomic ions, and write formulas for compounds that contain them</li>
+          <li><span class="obj-check">◎</span> Describe electron shells in terms of subshells, and read or write an electron configuration</li>
+        </ul>`,
+        es: `
+        <p>Este repaso reúne las <strong>Lecciones 17 a 24</strong> — pruebas de llama, modelos de capas, iones, fórmulas de compuestos iónicos, iones poliatómicos y configuraciones electrónicas — para prepararte para el <strong>Quiz A/B del Capítulo 4</strong>.</p>
+        <p><strong>Cómo funciona esto:</strong></p>
+        <ul>
+          <li>Haz clic en el encabezado de una sección para abrirla y leer el contenido.</li>
+          <li>Las secciones 2 y 3 son prácticas: un simulador de prueba de llama y un constructor de modelos de capas. Prueba la actividad real antes de leer la explicación.</li>
+          <li>Resuelve cada problema de práctica tú mismo antes de hacer clic en <em>Mostrar Respuesta</em>.</li>
+          <li>Haz clic en <strong>Marcar como Completo</strong> al final de cada sección para pasar a la siguiente.</li>
+          <li>La última sección es una <strong>Comprobación de Comprensión calificada</strong> — esa guarda tu puntaje para tu maestro.</li>
+        </ul>
+        <p><strong>Al terminar este repaso, deberías poder:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Explicar cómo una prueba de llama revela qué metal hay en un compuesto, y predecir los colores de llama de metales comunes</li>
+          <li><span class="obj-check">◎</span> Construir un modelo de capas (de Bohr) para un elemento dado, llenando las capas en el orden correcto</li>
+          <li><span class="obj-check">◎</span> Identificar los electrones de valencia frente a los del núcleo interno, y conectarlos con el número de grupo/período</li>
+          <li><span class="obj-check">◎</span> Explicar qué es un ion, y construir el modelo de capas del ion de un elemento ganando o perdiendo electrones hasta alcanzar un arreglo de gas noble</li>
+          <li><span class="obj-check">◎</span> Usar la regla de carga cero para predecir fórmulas de compuestos iónicos, incluyendo compuestos binarios y con iones poliatómicos</li>
+          <li><span class="obj-check">◎</span> Reconocer y nombrar iones poliatómicos comunes, y escribir fórmulas de compuestos que los contienen</li>
+          <li><span class="obj-check">◎</span> Describir las capas de electrones en términos de subcapas, y leer o escribir una configuración electrónica</li>
+        </ul>`
+      }
+    },
+    {
+      title: { en: 'Flame Tests: Finding Atoms by Their Light', es: 'Pruebas de Llama: Encontrando Átomos por su Luz' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
+        <h2>What Is a Flame Test?</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Flame test</strong>: a lab test used to look for the presence of certain metal atoms. A sample of a compound is heated in a flame, and the resulting color reveals which metal is present.</p>
+        </div>
+        <p>Try it yourself below — pick a sample, then test it in the flame.</p>
+        <div id="me-flame-mount"></div>
+        <table>
+          <thead><tr><th>Metal</th><th>Flame Color</th></tr></thead>
+          <tbody>
+            <tr><td>Lithium (Li)</td><td>Crimson red</td></tr>
+            <tr><td>Sodium (Na)</td><td>Bright yellow-orange</td></tr>
+            <tr><td>Potassium (K)</td><td>Lilac (pale violet)</td></tr>
+            <tr><td>Calcium (Ca)</td><td>Orange-red (brick red)</td></tr>
+            <tr><td>Strontium (Sr)</td><td>Deep red</td></tr>
+            <tr><td>Barium (Ba)</td><td>Apple green</td></tr>
+            <tr><td>Copper (Cu)</td><td>Blue-green</td></tr>
+          </tbody>
+        </table>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Why Does This Happen?</div>
+          <p>The flame's heat gives energy to the metal atom's electrons, which jump to a higher energy level. When they fall back down, they release that energy as light — a specific color for each element. This is also the evidence that originally led to Bohr's model of the atom.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, copy the metal/flame-color table above and memorize at least four of them.</div>
+        </div>
+        ${practiceProblem('en', 'f1', 'A sample burns with a bright yellow-orange flame. Which metal is most likely present?', 'basic', 'Check the table above.', 'Sodium (Na) — sodium compounds produce a bright yellow-orange flame.')}
+        ${practiceProblem('en', 'f2', 'Predict the flame color produced when heating lithium carbonate.', 'medium', 'The metal is lithium — the nonmetal part (carbonate) doesn\'t change the flame color.', 'Crimson red — the flame color is determined by the metal (lithium), not the rest of the compound.')}
+        ${practiceProblem('en', 'f3', 'True or False: if two different compounds both contain copper, they will both produce the same flame color.', 'challenge', 'What part of the compound actually determines the flame color?', 'True — the flame color comes from the metal atom, so any compound containing copper produces a blue-green flame, regardless of what else is in the compound.')}`,
+        es: `
+        <h2>¿Qué Es una Prueba de Llama?</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Prueba de llama</strong>: una prueba de laboratorio que se usa para buscar la presencia de ciertos átomos metálicos. Se calienta una muestra de un compuesto en una llama, y el color resultante revela qué metal está presente.</p>
+        </div>
+        <p>Pruébalo tú mismo abajo — elige una muestra, y luego pruébala en la llama.</p>
+        <div id="me-flame-mount"></div>
+        <table>
+          <thead><tr><th>Metal</th><th>Color de la Llama</th></tr></thead>
+          <tbody>
+            <tr><td>Litio (Li)</td><td>Rojo carmesí</td></tr>
+            <tr><td>Sodio (Na)</td><td>Amarillo-anaranjado brillante</td></tr>
+            <tr><td>Potasio (K)</td><td>Lila (violeta pálido)</td></tr>
+            <tr><td>Calcio (Ca)</td><td>Rojo anaranjado (rojo ladrillo)</td></tr>
+            <tr><td>Estroncio (Sr)</td><td>Rojo intenso</td></tr>
+            <tr><td>Bario (Ba)</td><td>Verde manzana</td></tr>
+            <tr><td>Cobre (Cu)</td><td>Verde azulado</td></tr>
+          </tbody>
+        </table>
+        <div class="info-panel">
+          <div class="panel-label">🔍 ¿Por Qué Pasa Esto?</div>
+          <p>El calor de la llama le da energía a los electrones del átomo metálico, que saltan a un nivel de energía más alto. Cuando vuelven a caer, liberan esa energía como luz — un color específico para cada elemento. Esta también fue la evidencia que originalmente llevó al modelo atómico de Bohr.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, copia la tabla de metal/color de llama de arriba y memoriza al menos cuatro de ellos.</div>
+        </div>
+        ${practiceProblem('es', 'f1', 'Una muestra se quema con una llama amarillo-anaranjada brillante. ¿Qué metal es más probable que esté presente?', 'basic', 'Revisa la tabla de arriba.', 'Sodio (Na) — los compuestos de sodio producen una llama amarillo-anaranjada brillante.')}
+        ${practiceProblem('es', 'f2', 'Predice el color de llama que se produce al calentar carbonato de litio.', 'medium', 'El metal es litio — la parte no metálica (carbonato) no cambia el color de la llama.', 'Rojo carmesí — el color de la llama lo determina el metal (litio), no el resto del compuesto.')}
+        ${practiceProblem('es', 'f3', 'Verdadero o Falso: si dos compuestos diferentes contienen cobre, ambos producirán el mismo color de llama.', 'challenge', '¿Qué parte del compuesto determina realmente el color de la llama?', 'Verdadero — el color de la llama proviene del átomo metálico, así que cualquier compuesto que contenga cobre produce una llama verde azulada, sin importar qué más tenga el compuesto.')}`
+      }
+    },
+    {
+      title: { en: 'Building Shell (Bohr) Models', es: 'Construyendo Modelos de Capas (de Bohr)' },
+      time: { en: '10 min', es: '10 min' },
+      bodyHtml: {
+        en: `
+        <h2>Filling the Shells</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Electron shell</strong>: a region around the nucleus where electrons are found. Shells fill in order from the nucleus outward: the 1st shell holds up to 2 electrons, the 2nd up to 8, and the 3rd up to 8 (for the elements in this course).</p>
+        </div>
+        <p>Build a shell model yourself below — pick an element, then add one electron at a time. Each electron automatically goes into the correct next shell.</p>
+        <div id="me-shell-build-mount"></div>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Valence electrons</strong>: the electrons in an atom's outermost shell. <strong>Core electrons</strong>: all the other electrons, in the inner, filled shells.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Patterns in the Periodic Table</div>
+          <p>The atomic number equals the total number of electrons. The <strong>period</strong> (row) number equals the number of electron shells. For main-group elements, the <strong>group</strong> number equals the number of valence electrons.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Valence electrons are in the outermost shell. Core electrons are everywhere else. Period number = number of shells; group number = number of valence electrons (main group)."</em></div>
+        </div>
+        ${practiceProblem('en', 'sh1', 'An atom has 13 electrons. What is its shell arrangement?', 'basic', 'Fill shell 1 (max 2), then shell 2 (max 8), then shell 3.', '2, 8, 3 — shell 1 takes 2, shell 2 takes 8, leaving 3 for shell 3 (this is aluminum).')}
+        ${practiceProblem('en', 'sh2', 'An element is in Period 3 and Group 6A. How many electron shells does it have, and how many valence electrons?', 'medium', 'Period = shells; group number (for main group) = valence electrons.', '3 electron shells (Period 3), and 6 valence electrons (Group 6A) — this is sulfur.')}
+        ${practiceProblem('en', 'sh3', 'Two elements both have 2 valence electrons. Are they necessarily in the same period?', 'challenge', 'What does having the same number of valence electrons actually tell you about an element\'s position?', 'No — having the same number of valence electrons means they\'re in the same group (column), not necessarily the same period (row). For example, beryllium and magnesium both have 2 valence electrons but are in different periods.')}`,
+        es: `
+        <h2>Llenando las Capas</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Capa de electrones</strong>: una región alrededor del núcleo donde se encuentran los electrones. Las capas se llenan en orden desde el núcleo hacia afuera: la 1ª capa tiene hasta 2 electrones, la 2ª hasta 8, y la 3ª hasta 8 (para los elementos de este curso).</p>
+        </div>
+        <p>Construye un modelo de capas tú mismo abajo — elige un elemento, y luego agrega un electrón a la vez. Cada electrón se ubica automáticamente en la siguiente capa correcta.</p>
+        <div id="me-shell-build-mount"></div>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Electrones de valencia</strong>: los electrones en la capa más externa de un átomo. <strong>Electrones del núcleo interno</strong>: todos los demás electrones, en las capas internas y llenas.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Patrones en la Tabla Periódica</div>
+          <p>El número atómico es igual al número total de electrones. El número de <strong>período</strong> (fila) es igual al número de capas de electrones. Para los elementos del grupo principal, el número de <strong>grupo</strong> es igual al número de electrones de valencia.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, escribe: <em>"Los electrones de valencia están en la capa más externa. Los electrones del núcleo interno están en todas las demás. Número de período = número de capas; número de grupo = número de electrones de valencia (grupo principal)."</em></div>
+        </div>
+        ${practiceProblem('es', 'sh1', 'Un átomo tiene 13 electrones. ¿Cuál es su arreglo de capas?', 'basic', 'Llena la capa 1 (máx 2), luego la capa 2 (máx 8), luego la capa 3.', '2, 8, 3 — la capa 1 toma 2, la capa 2 toma 8, dejando 3 para la capa 3 (esto es aluminio).')}
+        ${practiceProblem('es', 'sh2', 'Un elemento está en el Período 3 y el Grupo 6A. ¿Cuántas capas de electrones tiene, y cuántos electrones de valencia?', 'medium', 'Período = capas; número de grupo (grupo principal) = electrones de valencia.', '3 capas de electrones (Período 3), y 6 electrones de valencia (Grupo 6A) — esto es azufre.')}
+        ${practiceProblem('es', 'sh3', 'Dos elementos tienen ambos 2 electrones de valencia. ¿Están necesariamente en el mismo período?', 'challenge', '¿Qué te dice realmente tener el mismo número de electrones de valencia sobre la posición de un elemento?', 'No — tener el mismo número de electrones de valencia significa que están en el mismo grupo (columna), no necesariamente en el mismo período (fila). Por ejemplo, el berilio y el magnesio tienen ambos 2 electrones de valencia pero están en períodos diferentes.')}`
+      }
+    },
+    {
+      title: { en: 'Ions & the Octet Rule', es: 'Iones y la Regla del Octeto' },
+      time: { en: '10 min', es: '10 min' },
+      bodyHtml: {
+        en: `
+        <h2>Becoming Like a Noble Gas</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Ion</strong>: an atom (or group of atoms) that has a positive or negative charge because it has lost or gained electrons. A <strong>cation</strong> (positive) usually forms from a metal losing electrons; an <strong>anion</strong> (negative) usually forms from a nonmetal gaining electrons.</p>
+        </div>
+        <p>Build a neutral atom below, then click <strong>Check My Model</strong> to unlock the ion step — add or remove electrons until the atom matches the nearest noble gas.</p>
+        <div id="me-shell-ion-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Why Bother?</div>
+          <p>A full outermost shell (like a noble gas has) is an especially stable arrangement. Atoms gain or lose just enough electrons to reach that same arrangement — never more than necessary.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Ions form when atoms gain or lose electrons to match the electron arrangement of the nearest noble gas. Metals tend to lose electrons (cations); nonmetals tend to gain electrons (anions)."</em></div>
+        </div>
+        ${practiceProblem('en', 'io1', 'A sodium atom (2, 8, 1) forms an ion. What is the resulting charge, and why?', 'basic', 'Is it easier for sodium to lose 1 electron or gain 7?', '+1 (Na⁺) — it\'s far easier to lose the single valence electron than to gain 7, and losing it leaves sodium with the same arrangement as neon (2, 8).')}
+        ${practiceProblem('en', 'io2', 'An oxygen atom (2, 6) forms an ion. What is the resulting charge, and why?', 'medium', 'Is it easier for oxygen to gain 2 electrons or lose 6?', '−2 (O²⁻) — gaining 2 electrons fills the outer shell to 8 (2, 8), matching neon, and that\'s far easier than losing 6.')}
+        ${practiceProblem('en', 'io3', 'True or False: noble gases like neon and argon readily form ions.', 'challenge', 'What would a noble gas have to do to its already-full outer shell to form an ion?', 'False — noble gases already have a full outer shell (the stable arrangement everything else is trying to reach), so they have essentially no tendency to gain or lose electrons.')}`,
+        es: `
+        <h2>Volviéndose Como un Gas Noble</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Ion</strong>: un átomo (o grupo de átomos) que tiene carga positiva o negativa porque ha perdido o ganado electrones. Un <strong>catión</strong> (positivo) generalmente se forma cuando un metal pierde electrones; un <strong>anión</strong> (negativo) generalmente se forma cuando un no metal gana electrones.</p>
+        </div>
+        <p>Construye un átomo neutro abajo, y luego haz clic en <strong>Revisar Mi Modelo</strong> para desbloquear el paso del ion — agrega o quita electrones hasta que el átomo coincida con el gas noble más cercano.</p>
+        <div id="me-shell-ion-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 ¿Por Qué Molestarse?</div>
+          <p>Una capa externa completa (como la que tiene un gas noble) es un arreglo especialmente estable. Los átomos ganan o pierden justo los electrones necesarios para alcanzar ese mismo arreglo — nunca más de lo necesario.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, escribe: <em>"Los iones se forman cuando los átomos ganan o pierden electrones para igualar el arreglo de electrones del gas noble más cercano. Los metales tienden a perder electrones (cationes); los no metales tienden a ganar electrones (aniones)."</em></div>
+        </div>
+        ${practiceProblem('es', 'io1', 'Un átomo de sodio (2, 8, 1) forma un ion. ¿Cuál es la carga resultante, y por qué?', 'basic', '¿Es más fácil para el sodio perder 1 electrón o ganar 7?', '+1 (Na⁺) — es mucho más fácil perder el único electrón de valencia que ganar 7, y al perderlo el sodio queda con el mismo arreglo que el neón (2, 8).')}
+        ${practiceProblem('es', 'io2', 'Un átomo de oxígeno (2, 6) forma un ion. ¿Cuál es la carga resultante, y por qué?', 'medium', '¿Es más fácil para el oxígeno ganar 2 electrones o perder 6?', '−2 (O²⁻) — ganar 2 electrones llena la capa externa a 8 (2, 8), igualando al neón, y eso es mucho más fácil que perder 6.')}
+        ${practiceProblem('es', 'io3', 'Verdadero o Falso: los gases nobles como el neón y el argón forman iones fácilmente.', 'challenge', '¿Qué tendría que hacerle un gas noble a su capa externa ya completa para formar un ion?', 'Falso — los gases nobles ya tienen una capa externa completa (el arreglo estable que todo lo demás intenta alcanzar), así que prácticamente no tienen tendencia a ganar o perder electrones.')}`
+      }
+    },
+    {
+      title: { en: 'Ionic Compounds & the Rule of Zero Charge', es: 'Compuestos Iónicos y la Regla de Carga Cero' },
+      time: { en: '7 min', es: '7 min' },
+      bodyHtml: {
+        en: `
+        <h2>Balancing the Charges</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Ionic compound</strong>: a compound made of positive and negative ions, formed when metal and nonmetal atoms combine.</p>
+        </div>
+        <div class="concept-box">
+          <div class="concept-label">Rule of Zero Charge</div>
+          <p>In an ionic compound, the total positive charge and the total negative charge must add up to zero.</p>
+        </div>
+        <p>Example: Mg²⁺ combines with Cl⁻. One Mg²⁺ needs <em>two</em> Cl⁻ to balance: +2 + (−1) + (−1) = 0, giving the formula <strong>MgCl₂</strong>.</p>
+        <p>Try it: combine ions until the total positive charge and total negative charge cancel to exactly zero. You'll see that one ion often isn't enough — you need <em>multiples</em> of each to balance.</p>
+        <div id="me-balance-binary-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Rule of zero charge: in an ionic compound, the positive and negative charges sum to 0."</em> Then work through the Mg²⁺ + Cl⁻ example above.</div>
+        </div>
+        ${practiceProblem('en', 'ic1', 'What formula forms between Al³⁺ and O²⁻?', 'medium', 'Find the smallest set of each ion whose charges add to zero (hint: the charges 3 and 2 both divide evenly into 6).', 'Al₂O₃ — two Al³⁺ (total +6) balance three O²⁻ (total −6).')}
+        ${practiceProblem('en', 'ic2', 'What formula forms between K⁺ and S²⁻?', 'medium', 'One S²⁻ needs how many K⁺ to balance its −2 charge?', 'K₂S — two K⁺ (total +2) balance one S²⁻ (−2).')}
+        ${practiceProblem('en', 'ic3', 'What formula forms between Ca²⁺ and N³⁻?', 'challenge', 'Find the smallest whole numbers of each ion so the total charge is zero (hint: 2 and 3 both divide evenly into 6).', 'Ca₃N₂ — three Ca²⁺ (total +6) balance two N³⁻ (total −6).')}`,
+        es: `
+        <h2>Equilibrando las Cargas</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Compuesto iónico</strong>: un compuesto hecho de iones positivos y negativos, formado cuando se combinan átomos metálicos y no metálicos.</p>
+        </div>
+        <div class="concept-box">
+          <div class="concept-label">Regla de Carga Cero</div>
+          <p>En un compuesto iónico, la carga positiva total y la carga negativa total deben sumar cero.</p>
+        </div>
+        <p>Ejemplo: Mg²⁺ se combina con Cl⁻. Un Mg²⁺ necesita <em>dos</em> Cl⁻ para equilibrarse: +2 + (−1) + (−1) = 0, dando la fórmula <strong>MgCl₂</strong>.</p>
+        <p>Pruébalo: combina iones hasta que la carga positiva total y la carga negativa total se cancelen exactamente a cero. Verás que a menudo un solo ion no basta — necesitas <em>múltiplos</em> de cada uno para equilibrar.</p>
+        <div id="me-balance-binary-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, escribe: <em>"Regla de carga cero: en un compuesto iónico, las cargas positivas y negativas suman 0."</em> Luego resuelve el ejemplo de Mg²⁺ + Cl⁻ de arriba.</div>
+        </div>
+        ${practiceProblem('es', 'ic1', '¿Qué fórmula se forma entre Al³⁺ y O²⁻?', 'medium', 'Encuentra el conjunto más pequeño de cada ion cuyas cargas sumen cero (pista: las cargas 3 y 2 se dividen exactamente en 6).', 'Al₂O₃ — dos Al³⁺ (total +6) equilibran tres O²⁻ (total −6).')}
+        ${practiceProblem('es', 'ic2', '¿Qué fórmula se forma entre K⁺ y S²⁻?', 'medium', '¿Cuántos K⁺ necesita un S²⁻ para equilibrar su carga −2?', 'K₂S — dos K⁺ (total +2) equilibran un S²⁻ (−2).')}
+        ${practiceProblem('es', 'ic3', '¿Qué fórmula se forma entre Ca²⁺ y N³⁻?', 'challenge', 'Encuentra los números enteros más pequeños de cada ion para que la carga total sea cero (pista: 2 y 3 se dividen exactamente en 6).', 'Ca₃N₂ — tres Ca²⁺ (total +6) equilibran dos N³⁻ (total −6).')}`
+      }
+    },
+    {
+      title: { en: 'Naming Binary Ionic Compounds', es: 'Nombrando Compuestos Iónicos Binarios' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
+        <h2>Predicting Compounds from Valence Electrons</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Binary ionic compound</strong>: an ionic compound made of exactly two elements — a metal (which loses electrons to become a cation) and a nonmetal (which gains electrons to become an anion).</p>
+        </div>
+        <p>In general, atoms come together to form an ionic compound when the metal's valence electrons given up exactly balance the nonmetal's valence electrons needed to fill its outer shell — so the total charge works out to zero. This is the same rule of zero charge you've already been using, just starting from valence electrons instead of ion charges.</p>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Naming a Binary Ionic Compound</div>
+          <p>Keep the metal's name unchanged, then change the nonmetal's ending to <strong>"-ide."</strong> For example: chlorine → chlor<strong>ide</strong>, oxygen → ox<strong>ide</strong>, sulfur → sulf<strong>ide</strong>, nitrogen → nitr<strong>ide</strong>. So Na + Cl → sodium chloride.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Atoms form an ionic compound when the metal's valence electrons given up balance the nonmetal's valence electrons needed. Binary ionic compound names end in '-ide.'"</em></div>
+        </div>
+        ${practiceProblem('en', 'bi1', 'What is the name of the compound formed between lithium (Li) and bromine (Br)?', 'basic', 'Lithium always forms a +1 ion. Keep the metal name, and change bromine\'s ending to "-ide."', 'Lithium bromide (LiBr) — Li⁺ and Br⁻ balance one-to-one.')}
+        ${practiceProblem('en', 'bi2', 'What is the formula and name for the compound formed between magnesium (Mg) and nitrogen (N)?', 'medium', 'Magnesium forms a +2 ion; nitrogen forms a −3 ion. Find the smallest whole numbers that balance the charges to zero.', 'Mg₃N₂, magnesium nitride — three Mg²⁺ (total +6) balance two N³⁻ (total −6).')}
+        ${practiceProblem('en', 'bi3', 'Explain why "NaO" is not a correct chemical formula.', 'challenge', 'Sodium forms a +1 ion. Oxygen forms a −2 ion. Do those balance to zero in a 1:1 ratio?', 'Sodium is always +1 and oxygen is always −2, so one Na⁺ and one O²⁻ would leave a net charge of −1, not zero. It takes two Na⁺ to balance one O²⁻, so the correct formula is Na₂O (sodium oxide).')}`,
+        es: `
+        <h2>Prediciendo Compuestos a partir de Electrones de Valencia</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Compuesto iónico binario</strong>: un compuesto iónico hecho de exactamente dos elementos — un metal (que pierde electrones para convertirse en catión) y un no metal (que gana electrones para convertirse en anión).</p>
+        </div>
+        <p>En general, los átomos se combinan para formar un compuesto iónico cuando los electrones de valencia que el metal cede equilibran exactamente los electrones de valencia que el no metal necesita para llenar su capa externa — así la carga total resulta en cero. Esta es la misma regla de carga cero que ya has usado, solo que partiendo de electrones de valencia en vez de cargas iónicas.</p>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Nombrando un Compuesto Iónico Binario</div>
+          <p>Mantén el nombre del metal sin cambios, y cambia la terminación del no metal a <strong>"-uro."</strong> Por ejemplo: cloro → clor<strong>uro</strong>, oxígeno → óx<strong>ido</strong>, azufre → sulf<strong>uro</strong>, nitrógeno → nitr<strong>uro</strong>. Así, Na + Cl → cloruro de sodio.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, escribe: <em>"Los átomos forman un compuesto iónico cuando los electrones de valencia que cede el metal equilibran los que necesita el no metal. Los nombres de los compuestos iónicos binarios terminan en '-uro' (u '-ido' para el oxígeno)."</em></div>
+        </div>
+        ${practiceProblem('es', 'bi1', '¿Cuál es el nombre del compuesto formado entre litio (Li) y bromo (Br)?', 'basic', 'El litio siempre forma un ion +1. Mantén el nombre del metal, y cambia la terminación del bromo a "-uro."', 'Bromuro de litio (LiBr) — Li⁺ y Br⁻ se equilibran uno a uno.')}
+        ${practiceProblem('es', 'bi2', '¿Cuál es la fórmula y el nombre del compuesto formado entre magnesio (Mg) y nitrógeno (N)?', 'medium', 'El magnesio forma un ion +2; el nitrógeno forma un ion −3. Encuentra los números enteros más pequeños que equilibren las cargas a cero.', 'Mg₃N₂, nitruro de magnesio — tres Mg²⁺ (total +6) equilibran dos N³⁻ (total −6).')}
+        ${practiceProblem('es', 'bi3', 'Explica por qué "NaO" no es una fórmula química correcta.', 'challenge', 'El sodio forma un ion +1. El oxígeno forma un ion −2. ¿Se equilibran esos a cero en una proporción de 1:1?', 'El sodio siempre es +1 y el oxígeno siempre es −2, así que un Na⁺ y un O²⁻ dejarían una carga neta de −1, no cero. Se necesitan dos Na⁺ para equilibrar un O²⁻, así que la fórmula correcta es Na₂O (óxido de sodio).')}`
+      }
+    },
+    {
+      title: { en: 'Polyatomic Ions', es: 'Iones Poliatómicos' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
+        <h2>Ions Made of More Than One Atom</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Polyatomic ion</strong>: an ion composed of a group of atoms bonded together, carrying an overall positive or negative charge. Most polyatomic ions are negative, though a notable exception — ammonium — is positive.</p>
+        </div>
+        <table>
+          <thead><tr><th>Polyatomic Ion</th><th>Name</th></tr></thead>
+          <tbody>
+            <tr><td>OH⁻</td><td>Hydroxide</td></tr>
+            <tr><td>NO₃⁻</td><td>Nitrate</td></tr>
+            <tr><td>CO₃²⁻</td><td>Carbonate</td></tr>
+            <tr><td>SO₄²⁻</td><td>Sulfate</td></tr>
+            <tr><td>NH₄⁺</td><td>Ammonium</td></tr>
+          </tbody>
+        </table>
+        <p>The rule of zero charge still works with polyatomic ions — just treat the whole group of atoms as a single ion with its own charge. Try balancing some below; notice how the formula gets parentheses when you need more than one polyatomic ion.</p>
+        <div id="me-balance-poly-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Naming and Writing Formulas</div>
+          <p>Unlike binary ionic compounds, a polyatomic ion's name is used as-is — never add "-ide" to it. (Calcium <strong>carbonate</strong> is not the same thing as calcium carb<strong>ide</strong>!) When a formula needs <em>more than one</em> of a polyatomic ion, put it in parentheses with the count as a subscript outside: for example, one Ca²⁺ needs two OH⁻, written <strong>Ca(OH)₂</strong>. If only one is needed, no parentheses are used, e.g. <strong>NaOH</strong>.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, copy the polyatomic ion table above, and write: <em>"A polyatomic ion's name is never changed. Parentheses are used only when more than one of the same polyatomic ion appears in a formula."</em></div>
+        </div>
+        ${practiceProblem('en', 'pi1', 'What is the name of the compound NaNO₃?', 'basic', 'Sodium forms Na⁺. Which polyatomic ion is NO₃⁻?', 'Sodium nitrate — Na⁺ and the nitrate ion (NO₃⁻) balance one-to-one.')}
+        ${practiceProblem('en', 'pi2', 'Write the formula for calcium hydroxide.', 'medium', 'Calcium forms Ca²⁺. Hydroxide (OH⁻) is a polyatomic ion — how many are needed, and does the formula need parentheses?', 'Ca(OH)₂ — one Ca²⁺ needs two OH⁻ to balance to zero, and since more than one hydroxide ion is needed, it\'s written in parentheses.')}
+        ${practiceProblem('en', 'pi3', 'Write the formula for aluminum sulfate.', 'challenge', 'Aluminum forms Al³⁺ and sulfate is SO₄²⁻. Find the smallest whole numbers of each that balance to zero (hint: 3 and 2 both divide evenly into 6).', 'Al₂(SO₄)₃ — two Al³⁺ (total +6) balance three SO₄²⁻ (total −6); parentheses are needed since more than one sulfate ion appears.')}`,
+        es: `
+        <h2>Iones Hechos de Más de un Átomo</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Ion poliatómico</strong>: un ion compuesto por un grupo de átomos enlazados entre sí, que lleva una carga neta positiva o negativa. La mayoría de los iones poliatómicos son negativos, aunque una excepción notable — el amonio — es positivo.</p>
+        </div>
+        <table>
+          <thead><tr><th>Ion Poliatómico</th><th>Nombre</th></tr></thead>
+          <tbody>
+            <tr><td>OH⁻</td><td>Hidróxido</td></tr>
+            <tr><td>NO₃⁻</td><td>Nitrato</td></tr>
+            <tr><td>CO₃²⁻</td><td>Carbonato</td></tr>
+            <tr><td>SO₄²⁻</td><td>Sulfato</td></tr>
+            <tr><td>NH₄⁺</td><td>Amonio</td></tr>
+          </tbody>
+        </table>
+        <p>La regla de carga cero sigue funcionando con los iones poliatómicos — solo trata todo el grupo de átomos como un solo ion con su propia carga. Intenta equilibrar algunos abajo; fíjate cómo la fórmula lleva paréntesis cuando necesitas más de un ion poliatómico.</p>
+        <div id="me-balance-poly-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Nombrando y Escribiendo Fórmulas</div>
+          <p>A diferencia de los compuestos iónicos binarios, el nombre de un ion poliatómico se usa tal cual — nunca le agregues "-uro" o "-ido". (¡El carbonato de calcio no es lo mismo que el carburo de calcio!) Cuando una fórmula necesita <em>más de uno</em> de un ion poliatómico, se pone entre paréntesis con la cantidad como subíndice afuera: por ejemplo, un Ca²⁺ necesita dos OH⁻, escrito <strong>Ca(OH)₂</strong>. Si solo se necesita uno, no se usan paréntesis, por ejemplo <strong>NaOH</strong>.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, copia la tabla de iones poliatómicos de arriba, y escribe: <em>"El nombre de un ion poliatómico nunca cambia. Los paréntesis se usan solo cuando aparece más de un mismo ion poliatómico en una fórmula."</em></div>
+        </div>
+        ${practiceProblem('es', 'pi1', '¿Cuál es el nombre del compuesto NaNO₃?', 'basic', 'El sodio forma Na⁺. ¿Qué ion poliatómico es NO₃⁻?', 'Nitrato de sodio — Na⁺ y el ion nitrato (NO₃⁻) se equilibran uno a uno.')}
+        ${practiceProblem('es', 'pi2', 'Escribe la fórmula del hidróxido de calcio.', 'medium', 'El calcio forma Ca²⁺. El hidróxido (OH⁻) es un ion poliatómico — ¿cuántos se necesitan, y la fórmula necesita paréntesis?', 'Ca(OH)₂ — un Ca²⁺ necesita dos OH⁻ para equilibrar a cero, y como se necesita más de un ion hidróxido, se escribe entre paréntesis.')}
+        ${practiceProblem('es', 'pi3', 'Escribe la fórmula del sulfato de aluminio.', 'challenge', 'El aluminio forma Al³⁺ y el sulfato es SO₄²⁻. Encuentra los números enteros más pequeños de cada uno que equilibren a cero (pista: 3 y 2 se dividen exactamente en 6).', 'Al₂(SO₄)₃ — dos Al³⁺ (total +6) equilibran tres SO₄²⁻ (total −6); se necesitan paréntesis porque aparece más de un ion sulfato.')}`
+      }
+    },
+    {
+      title: { en: 'Electron Configurations & Subshells', es: 'Configuraciones Electrónicas y Subcapas' },
+      time: { en: '10 min', es: '10 min' },
+      bodyHtml: {
+        en: `
+        <h2>A Closer Look Inside Each Shell</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Subshell</strong>: within each electron shell (except the first), electrons are further divided into subshells labeled <em>s</em>, <em>p</em>, <em>d</em>, and <em>f</em>, each holding its own maximum number of electrons.</p>
+        </div>
+        <table>
+          <thead><tr><th>Shell</th><th>Electrons in Shell</th><th>Subshell</th><th>Electrons in Subshell</th></tr></thead>
+          <tbody>
+            <tr><td>n = 1</td><td>2</td><td>1s</td><td>2</td></tr>
+            <tr><td>n = 2</td><td>8</td><td>2s</td><td>2</td></tr>
+            <tr><td>n = 2</td><td>8</td><td>2p</td><td>6</td></tr>
+            <tr><td>n = 3</td><td>18</td><td>3s</td><td>2</td></tr>
+            <tr><td>n = 3</td><td>18</td><td>3p</td><td>6</td></tr>
+            <tr><td>n = 3</td><td>18</td><td>3d</td><td>10</td></tr>
+          </tbody>
+        </table>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Reading an Electron Configuration</div>
+          <p>An <strong>electron configuration</strong> like <span class="formula-chip" style="font-family:'JetBrains Mono',monospace;background:var(--cream-dark);border-radius:6px;padding:0.1rem 0.4rem;">1s²2s²2p⁶</span> is shorthand for every subshell that has electrons: the number before the letter is the <strong>shell</strong> number, the letter is the <strong>subshell</strong> type, and the superscript is the <strong>number of electrons</strong> in that subshell.</p>
+        </div>
+        <p>The periodic table itself is organized into these subshell "blocks" — elements in the same block fill the same type of subshell and share related properties. One catch: subshells don't always fill in strict numerical order — for example, the 4s subshell fills <em>before</em> the 3d subshell.</p>
+        <p>Before the practice problems, try the tool: click any element on the periodic table, then place its electrons into subshells yourself. Notice how the row you work on lights up a matching block of the table — the table's shape <em>is</em> the filling order.</p>
+        <div id="me-config-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Electron configuration: shorthand for the electrons in every subshell of an atom. Subshells don't always fill in numerical order — 4s fills before 3d."</em></div>
+        </div>
+        ${practiceProblem('en', 'ec1', 'Write the electron configuration for nitrogen (N, atomic number 7).', 'basic', 'Fill 1s (max 2), then 2s (max 2), then 2p — how many electrons are left for 2p?', '1s²2s²2p³ — 2 + 2 + 3 = 7 electrons total.')}
+        ${practiceProblem('en', 'ec2', 'Write the electron configuration for silicon (Si, atomic number 14).', 'medium', 'Fill 1s, 2s, 2p completely (2+2+6=10), then start filling 3s and 3p with the remaining electrons.', '1s²2s²2p⁶3s²3p² — 2 + 2 + 6 + 2 + 2 = 14 electrons total.')}
+        ${practiceProblem('en', 'ec3', 'What element has the electron configuration 1s²2s²2p⁶3s²3p⁴?', 'challenge', 'Add up all the superscripts to find the total number of electrons, which equals the atomic number.', 'Sulfur (S) — 2 + 2 + 6 + 2 + 4 = 16 electrons, matching sulfur\'s atomic number.')}`,
+        es: `
+        <h2>Una Mirada Más de Cerca Dentro de Cada Capa</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Subcapa</strong>: dentro de cada capa de electrones (excepto la primera), los electrones se dividen aún más en subcapas llamadas <em>s</em>, <em>p</em>, <em>d</em>, y <em>f</em>, cada una con su propio número máximo de electrones.</p>
+        </div>
+        <table>
+          <thead><tr><th>Capa</th><th>Electrones en la Capa</th><th>Subcapa</th><th>Electrones en la Subcapa</th></tr></thead>
+          <tbody>
+            <tr><td>n = 1</td><td>2</td><td>1s</td><td>2</td></tr>
+            <tr><td>n = 2</td><td>8</td><td>2s</td><td>2</td></tr>
+            <tr><td>n = 2</td><td>8</td><td>2p</td><td>6</td></tr>
+            <tr><td>n = 3</td><td>18</td><td>3s</td><td>2</td></tr>
+            <tr><td>n = 3</td><td>18</td><td>3p</td><td>6</td></tr>
+            <tr><td>n = 3</td><td>18</td><td>3d</td><td>10</td></tr>
+          </tbody>
+        </table>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Leyendo una Configuración Electrónica</div>
+          <p>Una <strong>configuración electrónica</strong> como <span class="formula-chip" style="font-family:'JetBrains Mono',monospace;background:var(--cream-dark);border-radius:6px;padding:0.1rem 0.4rem;">1s²2s²2p⁶</span> es una forma abreviada de mostrar cada subcapa que tiene electrones: el número antes de la letra es el número de <strong>capa</strong>, la letra es el tipo de <strong>subcapa</strong>, y el superíndice es el <strong>número de electrones</strong> en esa subcapa.</p>
+        </div>
+        <p>La tabla periódica misma está organizada en estos "bloques" de subcapas — los elementos en el mismo bloque llenan el mismo tipo de subcapa y comparten propiedades relacionadas. Una advertencia: las subcapas no siempre se llenan en orden numérico estricto — por ejemplo, la subcapa 4s se llena <em>antes</em> que la subcapa 3d.</p>
+        <p>Antes de los problemas de práctica, prueba la herramienta: haz clic en cualquier elemento de la tabla periódica, y luego coloca tú mismo sus electrones en las subcapas. Fíjate cómo la fila en la que trabajas ilumina un bloque de la tabla — la forma de la tabla <em>es</em> el orden de llenado.</p>
+        <div id="me-config-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, escribe: <em>"Configuración electrónica: forma abreviada de los electrones en cada subcapa de un átomo. Las subcapas no siempre se llenan en orden numérico — la 4s se llena antes que la 3d."</em></div>
+        </div>
+        ${practiceProblem('es', 'ec1', 'Escribe la configuración electrónica del nitrógeno (N, número atómico 7).', 'basic', 'Llena 1s (máx 2), luego 2s (máx 2), luego 2p — ¿cuántos electrones quedan para 2p?', '1s²2s²2p³ — 2 + 2 + 3 = 7 electrones en total.')}
+        ${practiceProblem('es', 'ec2', 'Escribe la configuración electrónica del silicio (Si, número atómico 14).', 'medium', 'Llena 1s, 2s, 2p por completo (2+2+6=10), luego empieza a llenar 3s y 3p con los electrones restantes.', '1s²2s²2p⁶3s²3p² — 2 + 2 + 6 + 2 + 2 = 14 electrones en total.')}
+        ${practiceProblem('es', 'ec3', '¿Qué elemento tiene la configuración electrónica 1s²2s²2p⁶3s²3p⁴?', 'challenge', 'Suma todos los superíndices para encontrar el número total de electrones, que es igual al número atómico.', 'Azufre (S) — 2 + 2 + 6 + 2 + 4 = 16 electrones, igual al número atómico del azufre.')}`
+      }
+    }
+  ];
+
+  function render(host, ctx) {
+    ensureStylesInjected();
+    const lang = getLang();
+
+    const sectionsHtml = STATIC_SECTIONS.map((sec, i) => `
+      <div class="section-card" id="me-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
+          <span class="section-title">${escapeHtml(tr(sec.title, lang))}</span>
+          <span class="section-time">${escapeHtml(tr(sec.time, lang))}</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          ${tr(sec.bodyHtml, lang)}
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">${escapeHtml(t('markSectionComplete', lang))}</button>
+        </div>
+      </div>
+    `).join('');
+
+    host.innerHTML = `
+      <div class="me-lesson">
+        <div class="me-header">
+          <div class="me-lang-toggle" role="group" aria-label="${escapeHtml(t('langToggleAria', lang))}">
+            <button type="button" class="me-lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="me-lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="me-header-label">${escapeHtml(t('headerLabel', lang))}</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="me-header-meta">${escapeHtml(t('headerMeta', lang))}</div>
+        </div>
+        <div class="me-progress-wrap">
+          <span class="me-progress-label">${escapeHtml(t('progress', lang))}</span>
+          <div class="me-progress-track"><div class="me-progress-fill" id="me-progress-fill"></div></div>
+          <span class="me-progress-count" id="me-progress-count">${escapeHtml(t('sectionCount', lang, 0, SECTION_COUNT))}</span>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="me-sec-${SECTION_COUNT - 1}" data-section="${SECTION_COUNT - 1}">
+            <div class="section-header" data-toggle="${SECTION_COUNT - 1}">
+              <span class="section-num">✓</span>
+              <span class="section-title">${escapeHtml(t('checkForUnderstanding', lang))}</span>
+              <span class="section-time">${escapeHtml(t('quizTimeGraded', lang))}</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">${t('quizNote', lang)}</div>
+              <div id="me-quiz-mount"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    `;
+
+    const root = host.querySelector('.me-lesson');
+    const quizIndex = SECTION_COUNT - 1;
+    const completed = new Array(SECTION_COUNT).fill(false);
+
+    function updateProgress() {
+      const done = completed.filter(Boolean).length;
+      const pct = Math.round((done / SECTION_COUNT) * 100);
+      root.querySelector('#me-progress-fill').style.width = pct + '%';
+      root.querySelector('#me-progress-count').textContent = t('sectionCount', lang, done, SECTION_COUNT);
+    }
+
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#me-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function toggleSection(i) {
+      const card = root.querySelector(`#me-sec-${i}`);
+      const body = card.querySelector('.section-body');
+      const header = card.querySelector('.section-header');
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      header.classList.toggle('open', !isOpen);
+    }
+
+    root.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', () => toggleSection(Number(el.getAttribute('data-toggle'))));
+    });
+
+    root.querySelectorAll('[data-mark-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-mark-done'));
+        if (completed[i]) return;
+        completed[i] = true;
+        root.querySelector(`#me-sec-${i}`).classList.add('done');
+        btn.textContent = t('sectionComplete', lang);
+        btn.disabled = true;
+        updateProgress();
+        setTimeout(() => openSection(i + 1, true), 250);
+      });
+    });
+
+    root.querySelectorAll('[data-hint-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-hint-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? t('hintHide', lang) : t('hintShow', lang);
+      });
+    });
+    root.querySelectorAll('[data-answer-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-answer-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? t('hideAnswer', lang) : t('revealAnswer', lang);
+      });
+    });
+
+    root.querySelectorAll('[data-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newLang = btn.getAttribute('data-lang');
+        if (newLang === lang) return;
+        setLang(newLang);
+        render(host, ctx); // full re-render; progress lives in ctx.getProgress(), untouched by language
+      });
+    });
+
+    // Interactive widgets (sections 1-3) -- ungraded, session-only state.
+    const flameMount = root.querySelector('#me-flame-mount');
+    if (flameMount) renderFlameWidget(flameMount, lang);
+    const shellBuildMount = root.querySelector('#me-shell-build-mount');
+    if (shellBuildMount) renderShellBuilder(shellBuildMount, lang, ATOM_BUILD_ELEMENTS, false);
+    const shellIonMount = root.querySelector('#me-shell-ion-mount');
+    if (shellIonMount) renderShellBuilder(shellIonMount, lang, ION_BUILD_ELEMENTS, true);
+    const balBinaryMount = root.querySelector('#me-balance-binary-mount');
+    if (balBinaryMount) renderChargeBalancer(balBinaryMount, lang, BINARY_PAIRS, false);
+    const balPolyMount = root.querySelector('#me-balance-poly-mount');
+    if (balPolyMount) renderChargeBalancer(balPolyMount, lang, POLY_PAIRS, true);
+    const configMount = root.querySelector('#me-config-mount');
+    if (configMount) renderConfigTool(configMount, lang);
+
+    // Quiz (final section) — graded, saved via ctx.saveProgress.
+    const quizMount = root.querySelector('#me-quiz-mount');
+    renderQuiz(quizMount, ctx);
+
+    const progress = ctx.getProgress();
+    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
+      if (progress.status === 'completed') completed[quizIndex] = true;
+      openSection(quizIndex, false);
+    } else {
+      openSection(0, false);
+    }
+    updateProgress();
+  }
+
+  function renderQuiz(mount, ctx) {
+    const progress = ctx.getProgress();
+    if (progress && progress.status === 'completed') {
+      renderQuizSummary(mount, ctx);
+      return;
+    }
+    const answers = (progress && progress.answers) || [];
+    const index = answers.length;
+    if (index >= QUESTIONS.length) {
+      finishQuiz(mount, ctx, answers);
+      return;
+    }
+    renderQuizQuestion(mount, ctx, answers, index);
+  }
+
+  function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const lang = getLang();
+    const q = QUESTIONS[index];
+    const pct = Math.round((index / QUESTIONS.length) * 100);
+    mount.innerHTML = `
+      <div class="quiz-question-count">${escapeHtml(t('questionCount', lang, index + 1, QUESTIONS.length))}</div>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <p class="quiz-prompt">${escapeHtml(tr(q.prompt, lang))}</p>
+      <div id="me-answer-area"></div>
+      <div id="me-feedback-area"></div>
+      <button type="button" class="me-next-btn" id="me-next-btn" style="display:none;">${escapeHtml(t('nextQuestion', lang))}</button>
+    `;
+
+    const answerArea = mount.querySelector('#me-answer-area');
+    const feedbackArea = mount.querySelector('#me-feedback-area');
+    const nextBtn = mount.querySelector('#me-next-btn');
+    let submitted = false;
+
+    answerArea.innerHTML = q.choices.map((choice, i) => `
+      <button type="button" class="me-choice" data-choice="${i}">${escapeHtml(tr(choice, lang))}</button>
+    `).join('');
+
+    function submit(response, btnEl) {
+      if (submitted) return;
+      submitted = true;
+
+      const correct = response === q.correct;
+      answerArea.querySelectorAll('.me-choice').forEach(el => {
+        el.disabled = true;
+        const val = Number(el.getAttribute('data-choice'));
+        if (val === q.correct) el.classList.add('selected-correct');
+        else if (el === btnEl) el.classList.add('selected-incorrect');
+      });
+
+      feedbackArea.innerHTML = `
+        <div class="me-feedback ${correct ? 'correct' : 'incorrect'}">
+          ${correct ? escapeHtml(t('correctPrefix', lang)) : escapeHtml(t('incorrectPrefix', lang))} ${escapeHtml(tr(q.explanation, lang))}
+        </div>
+      `;
+      nextBtn.style.display = 'inline-block';
+
+      const answers = answersSoFar.concat([{ questionId: q.id, response, correct }]);
+      const record = {
+        status: 'in_progress',
+        score: answers.filter(a => a.correct).length,
+        totalQuestions: QUESTIONS.length,
+        answers
+      };
+      ctx.saveProgress(record);
+    }
+
+    answerArea.querySelectorAll('.me-choice').forEach(btn => {
+      btn.addEventListener('click', () => submit(Number(btn.getAttribute('data-choice')), btn));
+    });
+
+    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
+  }
+
+  async function finishQuiz(mount, ctx, answers) {
+    const record = {
+      status: 'completed',
+      score: answers.filter(a => a.correct).length,
+      totalQuestions: QUESTIONS.length,
+      answers
+    };
+    await ctx.saveProgress(record);
+    renderQuizSummary(mount, ctx);
+  }
+
+  function renderQuizSummary(mount, ctx) {
+    const lang = getLang();
+    const progress = ctx.getProgress();
+    const score = progress ? progress.score : 0;
+    const total = QUESTIONS.length;
+    mount.innerHTML = `
+      <div class="me-summary">
+        <div class="me-score">${score} / ${total}</div>
+        <p>${escapeHtml(t('summaryText', lang))}</p>
+        <button type="button" class="me-retake-btn" id="me-retake-btn">${escapeHtml(t('retakeQuiz', lang))}</button>
+      </div>
+    `;
+    mount.querySelector('#me-retake-btn').addEventListener('click', async () => {
+      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: total, answers: [] });
+      renderQuiz(mount, ctx);
+    });
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['moving-electrons-review'] = { render };
+})();
