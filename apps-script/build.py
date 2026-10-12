@@ -40,6 +40,7 @@ JS_FILES = [
     ('AtomicModelsJs.html', 'js/activities/atomic-models.js'),
     ('ParticlesReviewJs.html', 'js/activities/particles-review.js'),
     ('MovingElectronsReviewJs.html', 'js/activities/moving-electrons-review.js'),
+    ('ConductivityLabJs.html', 'js/activities/conductivity-lab.js'),
     ('CrossMultiplyDensityJs.html', 'js/activities/cross-multiply-density.js'),
     ('AppJs.html', 'js/app.js'),
 ]
@@ -78,6 +79,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <?!= include('AtomicModelsJs'); ?>
   <?!= include('ParticlesReviewJs'); ?>
   <?!= include('MovingElectronsReviewJs'); ?>
+  <?!= include('ConductivityLabJs'); ?>
   <?!= include('CrossMultiplyDensityJs'); ?>
   <?!= include('AppJs'); ?>
 </body>
