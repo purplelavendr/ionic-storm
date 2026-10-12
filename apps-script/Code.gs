@@ -13,7 +13,8 @@
 //   "Roster - <Period>"   columns: Name, StudentID, FirstSeen, LastSeen
 //   "Progress - <Period>" columns: StudentKey, Name, UnitId, ActivityId,
 //                                  ActivityTitle, Status, Score,
-//                                  TotalQuestions, AnswersJSON, LastUpdated
+//                                  TotalQuestions, AnswersJSON, LastUpdated,
+//                                  CompletionCode
 //
 // To add a class period: create a new sheet tab named exactly
 // "Roster - <Period>" (e.g. "Roster - Period 3") and list one student name
@@ -173,8 +174,11 @@ function handleSaveProgress(body) {
   }
   var sheet = getSheet(progressSheetName(period), [
     'StudentKey', 'Name', 'UnitId', 'ActivityId', 'ActivityTitle',
-    'Status', 'Score', 'TotalQuestions', 'AnswersJSON', 'LastUpdated'
+    'Status', 'Score', 'TotalQuestions', 'AnswersJSON', 'LastUpdated',
+    'CompletionCode'
   ]);
+  // Progress tabs created before CompletionCode existed lack the column header.
+  if (sheet.getRange(1, 11).getValue() === '') sheet.getRange(1, 11).setValue('CompletionCode');
   var data = sheet.getDataRange().getValues();
   var now = new Date();
   var row = [
@@ -187,7 +191,8 @@ function handleSaveProgress(body) {
     (body.score === undefined || body.score === null) ? '' : body.score,
     (body.totalQuestions === undefined || body.totalQuestions === null) ? '' : body.totalQuestions,
     JSON.stringify(body.answers || []),
-    now
+    now,
+    body.completionCode || ''
   ];
   var updated = false;
   for (var i = 1; i < data.length; i++) {
@@ -227,7 +232,8 @@ function getProgressForStudent(studentKey, period) {
         score: data[i][6],
         totalQuestions: data[i][7],
         answers: safeParse(data[i][8]),
-        lastUpdated: data[i][9]
+        lastUpdated: data[i][9],
+        completionCode: data[i][10] || ''
       });
     }
   }

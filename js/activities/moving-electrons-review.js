@@ -83,6 +83,8 @@
     shellElectronsPlaced: { en: (n, total) => `Electrons placed: ${n} / ${total}`, es: (n, total) => `Electrones colocados: ${n} / ${total}` },
     shellBreakdownLabel: { en: 'Shells', es: 'Capas' },
     shellCheckModel: { en: 'Check My Model', es: 'Revisar Mi Modelo' },
+    showMyCode: { en: 'Show my code', es: 'Mostrar mi código' },
+    completionCode: { en: 'Your completion code — show this to your teacher:', es: 'Tu código de finalización — muéstraselo a tu maestro:' },
     shellCorrect: { en: '✓ Correct! That\'s a complete, neutral atom.', es: '✓ ¡Correcto! Ese es un átomo neutro completo.' },
     shellIncomplete: { en: 'Keep going — add more electrons until you reach the atomic number.', es: 'Sigue — agrega más electrones hasta llegar al número atómico.' },
     shellValenceLabel: { en: 'Valence electrons (outermost shell)', es: 'Electrones de valencia (capa externa)' },
@@ -271,6 +273,8 @@
 .me-lesson .me-next-btn, .me-lesson .me-retake-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem; }
 .me-lesson .me-next-btn:hover, .me-lesson .me-retake-btn:hover { background: var(--navy-light); }
 .me-lesson .me-summary { text-align: center; padding: 1rem 0.5rem; }
+.me-summary .me-code-label { margin: 0.6rem 0 0.2rem; font-weight: 600; }
+.me-summary .me-code { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--navy); border: 2px dashed var(--navy); border-radius: 10px; padding: 0.3rem 1rem; margin-bottom: 0.8rem; user-select: all; }
 .me-lesson .me-score { font-family: 'JetBrains Mono', monospace; font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0; }
 
 /* ---- Flame test simulator ---- */
@@ -1954,14 +1958,28 @@
     const lang = getLang();
     const progress = ctx.getProgress();
     const score = progress ? progress.score : 0;
+    const code = progress && progress.code ? progress.code : '';
     const total = QUESTIONS.length;
     mount.innerHTML = `
       <div class="me-summary">
         <div class="me-score">${score} / ${total}</div>
+        ${code
+          ? `<p class="me-code-label">${escapeHtml(t('completionCode', lang))}</p><div class="me-code">${escapeHtml(code)}</div>`
+          : `<p><button type="button" class="me-retake-btn" id="me-show-code-btn">${escapeHtml(t('showMyCode', lang))}</button></p>`}
         <p>${escapeHtml(t('summaryText', lang))}</p>
         <button type="button" class="me-retake-btn" id="me-retake-btn">${escapeHtml(t('retakeQuiz', lang))}</button>
       </div>
     `;
+    // Quizzes finished before completion codes existed have none; saving the
+    // already-completed record again makes Storage.saveProgress mint one.
+    const showCodeBtn = mount.querySelector('#me-show-code-btn');
+    if (showCodeBtn) {
+      showCodeBtn.addEventListener('click', async () => {
+        showCodeBtn.disabled = true;
+        await ctx.saveProgress(Object.assign({}, progress));
+        renderQuizSummary(mount, ctx);
+      });
+    }
     mount.querySelector('#me-retake-btn').addEventListener('click', async () => {
       await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: total, answers: [] });
       renderQuiz(mount, ctx);

@@ -40,6 +40,15 @@ function cacheSet(key, value, ttlMs) {
 const CACHE_TTL_PERIODS_MS = 20 * 60 * 1000;
 const CACHE_TTL_ROSTER_MS = 10 * 60 * 1000;
 
+// Short random code shown to a student when they complete an activity, saved
+// to the Sheet alongside their row so the teacher can match what a student
+// reads aloud to the Progress tab. Skips look-alike characters (0/O, 1/I/L).
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function generateCompletionCode() {
+  const pick = () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  return Array.from({ length: 3 }, pick).join('') + '-' + Array.from({ length: 3 }, pick).join('');
+}
+
 const StorageKeys = {
   STUDENT: 'ionicstorm_student_v1',
   PROGRESS: 'ionicstorm_progress_v1',
@@ -83,6 +92,7 @@ const Storage = {
           score: r.score,
           totalQuestions: r.totalQuestions,
           answers: r.answers || [],
+          code: r.completionCode || '',
           lastUpdated: r.lastUpdated
         };
       }
@@ -157,6 +167,9 @@ const Storage = {
 
   async saveProgress(student, activity, unitId, record) {
     record.lastUpdated = new Date().toISOString();
+    // A retake resets the record to in_progress with no code, so each new
+    // completion gets a fresh code; re-saving a completed record keeps it.
+    if (record.status === 'completed' && !record.code) record.code = generateCompletionCode();
     this.setProgressLocal(activity.id, record);
 
     const payload = {
@@ -169,7 +182,8 @@ const Storage = {
       status: record.status,
       score: record.score,
       totalQuestions: record.totalQuestions,
-      answers: record.answers
+      answers: record.answers,
+      completionCode: record.status === 'completed' ? record.code : ''
     };
     const res = await this.apiPost('saveProgress', payload);
     if (!res.ok) {
