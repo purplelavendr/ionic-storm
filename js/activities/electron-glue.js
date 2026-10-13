@@ -1,0 +1,1256 @@
+// "Lesson 26: Electron Glue — Bonding" (registered as CONTENT activity id 'electron-glue').
+// Puts the Four Models of Bonding handout and the 16 Substance Cards online and interactive.
+// Students still write their worksheet answers (Questions 1-9) in their paper packet; this
+// activity is the handout + cards + the tools for thinking with them:
+//
+//   0 Mission briefing
+//   1 The handout, online: four bonding pictures with animated valence electrons, a
+//     "which picture is which model?" match, and a packet prompt for worksheet Q2
+//   2 The 16 substance cards: click-or-drag sort into the four bonding categories
+//     (the worksheet's results table), with the handout and an atom-type bar on hand
+//   3 Check the fit: compare any card with its model's property list, property by property
+//     (feeds worksheet Q1 "which ones don't fit?") + packet prompt for Q3
+//   4 Zoom in: salt vs. sugar dissolving (predict, then watch) + packet prompt for Q4-Q6
+//   5 Predict from the formula: new formulas, atom types -> bonding model, + prompt for Q7-Q9
+//   6 Graded check (7 questions) with a completion code
+//
+// Learning targets:
+//   1. Describe the four models of bonding and what each shows about valence electrons.
+//   2. Match a substance to a bonding model using its properties and the atoms in its formula.
+//   3. Predict a substance's bonding and properties from its chemical formula.
+//
+// Persistence: the Sheet only keeps score/status/answers, so the activity's own state lives in
+// answers[0] ({questionId:'_lab', state}). Graded check answers follow it. Only the check counts
+// toward the grade. Grading is by positional index, never by displayed text, so the EN/ES
+// toggle (shared LANG_KEY) can't affect correctness.
+(function () {
+  const STYLE_ID = 'eg-lesson-styles';
+  const FONT_LINK_ID = 'el-lesson-fonts'; // shared Google Fonts <link>, same family as every other lesson
+  const LANG_KEY = 'ionicstorm_lang_v1';  // shared literal: keeps language in sync across activities
+  const SECTION_COUNT = 7; // sections 0-5 (lesson sections) + 6 (graded check)
+  const QUIZ_INDEX = SECTION_COUNT - 1;
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function getLang() {
+    try { return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'; } catch (e) { return 'en'; }
+  }
+  function setLang(lang) {
+    try { localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en'); } catch (e) { /* ignore */ }
+  }
+  const L = (en, es) => ({ en, es });
+  function tr(field, lang) {
+    return (field && typeof field === 'object') ? (field[lang] || field.en) : field;
+  }
+  // Inline translator: const _ = T(lang); _('English', 'Español')
+  function T(lang) { return (en, es) => (lang === 'es' && es != null) ? es : en; }
+  const reducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  // ---------------------------------------------------------------- the handout (Four Models of Bonding)
+  const MODELS = [
+    { id: 'ionic', n: 1, color: '#d97706', name: L('Ionic', 'Iónico'),
+      props: [L('Dissolve in water', 'Se disuelven en agua'), L('Conduct electricity when dissolved', 'Conducen electricidad cuando están disueltos'),
+        L('Brittle solids', 'Sólidos quebradizos'), L('Made of metal and nonmetal atoms combined', 'Hechos de átomos de metal y de no metal combinados')],
+      cap: L('Metal atoms “give up” their valence electrons to nonmetal atoms.', 'Los átomos de metal “ceden” sus electrones de valencia a los átomos de no metal.'),
+      hint: L('Look at the shading: only SOME of the atoms have it — the electrons have moved onto those atoms.', 'Mira el sombreado: solo ALGUNOS átomos lo tienen — los electrones se movieron hacia esos átomos.') },
+    { id: 'molecular', n: 2, color: '#0d9488', name: L('Molecular Covalent', 'Covalente Molecular'),
+      props: [L('Some dissolve in water, some do not', 'Algunos se disuelven en agua, otros no'), L('Do not conduct electricity', 'No conducen electricidad'),
+        L('Some are liquids or gases', 'Algunos son líquidos o gases'), L('Made entirely of nonmetal atoms', 'Hechos totalmente de átomos de no metal')],
+      cap: L('Valence electrons are shared between some atoms. This creates small stable units within the substance.', 'Los electrones de valencia se comparten entre algunos átomos. Esto crea unidades pequeñas y estables dentro de la sustancia.'),
+      hint: L('Look at the shading: it only joins atoms in small PAIRS. Each pair is a separate little unit.', 'Mira el sombreado: solo une átomos en pequeños PARES. Cada par es una pequeña unidad separada.') },
+    { id: 'metallic', n: 3, color: '#2563eb', name: L('Metallic', 'Metálico'),
+      props: [L('Do not dissolve in water', 'No se disuelven en agua'), L('Conduct electricity', 'Conducen electricidad'),
+        L('Bendable and hard solids', 'Sólidos flexibles y duros'), L('Made entirely of metal atoms', 'Hechos totalmente de átomos de metal')],
+      cap: L('Valence electrons are free to move about the substance.', 'Los electrones de valencia están libres para moverse por toda la sustancia.'),
+      hint: L('Look at the shading: one big shaded area behind ALL the atoms — the electrons are not stuck to any one atom.', 'Mira el sombreado: una gran zona sombreada detrás de TODOS los átomos — los electrones no están pegados a ningún átomo.') },
+    { id: 'network', n: 4, color: '#7c3aed', name: L('Network Covalent', 'Covalente de Red'),
+      props: [L('Do not dissolve in water', 'No se disuelven en agua'), L('Do not conduct electricity', 'No conducen electricidad'),
+        L('Extremely hard solids', 'Sólidos extremadamente duros'), L('Made entirely of nonmetal and metalloid atoms', 'Hechos totalmente de átomos de no metal y de metaloide')],
+      cap: L('Valence electrons connect atoms with each other in all directions, like a grid or network.', 'Los electrones de valencia conectan los átomos entre sí en todas las direcciones, como una cuadrícula o red.'),
+      hint: L('Look at the shading: bars connect every atom to its neighbors in ALL directions, like a grid.', 'Mira el sombreado: barras conectan cada átomo con sus vecinos en TODAS las direcciones, como una cuadrícula.') }
+  ];
+  const MODEL = id => MODELS.find(m => m.id === id);
+  const BIN_ORDER = ['ionic', 'network', 'metallic', 'molecular']; // same order as the worksheet's results table
+  const BIN_NAME = {
+    ionic: L('Ionic', 'Iónico'), network: L('Network covalent', 'Covalente de red'),
+    metallic: L('Metallic', 'Metálico'), molecular: L('Molecular covalent', 'Covalente molecular')
+  };
+
+  // Handout picture geometry (240 x 150 viewBox)
+  const GX = [36, 92, 148, 204], GY = [30, 75, 120];
+  const PAIRS = [[50, 82], [146, 178]];
+
+  function modelSvg(id, uid, aria) {
+    const A = (x, y, k) => `<circle cx="${x}" cy="${y}" r="9" fill="url(#${uid}${k})" stroke="#334155" stroke-width=".8"/>`;
+    const bar = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(w, h) / 2}" fill="#6b7280" opacity=".5" filter="url(#${uid}b)"/>`;
+    let body = '';
+    if (id === 'ionic') {
+      let halos = '', atoms = '';
+      GY.forEach((y, r) => GX.forEach((x, c) => {
+        if ((r + c) % 2 === 0) { halos += `<circle cx="${x}" cy="${y}" r="26" fill="url(#${uid}h)"/>`; atoms += A(x, y, 'n'); }
+        else atoms += A(x, y, 'm');
+      }));
+      body = halos + atoms;
+    } else if (id === 'molecular') {
+      let bonds = '', atoms = '';
+      GY.forEach(y => PAIRS.forEach(p => { bonds += bar(p[0], y - 6, p[1] - p[0], 12); atoms += A(p[0], y, 'n') + A(p[1], y, 'n'); }));
+      body = bonds + atoms;
+    } else if (id === 'metallic') {
+      body = `<rect x="12" y="6" width="216" height="138" rx="12" fill="#6b7280" opacity=".38" filter="url(#${uid}b)"/>` + GY.map(y => GX.map(x => A(x, y, 'm')).join('')).join('');
+    } else {
+      const xs = [60, 120, 180];
+      body = GY.map(y => bar(4, y - 5, 232, 10)).join('') + xs.map(x => bar(x - 5, 4, 10, 142)).join('') + GY.map(y => xs.map(x => A(x, y, 'n')).join('')).join('');
+    }
+    const grad = (k, a, b) => `<radialGradient id="${uid}${k}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient>`;
+    return `<svg class="eg-pic" viewBox="0 0 240 150" role="img" aria-label="${escapeHtml(aria)}"><defs>
+      ${grad('m', '#e3edf9', '#3b6aa6')}${grad('n', '#fff0dc', '#d9822b')}
+      <radialGradient id="${uid}h"><stop offset="0" stop-color="#6b7280" stop-opacity=".6"/><stop offset=".6" stop-color="#6b7280" stop-opacity=".3"/><stop offset="1" stop-color="#6b7280" stop-opacity="0"/></radialGradient>
+      <filter id="${uid}b" x="-30%" y="-100%" width="160%" height="300%"><feGaussianBlur stdDeviation="3"/></filter></defs>${body}<g data-es></g></svg>`;
+  }
+
+  // Each function returns an electron's [x, y] at time t (seconds). The motion is the point of the picture:
+  // ionic electrons stay with their nonmetal atom, molecular ones shuttle inside a pair, metallic ones roam
+  // the whole substance, network ones run along the links in every direction.
+  function electronPaths(id) {
+    const E = [];
+    if (id === 'ionic') {
+      GY.forEach((y, r) => GX.forEach((x, c) => {
+        if ((r + c) % 2) return;
+        for (let k = 0; k < 3; k++) { const ph = k * 2.094 + r * 4 + c; E.push(t => [x + 14 * Math.cos(t * 1.9 + ph), y + 14 * Math.sin(t * 1.9 + ph)]); }
+      }));
+    } else if (id === 'molecular') {
+      GY.forEach((y, r) => PAIRS.forEach((p, q) => {
+        const mid = (p[0] + p[1]) / 2, ph = r * 1.3 + q * 2.1;
+        for (let k = 0; k < 2; k++) E.push(t => [mid + 10 * Math.sin(t * 2.4 + ph + k * 3.14), y + (k ? 3.5 : -3.5) * Math.cos(t * 3.1 + ph)]);
+      }));
+    } else if (id === 'metallic') {
+      for (let i = 0; i < 18; i++) E.push(t => [120 + 100 * Math.sin(t * (0.45 + (i % 5) * 0.17) + i * 1.7), 75 + 60 * Math.sin(t * (0.55 + (i % 7) * 0.11) + i * 2.3)]);
+    } else {
+      [30, 75, 120].forEach((y, j) => [0, 1].forEach(k => E.push(t => [120 + 112 * Math.sin(t * (0.7 + 0.13 * j + 0.1 * k) + j * 2 + k * 3), y])));
+      [60, 120, 180].forEach((x, j) => [0, 1].forEach(k => E.push(t => [x, 75 + 66 * Math.sin(t * (0.75 + 0.12 * j + 0.1 * k) + j * 1.5 + k * 2.7)])));
+    }
+    return E;
+  }
+  function runElectrons(svg, id) {
+    const g = svg.querySelector('[data-es]');
+    const E = electronPaths(id);
+    g.innerHTML = E.map(() => '<circle r="3" fill="#0f766e" stroke="#fff" stroke-width=".9"/>').join('');
+    const dots = Array.from(g.children);
+    const still = reducedMotion();
+    let raf = 0, alive = true;
+    function frame(ms) {
+      if (!alive || !svg.isConnected) return;
+      const t = ms / 1000;
+      E.forEach((fn, i) => { const p = fn(t); dots[i].setAttribute('cx', p[0].toFixed(1)); dots[i].setAttribute('cy', p[1].toFixed(1)); });
+      if (!still) raf = requestAnimationFrame(frame);
+    }
+    raf = requestAnimationFrame(frame);
+    return { stop() { alive = false; cancelAnimationFrame(raf); g.innerHTML = ''; } };
+  }
+
+  // ---------------------------------------------------------------- the 16 substance cards
+  // dis: 'yes' dissolves | 'no' does not | 'aq' already dissolved | null not on the card
+  // con: 'yes' conducts | 'no' does not | 'some' sometimes | 'nosolid' does not conduct (as a solid)
+  // mk:  atoms in the formula — 'M' metal only, 'N' nonmetal only, 'X' metalloid only, 'MN', 'NX'
+  // k:   how the card describes the substance (selects the wording)
+  const FEEL = {
+    liquid: L('Liquid', 'Líquido'), gas: L('Gas', 'Gas'), hard: L('Hard solid', 'Sólido duro'), vhard: L('Very hard solid', 'Sólido muy duro'),
+    brittle: L('Brittle solid', 'Sólido quebradizo'), soft: L('Soft solid', 'Sólido blando'),
+    vsoft: L('Soft, very malleable solid', 'Sólido blando y muy maleable'), mal: L('Malleable, ductile solid', 'Sólido maleable y dúctil'),
+    aq: L('Aqueous solution', 'Solución acuosa')
+  };
+  const DIS = { yes: L('Dissolves', 'Se disuelve'), no: L('Does not dissolve', 'No se disuelve'), aq: L('Dissolved', 'Disuelto') };
+  const CON = {
+    yes: L('Conducts', 'Conduce'), no: L('Does not conduct', 'No conduce'), some: L('Sometimes conducts', 'A veces conduce'),
+    nosolid: L('Does not conduct (as a solid)', 'No conduce (como sólido)')
+  };
+  const CARDS = [
+    { id: 'water', f: 'H<sub>2</sub>O', s: 'l', icon: '💧', name: L('Water', 'Agua'), k: 'liquid', dis: null, con: 'no', mk: 'N', bin: 'molecular' },
+    { id: 'si', f: 'Si', s: 's', icon: '🔲', name: L('Silicon', 'Silicio'), k: 'hard', dis: 'no', con: 'some', mk: 'X', bin: 'network', hard: 1 },
+    { id: 'hg', f: 'Hg', s: 'l', icon: '🪞', name: L('Mercury', 'Mercurio'), k: 'liquid', dis: 'no', con: 'yes', mk: 'M', bin: 'metallic' },
+    { id: 'ch4', f: 'CH<sub>4</sub>', s: 'g', icon: '🔥', name: L('Methane', 'Metano'), k: 'gas', dis: 'no', con: 'no', mk: 'N', bin: 'molecular' },
+    { id: 'sio2', f: 'SiO<sub>2</sub>', s: 's', icon: '🏖️', name: L('Sand', 'Arena'), k: 'hard', dis: 'no', con: 'no', mk: 'NX', bin: 'network', hard: 1 },
+    { id: 'na', f: 'Na', s: 's', icon: '🪨', name: L('Sodium', 'Sodio'), k: 'vsoft', dis: 'no', con: 'yes', mk: 'M', bin: 'metallic' },
+    { id: 'nacl_aq', f: 'NaCl', s: 'aq', icon: '🌊', name: L('Salt Water', 'Agua salada'), k: 'aq', dis: 'aq', con: 'yes', mk: 'MN', bin: 'ionic' },
+    { id: 'pt', f: 'Pt', s: 's', icon: '💍', name: L('Platinum', 'Platino'), k: 'mal', dis: 'no', con: 'yes', mk: 'M', bin: 'metallic' },
+    { id: 'c', f: 'C', s: 's', icon: '💎', name: L('Diamond', 'Diamante'), k: 'vhard', dis: 'no', con: 'no', mk: 'N', bin: 'network', hard: 1 },
+    { id: 'nacl_s', f: 'NaCl', s: 's', icon: '🧂', name: L('Table Salt', 'Sal de mesa'), k: 'brittle', dis: 'yes', con: 'nosolid', mk: 'MN', bin: 'ionic' },
+    { id: 'cucl2', f: 'CuCl<sub>2</sub>', s: 'aq', icon: '🧪', name: L('Aqueous Copper Chloride', 'Cloruro de cobre acuoso'), k: 'aq', dis: 'aq', con: 'yes', mk: 'MN', bin: 'ionic' },
+    { id: 'naoh', f: 'NaOH', s: 'aq', icon: '🧴', name: L('Drain Cleaner', 'Destapacaños'), k: 'aq', dis: 'aq', con: 'yes', mk: 'MN', bin: 'ionic' },
+    { id: 'sugar', f: 'C<sub>12</sub>H<sub>22</sub>O<sub>11</sub>', s: 's', icon: '🍬', name: L('Table Sugar', 'Azúcar de mesa'), k: 'soft', dis: 'yes', con: 'no', mk: 'N', bin: 'molecular' },
+    { id: 'cu', f: 'Cu', s: 's', icon: '🪙', name: L('Copper', 'Cobre'), k: 'mal', dis: 'no', con: 'yes', mk: 'M', bin: 'metallic' },
+    { id: 'ethanol', f: 'C<sub>2</sub>H<sub>6</sub>O', s: 'l', icon: '🍶', name: L('Ethanol', 'Etanol'), k: 'liquid', dis: 'yes', con: 'no', mk: 'N', bin: 'molecular' },
+    { id: 'epsom', f: 'MgSO<sub>4</sub>', s: 's', icon: '🛁', name: L('Epsom Salt', 'Sal de Epsom'), k: 'brittle', dis: 'yes', con: 'nosolid', mk: 'MN', bin: 'ionic' }
+  ];
+  const ELT = { H: 'N', C: 'N', O: 'N', S: 'N', Cl: 'N', Si: 'X', Na: 'M', Mg: 'M', Cu: 'M', Hg: 'M', Pt: 'M' };
+
+  function stateTag(s) { return `<span class="eg-st">(${s})</span>`; }
+  function cardHtml(c, lang) {
+    const lit = c.con === 'yes' ? ' on' : (c.con === 'some' ? ' half' : '');
+    return `<span class="eg-card-top"><span class="eg-ic" aria-hidden="true">${c.icon}</span><span class="eg-cn"><b>${escapeHtml(tr(c.name, lang))}</b><span class="eg-fm">${c.f}${stateTag(c.s)}</span></span></span>
+      <span class="eg-feel">${escapeHtml(tr(FEEL[c.k], lang))}</span>
+      ${c.dis ? `<span class="eg-prop"><i aria-hidden="true">${c.dis === 'no' ? '🚫' : '🫧'}</i>${escapeHtml(tr(DIS[c.dis], lang))}</span>` : ''}
+      <span class="eg-prop"><i class="eg-bulb${lit}" aria-hidden="true">💡</i>${escapeHtml(tr(CON[c.con], lang))}</span>`;
+  }
+  function miniHtml(c, lang) {
+    return `<span aria-hidden="true">${c.icon}</span> <b>${escapeHtml(tr(c.name, lang))}</b> <span class="eg-fm">${c.f}${stateTag(c.s)}</span>`;
+  }
+
+  // How well does a card fit each model's four handout properties? 'ok' | 'no' | 'part' | 'na' (not shown on the card)
+  function fitTests(c) {
+    const dissolves = c.dis === 'yes' || c.dis === 'aq';
+    return {
+      ionic: [c.dis == null ? 'na' : (dissolves ? 'ok' : 'no'), c.s === 'aq' ? (c.con === 'yes' ? 'ok' : 'no') : 'na',
+        c.k === 'brittle' ? 'ok' : (c.k === 'aq' ? 'na' : 'no'), c.mk === 'MN' ? 'ok' : 'no'],
+      molecular: ['ok', (c.con === 'yes' || c.con === 'some') ? 'no' : 'ok', (c.s === 'l' || c.s === 'g') ? 'ok' : 'na', c.mk === 'N' ? 'ok' : 'no'],
+      metallic: [c.dis == null ? 'na' : (c.dis === 'no' ? 'ok' : 'no'), c.con === 'yes' ? 'ok' : 'no',
+        c.s === 'l' ? 'no' : (c.k === 'mal' ? 'ok' : (c.k === 'vsoft' ? 'part' : 'no')), c.mk === 'M' ? 'ok' : 'no'],
+      network: [c.dis == null ? 'na' : (c.dis === 'no' ? 'ok' : 'no'), (c.con === 'no' || c.con === 'nosolid') ? 'ok' : 'no',
+        c.k === 'vhard' ? 'ok' : (c.k === 'hard' ? 'part' : 'no'), (c.mk === 'N' || c.mk === 'X' || c.mk === 'NX') ? 'ok' : 'no']
+    };
+  }
+
+  // A hint for putting `c` in the wrong bin `b`. Atoms in the formula first, then properties.
+  function sortHint(c, b, lang) {
+    const _ = T(lang);
+    if (b === 'ionic' && c.mk !== 'MN') return _('Ionic substances are made of metal AND nonmetal atoms combined. Look at this formula — are both kinds of atoms in it?', 'Las sustancias iónicas están hechas de átomos de metal Y de no metal combinados. Mira esta fórmula — ¿tiene ambos tipos de átomos?');
+    if (b === 'metallic' && c.mk !== 'M') return _('Metallic substances are made entirely of metal atoms. Look at this formula — is every atom a metal?', 'Las sustancias metálicas están hechas totalmente de átomos de metal. Mira esta fórmula — ¿todos los átomos son metales?');
+    if (b === 'molecular' && c.mk !== 'N') return _('Molecular covalent substances are made entirely of NONMETAL atoms. Does this formula have a metal or a metalloid in it? (Check the atom-type reference or a periodic table.)', 'Las sustancias covalentes moleculares están hechas totalmente de átomos de NO metal. ¿Tiene esta fórmula un metal o un metaloide? (Revisa la referencia de tipos de átomos o una tabla periódica.)');
+    if (b === 'network' && c.mk.indexOf('M') >= 0) return _('Network covalent substances have only nonmetal and metalloid atoms. This formula has a metal in it.', 'Las sustancias covalentes de red tienen solo átomos de no metal y de metaloide. Esta fórmula tiene un metal.');
+    if (c.con === 'yes' && (b === 'molecular' || b === 'network')) return _('This substance conducts electricity, but the handout says this model does NOT conduct.', 'Esta sustancia conduce electricidad, pero la hoja dice que este modelo NO conduce.');
+    if (c.dis === 'no' && b === 'ionic') return _('Ionic substances dissolve in water, and this one does not.', 'Las sustancias iónicas se disuelven en agua, y esta no.');
+    if ((c.dis === 'yes' || c.dis === 'aq') && (b === 'metallic' || b === 'network')) return _('This substance dissolves in water, but the handout says this model does NOT dissolve.', 'Esta sustancia se disuelve en agua, pero la hoja dice que este modelo NO se disuelve.');
+    if ((c.s === 'l' || c.s === 'g') && (b === 'network' || b === 'metallic')) return _('This is a liquid or gas, but the handout describes this model as solids.', 'Esto es un líquido o un gas, pero la hoja describe este modelo como sólidos.');
+    if (c.con !== 'yes' && b === 'metallic') return _('Metallic substances conduct electricity. Check the bulb on the card.', 'Las sustancias metálicas conducen electricidad. Revisa el foco en la tarjeta.');
+    if (c.hard && b === 'molecular') return _('Molecular covalent substances are made of small separate units. Is this substance really like that — or is it extremely hard? Reread the handout.', 'Las sustancias covalentes moleculares están hechas de pequeñas unidades separadas. ¿Esta sustancia es realmente así — o es extremadamente dura? Vuelve a leer la hoja.');
+    return _('Not quite. Compare this card with that model\'s property list on the handout, then try another box.', 'No exactamente. Compara esta tarjeta con la lista de propiedades de ese modelo en la hoja y prueba otra caja.');
+  }
+
+  // New formulas for "Predict from the formula" (none are on the worksheet)
+  const PRACTICE = [
+    { f: 'MgBr<sub>2</sub>', name: L('magnesium bromide', 'bromuro de magnesio'), els: [['Mg', 'M'], ['Br', 'N']], mk: 'MN', s: 's', dis: 'yes', con: 'nosolid', k: 'brittle', bin: 'ionic',
+      clue: L('A brittle solid. It dissolves in water.', 'Un sólido quebradizo. Se disuelve en agua.') },
+    { f: 'Zn', name: L('zinc', 'zinc'), els: [['Zn', 'M']], mk: 'M', s: 's', dis: 'no', con: 'yes', k: 'mal', bin: 'metallic',
+      clue: L('A bendable solid. It does not dissolve in water.', 'Un sólido flexible. No se disuelve en agua.') },
+    { f: 'N<sub>2</sub>', name: L('nitrogen gas', 'gas nitrógeno'), els: [['N', 'N']], mk: 'N', s: 'g', dis: null, con: 'no', k: 'gas', bin: 'molecular',
+      clue: L('A gas at room temperature. It does not conduct electricity.', 'Un gas a temperatura ambiente. No conduce electricidad.') },
+    { f: 'SiC', name: L('silicon carbide', 'carburo de silicio'), els: [['Si', 'X'], ['C', 'N']], mk: 'NX', s: 's', dis: 'no', con: 'no', k: 'vhard', hard: 1, bin: 'network',
+      clue: L('An extremely hard solid. It does not dissolve and does not conduct.', 'Un sólido extremadamente duro. No se disuelve y no conduce.') },
+    { f: 'NH<sub>3</sub>', name: L('ammonia', 'amoníaco'), els: [['N', 'N'], ['H', 'N']], mk: 'N', s: 'g', dis: 'yes', con: 'no', k: 'gas', bin: 'molecular',
+      clue: L('A gas at room temperature. It dissolves in water.', 'Un gas a temperatura ambiente. Se disuelve en agua.') },
+    { f: 'KBr', name: L('potassium bromide', 'bromuro de potasio'), els: [['K', 'M'], ['Br', 'N']], mk: 'MN', s: 's', dis: 'yes', con: 'nosolid', k: 'brittle', bin: 'ionic',
+      clue: L('A brittle solid. Its solution in water conducts electricity.', 'Un sólido quebradizo. Su solución en agua conduce electricidad.') }
+  ];
+  const TYPE_NAME = { M: L('Metal', 'Metal'), N: L('Nonmetal', 'No metal'), X: L('Metalloid', 'Metaloide') };
+  const MK_NAME = {
+    M: L('only metal atoms', 'solo átomos de metal'), N: L('only nonmetal atoms', 'solo átomos de no metal'),
+    MN: L('metal + nonmetal atoms', 'átomos de metal + no metal'), NX: L('nonmetal + metalloid atoms', 'átomos de no metal + metaloide')
+  };
+
+  // ---------------------------------------------------------------- graded check (7 questions)
+  const QUESTIONS = [
+    { id: 'q1', prompt: L('Zinc, Zn(s), is a bendable solid. It conducts electricity and does not dissolve in water. Which bonding model fits zinc?', 'El zinc, Zn(s), es un sólido flexible. Conduce electricidad y no se disuelve en agua. ¿Qué modelo de enlace corresponde al zinc?'),
+      choices: [L('Ionic', 'Iónico'), L('Molecular covalent', 'Covalente molecular'), L('Metallic', 'Metálico'), L('Network covalent', 'Covalente de red')], correct: 2,
+      explanation: L('Zinc is made entirely of metal atoms. In the metallic model, valence electrons are free to move about the substance — that is why it conducts.', 'El zinc está hecho totalmente de átomos de metal. En el modelo metálico, los electrones de valencia están libres para moverse por la sustancia — por eso conduce.') },
+    { id: 'q2', prompt: L('Potassium bromide, KBr, is made of a metal and a nonmetal. What do you predict?', 'El bromuro de potasio, KBr, está hecho de un metal y un no metal. ¿Qué predices?'),
+      choices: [L('Ionic: it dissolves in water, and the solution conducts electricity', 'Iónico: se disuelve en agua y la solución conduce electricidad'),
+        L('Molecular covalent: it is a gas that does not conduct', 'Covalente molecular: es un gas que no conduce'),
+        L('Metallic: it is bendable and conducts as a solid', 'Metálico: es flexible y conduce como sólido'),
+        L('Network covalent: it is extremely hard and does not dissolve', 'Covalente de red: es extremadamente duro y no se disuelve')], correct: 0,
+      explanation: L('A metal combined with a nonmetal means ionic bonding: brittle, dissolves in water, and conducts once dissolved.', 'Un metal combinado con un no metal significa enlace iónico: quebradizo, se disuelve en agua y conduce una vez disuelto.') },
+    { id: 'q3', prompt: L('A solid is extremely hard, does not dissolve in water, and does not conduct electricity. It is made only of nonmetal and metalloid atoms. Which model fits?', 'Un sólido es extremadamente duro, no se disuelve en agua y no conduce electricidad. Está hecho solo de átomos de no metal y de metaloide. ¿Qué modelo corresponde?'),
+      choices: [L('Ionic', 'Iónico'), L('Network covalent', 'Covalente de red'), L('Metallic', 'Metálico'), L('Molecular covalent', 'Covalente molecular')], correct: 1,
+      explanation: L('Valence electrons connect the atoms in all directions like a grid, so the atoms cannot break off and dissolve, and the solid is extremely hard.', 'Los electrones de valencia conectan los átomos en todas las direcciones como una cuadrícula, así que los átomos no pueden separarse y disolverse, y el sólido es extremadamente duro.') },
+    { id: 'q4', prompt: L('In the handout pictures, what do the gray shaded areas show?', 'En las imágenes de la hoja, ¿qué muestran las zonas sombreadas en gris?'),
+      choices: [L('Where the positive nuclei are', 'Dónde están los núcleos positivos'), L('Where the negatively charged valence electrons might be found', 'Dónde se podrían encontrar los electrones de valencia con carga negativa'),
+        L('Where the substance melts', 'Dónde se derrite la sustancia'), L('Where water molecules fit', 'Dónde caben las moléculas de agua')], correct: 1,
+      explanation: L('The pictures show how the valence electrons are distributed among the atoms in each kind of bonding.', 'Las imágenes muestran cómo se distribuyen los electrones de valencia entre los átomos en cada tipo de enlace.') },
+    { id: 'q5', prompt: L('Both metals and ionic compounds contain metal atoms, but a metal conducts electricity as a solid and an ionic solid does not. Why?', 'Tanto los metales como los compuestos iónicos contienen átomos de metal, pero un metal conduce electricidad como sólido y un sólido iónico no. ¿Por qué?'),
+      choices: [L('In a metal the valence electrons are free to move; in an ionic solid they have been given up to nonmetal atoms and stay put', 'En un metal los electrones de valencia están libres para moverse; en un sólido iónico se cedieron a los átomos de no metal y se quedan fijos'),
+        L('Ionic solids have no valence electrons at all', 'Los sólidos iónicos no tienen electrones de valencia'),
+        L('Metals are always liquids', 'Los metales siempre son líquidos'),
+        L('Ionic solids dissolve and metals do not, and that is the only reason', 'Los sólidos iónicos se disuelven y los metales no, y esa es la única razón')], correct: 0,
+      explanation: L('Free-moving electrons carry the current in a metal. In an ionic solid the electrons are held by the nonmetal atoms, so nothing is free to move until the solid dissolves.', 'Los electrones libres llevan la corriente en un metal. En un sólido iónico los electrones están sujetos por los átomos de no metal, así que nada puede moverse hasta que el sólido se disuelve.') },
+    { id: 'q6', prompt: L('Ethanol and diamond are both made only of nonmetal atoms. Why are their properties so different?', 'El etanol y el diamante están hechos solo de átomos de no metal. ¿Por qué sus propiedades son tan diferentes?'),
+      choices: [L('Ethanol is a metal', 'El etanol es un metal'),
+        L('Ethanol is made of small separate units (molecular covalent); diamond is one giant network of atoms joined in all directions (network covalent)', 'El etanol está hecho de pequeñas unidades separadas (covalente molecular); el diamante es una red gigante de átomos unidos en todas las direcciones (covalente de red)'),
+        L('Diamond has more valence electrons than any other substance', 'El diamante tiene más electrones de valencia que cualquier otra sustancia'),
+        L('Ethanol is ionic', 'El etanol es iónico')], correct: 1,
+      explanation: L('Same kind of atoms, different electron "glue." Small units can slide past each other as a liquid; a network holds every atom in place.', 'El mismo tipo de átomos, un “pegamento” de electrones distinto. Las unidades pequeñas pueden deslizarse como un líquido; una red mantiene cada átomo en su lugar.') },
+    { id: 'q7', prompt: L('Which of these formulas would you predict to be ionic?', '¿Cuál de estas fórmulas predices que sea iónica?'),
+      choices: [L('O₂', 'O₂'), L('CaCl₂', 'CaCl₂'), L('Cu', 'Cu'), L('SiO₂', 'SiO₂')], correct: 1,
+      explanation: L('CaCl₂ combines a metal (Ca) with a nonmetal (Cl). O₂ is all nonmetal (molecular), Cu is all metal (metallic), and SiO₂ is nonmetal + metalloid (network).', 'CaCl₂ combina un metal (Ca) con un no metal (Cl). O₂ es todo no metal (molecular), Cu es todo metal (metálico) y SiO₂ es no metal + metaloide (red).') }
+  ];
+
+  // ---------------------------------------------------------------- styles
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.eg-lesson {
+  --navy: #0d1b2a; --navy-mid: #1b2d42; --navy-light: #253a52;
+  --teal: #2ec4b6; --teal-dim: #1a8c83; --amber: #f4a261;
+  --cream: #f7f3ec; --cream-dark: #ede8df;
+  --text: #1a1a2e; --text-muted: #5a6475;
+  --note-bg: #fff8e7; --note-border: #f4a261;
+  --correct-bg: #e8f8f5; --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text); font-size: 17px; line-height: 1.7;
+  background: var(--cream); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.eg-lesson * { box-sizing: border-box; }
+.eg-lesson .eg-header { background: var(--navy); color: var(--cream); padding: 2rem 1.75rem 1.6rem; position: relative; overflow: hidden; }
+.eg-lesson .eg-header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; border: 32px solid rgba(46,196,182,0.12); }
+.eg-lesson .eg-lang-toggle { position: absolute; top: 1.75rem; right: 1.75rem; z-index: 2; display: flex; gap: 0.3rem; }
+.eg-lesson .eg-lang-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.3rem 0.6rem; border-radius: 6px; background: transparent; border: 1px solid rgba(247,243,236,0.35); color: rgba(247,243,236,0.65); cursor: pointer; }
+.eg-lesson .eg-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.eg-lesson .eg-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
+.eg-lesson .eg-header-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem; position: relative; }
+.eg-lesson .eg-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; line-height: 1.2; margin: 0 0 0.4rem; position: relative; }
+.eg-lesson .eg-header-meta { font-size: 0.82rem; color: rgba(247,243,236,0.65); font-family: 'JetBrains Mono', monospace; position: relative; }
+.eg-lesson .eg-progress-wrap { background: var(--navy-mid); padding: 0.7rem 1.75rem; display: flex; align-items: center; gap: 0.9rem; position: sticky; top: 0; z-index: 10; }
+.eg-lesson .eg-progress-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+.eg-lesson .eg-progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; }
+.eg-lesson .eg-progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber)); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+.eg-lesson .eg-progress-count { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(247,243,236,0.55); white-space: nowrap; }
+.eg-lesson main { padding: 1.5rem 1.25rem 2.5rem; }
+.eg-lesson .section-card { background: white; border-radius: 12px; margin-bottom: 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+.eg-lesson .section-header { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.2rem; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; }
+.eg-lesson .section-header:hover { background: #fafafa; }
+.eg-lesson .section-header.open { border-bottom-color: var(--cream-dark); }
+.eg-lesson .section-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; color: white; background: var(--navy); border-radius: 6px; padding: 0.22rem 0.5rem; flex-shrink: 0; }
+.eg-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.eg-lesson .section-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; flex: 1; }
+.eg-lesson .section-time { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); }
+.eg-lesson .section-arrow { font-size: 0.9rem; color: var(--text-muted); transition: transform 0.25s; flex-shrink: 0; }
+.eg-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.eg-lesson .section-body { display: none; padding: 1.3rem; }
+.eg-lesson .section-body.open { display: block; animation: egFadeIn 0.25s ease; }
+@keyframes egFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.eg-lesson h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--navy); margin: 0 0 0.6rem; }
+.eg-lesson h3 { font-size: 0.95rem; font-weight: 600; color: var(--navy-mid); margin: 1.1rem 0 0.5rem; }
+.eg-lesson p { margin: 0 0 0.85rem; }
+.eg-lesson p:last-child { margin-bottom: 0; }
+.eg-lesson .note-box { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin: 1.1rem 0; display: flex; gap: 0.7rem; font-size: 0.9rem; }
+.eg-lesson .note-box .note-icon { font-size: 1.15rem; flex-shrink: 0; }
+.eg-lesson .concept-box { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%); color: var(--cream); border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.1rem 0; }
+.eg-lesson .concept-box .concept-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--teal); margin-bottom: 0.4rem; }
+.eg-lesson .concept-box p { color: rgba(247,243,236,0.92); margin-bottom: 0; }
+.eg-lesson .info-panel { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 0.9rem 1.1rem; margin: 1.1rem 0; font-size: 0.9rem; }
+.eg-lesson .info-panel .panel-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.14em; color: #0369a1; margin-bottom: 0.35rem; }
+.eg-lesson table { width: 100%; border-collapse: collapse; margin: 0.9rem 0; font-size: 0.85rem; }
+.eg-lesson th { background: var(--navy); color: var(--cream); font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; text-align: left; }
+.eg-lesson td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cream-dark); }
+.eg-lesson tr:nth-child(even) td { background: #fafafa; }
+.eg-lesson ul, .eg-lesson ol { padding-left: 1.3rem; margin: 0 0 0.85rem; }
+.eg-lesson li { margin-bottom: 0.3rem; font-size: 0.93rem; }
+.eg-lesson .objectives-list { list-style: none; padding: 0; margin: 0.4rem 0; }
+.eg-lesson .objectives-list li { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.4rem 0; font-size: 0.92rem; border-bottom: 1px solid var(--cream-dark); }
+.eg-lesson .objectives-list li:last-child { border-bottom: none; }
+.eg-lesson .obj-check { color: var(--teal); flex-shrink: 0; }
+.eg-lesson .practice-problem { border: 1.5px solid var(--cream-dark); border-radius: 10px; margin-bottom: 1.1rem; overflow: hidden; }
+.eg-lesson .pp-header { display: flex; align-items: center; gap: 0.65rem; padding: 0.85rem 1.1rem; background: #fafafa; border-bottom: 1px solid var(--cream-dark); }
+.eg-lesson .pp-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700; color: white; background: var(--amber); border-radius: 6px; padding: 0.18rem 0.45rem; flex-shrink: 0; }
+.eg-lesson .pp-difficulty { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; margin-left: auto; }
+.eg-lesson .diff-basic { color: #16a34a; }
+.eg-lesson .diff-medium { color: #d97706; }
+.eg-lesson .diff-challenge { color: #dc2626; }
+.eg-lesson .pp-body { padding: 0.95rem 1.1rem; }
+.eg-lesson .pp-body p { font-size: 0.92rem; }
+.eg-lesson .hint-btn, .eg-lesson .reveal-btn, .eg-lesson .mark-done-btn, .eg-lesson .eg-choice, .eg-lesson .eg-next-btn, .eg-lesson .eg-retake-btn, .eg-lesson .eg-flame-btn, .eg-lesson .eg-builder-btn {
+  font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none;
+}
+.eg-lesson .hint-btn, .eg-lesson .reveal-btn { border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.eg-lesson .hint-btn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; margin-right: 0.5rem; }
+.eg-lesson .hint-btn:hover { background: #fde68a; }
+.eg-lesson .reveal-btn { background: var(--navy); color: white; }
+.eg-lesson .reveal-btn:hover { background: var(--navy-light); }
+.eg-lesson .hint-box, .eg-lesson .answer-box { border-radius: 7px; padding: 0.75rem 0.95rem; margin-top: 0.7rem; font-size: 0.87rem; display: none; }
+.eg-lesson .hint-box.open, .eg-lesson .answer-box.open { display: block; animation: egFadeIn 0.2s ease; }
+.eg-lesson .hint-box { background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; }
+.eg-lesson .answer-box { background: var(--correct-bg); border: 1px solid var(--correct-border); color: #065f46; }
+.eg-lesson .answer-box .answer-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim); margin-bottom: 0.35rem; font-weight: 700; }
+.eg-lesson .mark-done-btn { display: block; width: 100%; margin-top: 1.2rem; background: var(--navy); color: var(--cream); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; transition: background 0.2s; }
+.eg-lesson .mark-done-btn:hover:not(:disabled) { background: var(--teal-dim); }
+.eg-lesson .mark-done-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.eg-lesson .quiz-note { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin-bottom: 1.1rem; font-size: 0.88rem; }
+.eg-lesson .quiz-progress-bar { height: 6px; background: var(--cream-dark); border-radius: 999px; overflow: hidden; margin: 0.6rem 0 0.9rem; }
+.eg-lesson .quiz-progress-fill { height: 100%; background: linear-gradient(90deg, var(--navy), var(--teal)); transition: width 0.2s ease; }
+.eg-lesson .quiz-question-count { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+.eg-lesson .quiz-prompt { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--navy); margin: 0.5rem 0 1rem; }
+.eg-lesson .eg-choice { display: block; width: 100%; text-align: left; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem; font-size: 0.93rem; color: var(--text); font-family: 'Source Serif 4', serif; transition: border-color 0.15s, background 0.15s; }
+.eg-lesson .eg-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.eg-lesson .eg-choice:disabled { cursor: default; }
+.eg-lesson .eg-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.eg-lesson .eg-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.eg-lesson .eg-feedback { border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600; }
+.eg-lesson .eg-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.eg-lesson .eg-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.eg-lesson .eg-next-btn, .eg-lesson .eg-retake-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem; }
+.eg-lesson .eg-next-btn:hover, .eg-lesson .eg-retake-btn:hover { background: var(--navy-light); }
+.eg-lesson .eg-summary { text-align: center; padding: 1rem 0.5rem; }
+.eg-summary .eg-code-label { margin: 0.6rem 0 0.2rem; font-weight: 600; }
+.eg-summary .eg-code { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--navy); border: 2px dashed var(--navy); border-radius: 10px; padding: 0.3rem 1rem; margin-bottom: 0.8rem; user-select: all; }
+.eg-lesson .eg-score { font-family: 'JetBrains Mono', monospace; font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0; }
+.eg-lesson .eg-lock { background: var(--cream-dark); border-radius: 10px; padding: 1.1rem 1.2rem; text-align: center; font-size: 0.92rem; color: var(--text-muted); }
+.eg-lesson .eg-gate-hint { font-size: 0.78rem; color: var(--text-muted); font-style: italic; text-align: center; margin: 0.5rem 0 0; min-height: 1.1em; }
+.eg-lesson .eg-btn { font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none; background: var(--navy); color: white; border-radius: 8px; padding: 0.55rem 1rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.eg-lesson .eg-btn:hover:not(:disabled) { background: var(--navy-light); }
+.eg-lesson .eg-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.eg-lesson .eg-btn.secondary { background: white; color: var(--navy); border: 1.5px solid var(--navy-light); }
+.eg-lesson .eg-btn.on { background: var(--teal-dim); }
+.eg-lesson .eg-btn.pulse { animation: egPulseBtn 0.9s ease-in-out 3; box-shadow: 0 0 0 0 rgba(244,162,97,0.7); }
+@keyframes egPulseBtn { 0% { box-shadow: 0 0 0 0 rgba(244,162,97,0.8); } 100% { box-shadow: 0 0 0 12px rgba(244,162,97,0); } }
+.eg-lesson .eg-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.eg-lesson .eg-q { background: #fafafa; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.8rem 1rem; margin: 0.7rem 0; }
+.eg-lesson .eg-q p { margin-bottom: 0.5rem; font-size: 0.92rem; }
+.eg-lesson .eg-opt { font-family: 'Source Serif 4', serif; cursor: pointer; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.45rem 0.8rem; font-size: 0.9rem; color: var(--text); }
+.eg-lesson .eg-opt:hover { border-color: var(--teal); }
+.eg-lesson .eg-opt.sel { border-color: var(--navy); background: var(--navy); color: white; }
+.eg-lesson textarea.eg-text { width: 100%; font-family: 'Source Serif 4', serif; font-size: 0.92rem; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.6rem 0.8rem; min-height: 4.2rem; resize: vertical; background: white; color: var(--text); }
+.eg-lesson textarea.eg-text:focus { outline: none; border-color: var(--teal); }
+
+.eg-lesson .eg-tablewrap { overflow-x: auto; margin: 0.8rem 0; }
+.eg-lesson .eg-tip { font-size: 0.82rem; color: var(--text-muted); font-style: italic; margin: 0.3rem 0; }
+.eg-lesson .eg-flash { background: #fff1e6; border-left: 4px solid var(--amber); border-radius: 0 8px 8px 0; padding: 0.55rem 0.9rem; font-size: 0.86rem; margin: 0.5rem 0; min-height: 1.2em; }
+.eg-lesson .eg-flash:empty { display: none; }
+.eg-lesson .eg-result { background: var(--correct-bg); border: 1px solid var(--correct-border); border-radius: 10px; padding: 0.8rem 1rem; margin: 0.8rem 0; font-size: 0.9rem; }
+
+.eg-lesson .eg-write { background: #fff8e1; border: 2.5px solid var(--amber); border-radius: 12px; padding: 0.9rem 1.1rem; margin: 1rem 0; font-size: 0.95rem; }
+.eg-lesson .eg-write-tag { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: var(--amber); color: #3b2200; border-radius: 6px; padding: 0.2rem 0.55rem; margin-bottom: 0.55rem; }
+.eg-lesson .eg-write p { margin: 0 0 0.5rem; }
+.eg-lesson .eg-write ol, .eg-lesson .eg-write ul { margin: 0.2rem 0 0.2rem; }
+.eg-lesson .eg-write li { font-size: 0.95rem; margin-bottom: 0.45rem; }
+.eg-lesson .eg-ack { display: flex; gap: 0.6rem; align-items: flex-start; background: white; border: 2px solid var(--navy-light); border-radius: 10px; padding: 0.7rem 0.9rem; margin: 0.8rem 0; cursor: pointer; font-weight: 600; font-size: 0.93rem; }
+.eg-lesson .eg-ack input { width: 1.3rem; height: 1.3rem; margin-top: 0.1rem; flex-shrink: 0; accent-color: var(--teal-dim); }
+.eg-lesson ul.eg-check { list-style: none; padding: 0; margin: 0.2rem 0 0; }
+.eg-lesson ul.eg-check li { font-size: 0.92rem; padding: 0.2rem 0.3rem; border-radius: 6px; }
+.eg-lesson ul.eg-check li.next { background: #fff1c2; font-weight: 600; }
+.eg-lesson ul.eg-check li.ok { color: var(--teal-dim); }
+
+/* sorters */
+.eg-lesson .eg-tray { display: flex; flex-wrap: wrap; gap: 0.45rem; background: #fafafa; border: 1.5px dashed var(--cream-dark); border-radius: 10px; padding: 0.6rem; min-height: 3rem; margin: 0.6rem 0; }
+.eg-lesson .eg-chip { font-family: 'JetBrains Mono', monospace; cursor: grab; background: white; border: 1.5px solid var(--navy-light); border-radius: 8px; padding: 0.3rem 0.6rem; font-size: 0.8rem; color: var(--text); text-align: left; }
+.eg-lesson .eg-chip small { display: block; font-size: 0.62rem; color: var(--text-muted); }
+.eg-lesson .eg-chip.sel { background: var(--navy); color: white; border-color: var(--navy); }
+.eg-lesson .eg-chip.sel small { color: rgba(255,255,255,0.75); }
+.eg-lesson .eg-chip.placed { cursor: default; border-color: var(--teal-dim); background: #f3fdfc; }
+.eg-lesson .eg-bins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.eg-lesson .eg-bins.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.eg-lesson .eg-bin { background: white; border: 2px solid var(--cream-dark); border-radius: 10px; padding: 0.55rem 0.6rem; min-height: 6.2rem; cursor: pointer; text-align: left; font-family: 'Source Serif 4', serif; color: var(--text); display: block; width: 100%; }
+.eg-lesson .eg-bin:hover, .eg-lesson .eg-bin.over { border-color: var(--teal); background: #f3fdfc; }
+.eg-lesson .eg-bin h4 { margin: 0 0 0.1rem; font-family: 'Playfair Display', serif; font-size: 0.92rem; color: var(--navy); }
+.eg-lesson .eg-bin .sub { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.4rem; font-family: 'JetBrains Mono', monospace; }
+.eg-lesson .eg-bin .items { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.eg-lesson .eg-bin.reveal h4 .term { color: var(--teal-dim); }
+.eg-lesson .eg-refbar { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; margin: 0.4rem 0; }
+.eg-lesson .eg-el { border-radius: 6px; padding: 0.15rem 0.45rem; font-weight: 700; border: 1.5px solid; }
+.eg-lesson .eg-el.M { background: #e6f0fb; border-color: #3b7cc4; color: #1f4f8c; }
+.eg-lesson .eg-el.N { background: #fff3e2; border-color: #d98a3c; color: #a9611a; }
+.eg-lesson .eg-el.X { background: #eceff5; border-color: #8a94a8; color: #4b5568; }
+.eg-lesson .eg-pat td, .eg-lesson .eg-pat th { text-align: left; }
+.eg-lesson .eg-rule { background: #fafafa; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.9rem 1rem; margin: 0.7rem 0; font-size: 0.95rem; line-height: 2.1; }
+.eg-lesson .eg-rule select { font-family: 'Source Serif 4', serif; font-size: 0.9rem; padding: 0.2rem 0.3rem; border: 1.5px solid var(--navy-light); border-radius: 6px; background: white; max-width: 100%; }
+.eg-lesson .eg-rule select.ok { border-color: var(--teal-dim); background: #e8f8f5; }
+.eg-lesson .eg-rule select.bad { border-color: #dc2626; background: #fef2f2; }
+.eg-lesson canvas.eg-zoom { width: 100%; max-width: 560px; height: auto; display: block; margin: 0.6rem auto; background: #fdfaf3; border: 1px solid #e4dccb; border-radius: 10px; }
+.eg-lesson .eg-readout { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; text-align: center; color: var(--navy-mid); }
+.eg-lesson .eg-reason { margin-top: 0.8rem; }
+.eg-lesson .eg-reason label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem; }
+@media (max-width: 560px) {
+  .eg-lesson .eg-bins.three { grid-template-columns: 1fr; }
+  .eg-lesson .eg-header h1 { font-size: 1.5rem; }
+}
+
+/* ---- Electron Glue specific ---- */
+.eg-lesson .eg-models { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; margin: 1rem 0; }
+.eg-lesson .eg-model { background: white; border: 2.5px solid #1f2937; border-top: 7px solid var(--mc); border-radius: 10px; padding: 0.8rem 0.95rem 0.9rem; }
+.eg-lesson .eg-model h4 { font-family: 'Playfair Display', serif; font-size: 1.05rem; margin: 0 0 0.3rem; color: var(--navy); }
+.eg-lesson .eg-lbl { font-size: 0.78rem; font-weight: 700; margin: 0.2rem 0 0.1rem; }
+.eg-lesson .eg-model ul { margin: 0 0 0.5rem; padding-left: 1.1rem; }
+.eg-lesson .eg-model li { font-size: 0.85rem; margin: 0; line-height: 1.45; }
+.eg-lesson .eg-pic { display: block; width: 100%; height: auto; background: #fdfaf3; border-radius: 8px; border: 1px solid #e4dccb; }
+.eg-lesson .eg-cap { font-size: 0.85rem; margin: 0.5rem 0 0.5rem; }
+.eg-lesson .eg-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.78rem; color: var(--text-muted); margin: 0.2rem 0 0.4rem; align-items: center; }
+.eg-lesson .eg-dot { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%; vertical-align: -0.1rem; margin-right: 0.25rem; border: 1px solid #334155; }
+.eg-lesson .eg-dot.m { background: #5b86bd; } .eg-lesson .eg-dot.n { background: #e59a4e; } .eg-lesson .eg-dot.e { background: #0f766e; border-color: white; }
+.eg-lesson .eg-dot.g { background: rgba(107,114,128,0.45); border-color: #9ca3af; }
+.eg-lesson .eg-match { display: grid; grid-template-columns: minmax(140px, 200px) 1fr; gap: 0.8rem; align-items: center; background: #fafafa; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.6rem 0.8rem; margin: 0.6rem 0; }
+.eg-lesson .eg-match.solved { background: #f3fdfc; border-color: var(--teal-dim); }
+.eg-lesson .eg-match .eg-row { gap: 0.4rem; }
+.eg-lesson .eg-opt.good { border-color: var(--teal-dim); background: var(--teal-dim); color: white; }
+.eg-lesson .eg-opt.wrong { border-color: #dc2626; background: #fef2f2; animation: egShake 0.45s ease; }
+@keyframes egShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+.eg-lesson .eg-deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.6rem; background: #fafafa; border: 1.5px dashed var(--cream-dark); border-radius: 10px; padding: 0.6rem; margin: 0.6rem 0; min-height: 3rem; }
+.eg-lesson .eg-card { display: block; text-align: left; font-family: 'Source Serif 4', serif; cursor: grab; background: white; border: 2px solid var(--navy-light); border-radius: 10px; padding: 0.55rem 0.7rem; color: var(--text); }
+.eg-lesson .eg-card:hover { border-color: var(--teal); }
+.eg-lesson .eg-card.sel { border-color: var(--amber); background: #fff8e1; box-shadow: 0 0 0 3px rgba(244,162,97,0.35); }
+.eg-lesson .eg-card > span { display: block; }
+.eg-lesson .eg-card-top { display: flex !important; gap: 0.5rem; align-items: center; margin-bottom: 0.25rem; }
+.eg-lesson .eg-ic { font-size: 1.7rem; line-height: 1; }
+.eg-lesson .eg-cn { display: block; line-height: 1.25; }
+.eg-lesson .eg-cn b { display: block; font-size: 0.9rem; }
+.eg-lesson .eg-fm { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--navy-mid); }
+.eg-lesson .eg-st { color: var(--text-muted); font-size: 0.72rem; margin-left: 1px; }
+.eg-lesson .eg-feel { font-size: 0.82rem; font-style: italic; margin-bottom: 0.2rem; }
+.eg-lesson .eg-prop { font-size: 0.78rem; line-height: 1.5; }
+.eg-lesson .eg-prop i { font-style: normal; display: inline-block; width: 1.3rem; }
+.eg-lesson .eg-bulb { filter: grayscale(1) opacity(0.5); }
+.eg-lesson .eg-bulb.half { filter: grayscale(0.4) opacity(0.8); }
+.eg-lesson .eg-bulb.on { filter: drop-shadow(0 0 4px #fbbf24); }
+.eg-lesson .eg-bins4 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.eg-lesson .eg-bin4 { background: white; border: 2px solid var(--cream-dark); border-top: 6px solid var(--mc); border-radius: 10px; padding: 0.5rem 0.6rem; min-height: 6rem; cursor: pointer; text-align: left; font-family: 'Source Serif 4', serif; color: var(--text); width: 100%; display: block; }
+.eg-lesson .eg-bin4:hover, .eg-lesson .eg-bin4.over { background: #f3fdfc; border-color: var(--teal); border-top-color: var(--mc); }
+.eg-lesson .eg-bin4 h4 { margin: 0; font-family: 'Playfair Display', serif; font-size: 0.95rem; color: var(--navy); }
+.eg-lesson .eg-bin4 .eg-bsub { font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 0.35rem; }
+.eg-lesson .eg-bin4 .eg-items { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.eg-lesson .eg-mini { display: inline-block; background: #f3fdfc; border: 1.5px solid var(--teal-dim); border-radius: 8px; padding: 0.15rem 0.45rem; font-size: 0.78rem; }
+.eg-lesson details.eg-ref { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 0.5rem 0.9rem; margin: 0.8rem 0; font-size: 0.88rem; }
+.eg-lesson details.eg-ref summary { cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #0369a1; }
+.eg-lesson .eg-refgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 1rem; margin-top: 0.5rem; }
+.eg-lesson .eg-refgrid b { display: block; font-size: 0.85rem; }
+.eg-lesson .eg-refgrid ul { margin: 0.1rem 0 0.3rem; padding-left: 1.05rem; }
+.eg-lesson .eg-refgrid li { font-size: 0.8rem; margin: 0; }
+.eg-lesson .eg-fit { min-width: 0; }
+.eg-lesson .eg-fit td, .eg-lesson .eg-fit th { text-align: left; }
+.eg-lesson .eg-fit td.ok { background: #e8f8f5; } .eg-lesson .eg-fit td.no { background: #fef2f2; } .eg-lesson .eg-fit td.part { background: #fff7e0; } .eg-lesson .eg-fit td.na { color: var(--text-muted); }
+.eg-lesson .eg-pick { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.5rem 0; }
+.eg-lesson .eg-pick .eg-chip.seen { border-color: var(--teal-dim); background: #f3fdfc; }
+.eg-lesson .eg-chip { font-family: 'Source Serif 4', serif; cursor: pointer; background: white; border: 1.5px solid var(--navy-light); border-radius: 8px; padding: 0.25rem 0.55rem; font-size: 0.82rem; color: var(--text); }
+.eg-lesson .eg-chip.sel { background: var(--navy); color: white; border-color: var(--navy); }
+.eg-lesson .eg-chip.sel .eg-fm { color: rgba(255,255,255,0.8); }
+.eg-lesson .eg-tabs { display: flex; gap: 0.4rem; margin: 0.4rem 0 0.7rem; flex-wrap: wrap; }
+.eg-lesson .eg-tab { font-family: 'JetBrains Mono', monospace; cursor: pointer; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: var(--text); }
+.eg-lesson .eg-tab.sel { background: var(--navy); border-color: var(--navy); color: white; }
+.eg-lesson .eg-tab.done::after { content: ' ✓'; color: var(--teal); font-weight: 700; }
+.eg-lesson .eg-stage { background: var(--cream-dark); border-radius: 12px; padding: 0.7rem; margin: 0.7rem 0; }
+.eg-lesson .eg-stage svg { display: block; width: 100%; max-width: 520px; height: auto; margin: 0 auto; background: #fdfaf3; border-radius: 10px; border: 1px solid #e4dccb; }
+.eg-lesson .eg-water { transition: opacity 0.9s ease; }
+.eg-lesson .eg-prac { background: white; border: 2px solid var(--cream-dark); border-radius: 12px; padding: 0.8rem 1rem; margin: 0.8rem 0; }
+.eg-lesson .eg-prac.done { border-color: var(--teal-dim); background: #f3fdfc; }
+.eg-lesson .eg-prac h4 { margin: 0 0 0.2rem; font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; color: var(--navy); }
+.eg-lesson .eg-prac h4 small { font-family: 'Source Serif 4', serif; font-size: 0.85rem; font-weight: 400; color: var(--text-muted); margin-left: 0.4rem; }
+.eg-lesson .eg-el-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin: 0.25rem 0; }
+.eg-lesson .eg-el-row .eg-sym { font-family: 'JetBrains Mono', monospace; font-weight: 700; min-width: 2.4rem; }
+@media (max-width: 640px) {
+  .eg-lesson .eg-models, .eg-lesson .eg-bins4, .eg-lesson .eg-refgrid { grid-template-columns: 1fr; }
+  .eg-lesson .eg-match { grid-template-columns: 1fr; }
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  // ---------------------------------------------------------------- small shared widgets
+  function writeBox(tag, html) {
+    return `<div class="eg-write"><div class="eg-write-tag">✏️ ${escapeHtml(tag)}</div>${html}</div>`;
+  }
+  // "I did this in my packet" confirmation. cfg: { label, checked, onToggle }
+  function mountAck(mount, cfg) {
+    mount.innerHTML = `<label class="eg-ack"><input type="checkbox"${cfg.checked ? ' checked' : ''}> <span>${escapeHtml(cfg.label)}</span></label>`;
+    mount.querySelector('input').addEventListener('change', e => cfg.onToggle(e.target.checked));
+  }
+  // Collapsible copy of the handout's text, so the properties are one click away in every section.
+  function handoutRef(lang) {
+    const _ = T(lang);
+    return `<details class="eg-ref"><summary>📄 ${escapeHtml(_('Handout: Four Models of Bonding (tap to open)', 'Hoja: Cuatro Modelos de Enlace (toca para abrir)'))}</summary>
+      <div class="eg-refgrid">${MODELS.map(m => `<div><b style="color:${m.color}">${escapeHtml(_('Model', 'Modelo'))} ${m.n}: ${escapeHtml(tr(m.name, lang))}</b>
+        <ul>${m.props.map(p => `<li>${escapeHtml(tr(p, lang))}</li>`).join('')}</ul><span style="font-size:0.8rem;font-style:italic">${escapeHtml(tr(m.cap, lang))}</span></div>`).join('')}</div></details>`;
+  }
+  function atomBar(lang, syms) {
+    const _ = T(lang);
+    return `<details class="eg-ref"><summary>🧪 ${escapeHtml(_('Atom-type reference (metal, nonmetal, or metalloid?)', 'Referencia de tipos de átomos (¿metal, no metal o metaloide?)'))}</summary>
+      <div class="eg-refbar" style="margin-top:0.5rem">${syms.map(s => `<span class="eg-el ${ELT[s]}">${s}</span>`).join('')}</div>
+      <div class="eg-legend"><span><span class="eg-dot m"></span>${escapeHtml(_('metal', 'metal'))}</span><span><span class="eg-dot n"></span>${escapeHtml(_('nonmetal', 'no metal'))}</span><span><span class="eg-dot" style="background:#aab2c2"></span>${escapeHtml(_('metalloid', 'metaloide'))}</span></div></details>`;
+  }
+
+  // ---------------------------------------------------------------- 16-card sorter (click-or-drag)
+  // cfg: { lang, placed:{cardId:bin}, onChange, onWrong, onDone }
+  function mountCardSorter(mount, cfg) {
+    const { lang, placed } = cfg;
+    const _ = T(lang);
+    let sel = null;
+    mount.innerHTML = `<div class="eg-deck" data-tray></div><div class="eg-flash" data-fl></div><div class="eg-bins4" data-bins></div>`;
+    const tray = mount.querySelector('[data-tray]');
+    const binsEl = mount.querySelector('[data-bins]');
+    const fl = mount.querySelector('[data-fl]');
+    const subs = {
+      ionic: _('metal + nonmetal', 'metal + no metal'), network: _('one giant network', 'una red gigante'),
+      metallic: _('all metal', 'todo metal'), molecular: _('small units', 'unidades pequeñas')
+    };
+    function paint() {
+      const unplaced = CARDS.filter(c => !placed[c.id]);
+      tray.innerHTML = unplaced.length
+        ? unplaced.map(c => `<button type="button" class="eg-card${sel === c.id ? ' sel' : ''}" data-card="${c.id}" draggable="true">${cardHtml(c, lang)}</button>`).join('')
+        : `<span class="eg-tip">${escapeHtml(_('All 16 sorted! ✓', '¡Las 16 clasificadas! ✓'))}</span>`;
+      binsEl.innerHTML = BIN_ORDER.map(b => `
+        <div class="eg-bin4" role="button" tabindex="0" data-bin="${b}" style="--mc:${MODEL(b).color}">
+          <h4>${escapeHtml(tr(BIN_NAME[b], lang))}</h4><div class="eg-bsub">${escapeHtml(subs[b])}</div>
+          <div class="eg-items">${CARDS.filter(c => placed[c.id] === b).map(c => `<span class="eg-mini">${miniHtml(c, lang)}</span>`).join('')}</div>
+        </div>`).join('');
+    }
+    function attempt(id, binId) {
+      const c = CARDS.find(x => x.id === id);
+      if (!c || placed[id]) return;
+      if (c.bin === binId) {
+        placed[id] = binId; sel = null;
+        const oks = fitTests(c)[binId].map((s, i) => s === 'ok' ? tr(MODEL(binId).props[i], lang) : null).filter(Boolean).slice(0, 2);
+        fl.textContent = `✓ ${tr(c.name, lang)} → ${tr(BIN_NAME[binId], lang)}` + (oks.length ? ' — ' + _('matches: ', 'coincide: ') + oks.join('; ') : '');
+        paint(); cfg.onChange();
+        if (CARDS.every(x => placed[x.id]) && cfg.onDone) cfg.onDone();
+      } else {
+        if (cfg.onWrong) cfg.onWrong();
+        fl.textContent = sortHint(c, binId, lang);
+        sel = null; paint();
+      }
+    }
+    mount.addEventListener('click', e => {
+      const c = e.target.closest('[data-card]');
+      if (c) { const id = c.getAttribute('data-card'); sel = sel === id ? null : id; paint(); return; }
+      const b = e.target.closest('[data-bin]');
+      if (b && sel) attempt(sel, b.getAttribute('data-bin'));
+      else if (b && !sel) fl.textContent = _('Click a card first (or drag it into a box).', 'Primero haz clic en una tarjeta (o arrástrala a una caja).');
+    });
+    mount.addEventListener('keydown', e => {
+      const b = e.target.closest && e.target.closest('[data-bin]');
+      if (b && e.target === b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); b.click(); }
+    });
+    mount.addEventListener('dragstart', e => {
+      const c = e.target.closest('[data-card]');
+      if (c && e.dataTransfer) { e.dataTransfer.setData('text/plain', c.getAttribute('data-card')); e.dataTransfer.effectAllowed = 'move'; }
+    });
+    mount.addEventListener('dragover', e => { const b = e.target.closest('[data-bin]'); if (b) { e.preventDefault(); b.classList.add('over'); } });
+    mount.addEventListener('dragleave', e => { const b = e.target.closest('[data-bin]'); if (b) b.classList.remove('over'); });
+    mount.addEventListener('drop', e => {
+      const b = e.target.closest('[data-bin]');
+      if (!b) return;
+      e.preventDefault(); b.classList.remove('over');
+      const id = e.dataTransfer && e.dataTransfer.getData('text/plain');
+      if (id) attempt(id, b.getAttribute('data-bin'));
+    });
+    paint();
+  }
+
+  // ---------------------------------------------------------------- zoom in: salt vs sugar dissolving
+  // cfg: { lang, S, onChange }. S.zoom = { salt:1, sugar:1 } once each has been watched to the end.
+  function mountZoomIn(mount, cfg) {
+    const { lang, S, onChange } = cfg;
+    const _ = T(lang);
+    const MODES = {
+      salt: { f: 'NaCl', name: _('Table salt', 'Sal de mesa'), lights: true },
+      sugar: { f: 'C<sub>12</sub>H<sub>22</sub>O<sub>11</sub>', name: _('Table sugar', 'Azúcar de mesa'), lights: false }
+    };
+    let mode = 'salt';
+    let run = null; // current animation controller
+
+    mount.innerHTML = `<div class="eg-tabs" data-tabs></div><div data-body></div>`;
+    const tabsEl = mount.querySelector('[data-tabs]'), body = mount.querySelector('[data-body]');
+    function paintTabs() {
+      tabsEl.innerHTML = Object.keys(MODES).map(k => `<button type="button" class="eg-tab${k === mode ? ' sel' : ''}${S.zoom[k] ? ' done' : ''}" data-mode="${k}">${MODES[k].f} — ${escapeHtml(MODES[k].name)}</button>`).join('');
+    }
+    tabsEl.addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (b && b.getAttribute('data-mode') !== mode) { mode = b.getAttribute('data-mode'); paint(); } });
+
+    // jittered, evenly-spread target positions inside the water (deterministic, so no two particles overlap)
+    function targets(n, cols, rows, x0, y0, w, h, seed) {
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        const c = i % cols, r = Math.floor(i / cols) % rows;
+        const j = k => Math.sin((i + 1) * 12.9898 + seed * 78.233 + k) * 0.5;
+        out.push([x0 + (c + 0.5 + 0.3 * j(1)) * (w / cols), y0 + (r + 0.5 + 0.3 * j(2)) * (h / rows)]);
+      }
+      return out;
+    }
+    function paint() {
+      if (run) { run.stop(); run = null; }
+      paintTabs();
+      const M = MODES[mode];
+      let pred = null;
+      body.innerHTML = `
+        <p>${escapeHtml(mode === 'salt'
+          ? _('Salt is on your cards as NaCl(s). Zoom in on a few particles of it, then add water.', 'La sal está en tus tarjetas como NaCl(s). Acércate a unas pocas partículas y luego agrega agua.')
+          : _('Sugar is on your cards as C₁₂H₂₂O₁₁(s). Zoom in on a few particles of it, then add water.', 'El azúcar está en tus tarjetas como C₁₂H₂₂O₁₁(s). Acércate a unas pocas partículas y luego agrega agua.'))}</p>
+        <div class="eg-q"><p><strong>${escapeHtml(_('Predict: once it has dissolved, will the bulb light?', 'Predice: una vez disuelto, ¿se encenderá el foco?'))}</strong></p>
+          <div class="eg-row"><button type="button" class="eg-opt" data-pred="1">${escapeHtml(_('💡 Yes, it will light', '💡 Sí, se encenderá'))}</button><button type="button" class="eg-opt" data-pred="0">${escapeHtml(_('⚫ No, it stays dark', '⚫ No, se queda apagado'))}</button></div></div>
+        <div class="eg-row"><button type="button" class="eg-btn" data-add disabled>${escapeHtml(_('💧 Add water', '💧 Agregar agua'))}</button><button type="button" class="eg-btn secondary" data-reset style="display:none">${escapeHtml(_('↺ Start over', '↺ Empezar de nuevo'))}</button></div>
+        <div class="eg-stage"><svg viewBox="0 0 340 210" role="img" aria-label="${escapeHtml(_('A beaker with a solid that can dissolve and a conductivity tester', 'Un vaso con un sólido que puede disolverse y un probador de conductividad'))}" data-svg>
+          <rect class="eg-water" data-water x="50" y="70" width="240" height="120" rx="8" fill="#bfe3f6" opacity="0"/>
+          <path d="M44 56 V190 a10 10 0 0 0 10 10 H286 a10 10 0 0 0 10 -10 V56" fill="none" stroke="#475569" stroke-width="3"/>
+          <g data-tester><line x1="130" y1="30" x2="130" y2="118" stroke="#64748b" stroke-width="3"/><line x1="210" y1="30" x2="210" y2="118" stroke="#64748b" stroke-width="3"/>
+            <line x1="130" y1="30" x2="156" y2="22" stroke="#64748b" stroke-width="2"/><line x1="210" y1="30" x2="184" y2="22" stroke="#64748b" stroke-width="2"/>
+            <circle data-glow cx="170" cy="20" r="26" fill="#fde68a" opacity="0"/><circle data-bulb cx="170" cy="20" r="12" fill="#e5e7eb" stroke="#64748b" stroke-width="2"/></g>
+          <g data-parts></g></svg>
+          <div class="eg-readout" data-read aria-live="polite" style="margin-top:0.4rem">${escapeHtml(_('💡 Bulb: dark', '💡 Foco: apagado'))}</div></div>
+        <div data-result></div>`;
+      const svg = body.querySelector('[data-svg]'), parts = svg.querySelector('[data-parts]');
+      const addBtn = body.querySelector('[data-add]'), resetBtn = body.querySelector('[data-reset]');
+      const resultEl = body.querySelector('[data-result]'), readEl = body.querySelector('[data-read]');
+
+      // particles
+      const P = [];
+      if (mode === 'salt') {
+        const tg = targets(12, 4, 3, 62, 92, 216, 92, 1);
+        for (let i = 0; i < 12; i++) {
+          const c = i % 4, r = Math.floor(i / 4), na = (c + r) % 2 === 0;
+          P.push({ home: [124 + 18 * c, 178 - 17 * r], to: tg[i], ph: i * 1.7, svg: na
+            ? `<circle r="6" fill="#5b86bd" stroke="#1f3f6e" stroke-width="1"/><text y="3.3" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">+</text>`
+            : `<circle r="8.5" fill="#e59a4e" stroke="#8a4a10" stroke-width="1"/><text y="3.8" font-size="12" font-weight="700" text-anchor="middle" fill="#fff">−</text>` });
+        }
+      } else {
+        const tg = targets(6, 3, 2, 66, 96, 208, 88, 2);
+        const mol = `<line x1="-8" y1="5" x2="8" y2="5" stroke="#6b7280" stroke-width="3"/><line x1="-8" y1="5" x2="0" y2="-8" stroke="#6b7280" stroke-width="3"/><line x1="8" y1="5" x2="0" y2="-8" stroke="#6b7280" stroke-width="3"/>
+          <circle cx="-8" cy="5" r="4.6" fill="#e59a4e" stroke="#8a4a10"/><circle cx="8" cy="5" r="4.6" fill="#e59a4e" stroke="#8a4a10"/><circle cx="0" cy="-8" r="4.6" fill="#e59a4e" stroke="#8a4a10"/>`;
+        for (let i = 0; i < 6; i++) P.push({ home: [128 + 34 * (i % 3), 176 - 32 * Math.floor(i / 3)], to: tg[i], ph: i * 2.3, spin: true, svg: mol });
+      }
+      parts.innerHTML = P.map(p => `<g>${p.svg}</g>`).join('');
+      const gs = Array.from(parts.children);
+      let started = 0, prog = 0, finished = false, alive = true, raf = 0;
+      const still = reducedMotion();
+      function place(t) {
+        const e = prog < 1 ? 1 - Math.pow(1 - prog, 3) : 1;
+        P.forEach((p, i) => {
+          const wx = e * 7 * Math.sin(t * 0.9 + p.ph), wy = e * 5 * Math.cos(t * 0.7 + p.ph * 1.3);
+          const x = p.home[0] + (p.to[0] - p.home[0]) * e + wx, y = p.home[1] + (p.to[1] - p.home[1]) * e + wy;
+          gs[i].setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})${p.spin ? ` rotate(${(e * (t * 30 + p.ph * 40)).toFixed(0)})` : ''}`);
+        });
+      }
+      function setBulb(on) {
+        svg.querySelector('[data-bulb]').setAttribute('fill', on ? '#fff3a8' : '#e5e7eb');
+        svg.querySelector('[data-glow]').setAttribute('opacity', on ? '0.85' : '0');
+        readEl.textContent = on ? _('💡 Bulb: glowing', '💡 Foco: encendido') : _('💡 Bulb: dark', '💡 Foco: apagado');
+      }
+      function finish() {
+        finished = true;
+        setBulb(M.lights);
+        const right = pred === (M.lights ? 1 : 0);
+        resultEl.innerHTML = `<div class="eg-result"><strong>${escapeHtml(right ? _('✓ Your prediction was right.', '✓ Tu predicción fue correcta.') : _('Your prediction was different — look closely at what the particles did.', 'Tu predicción fue diferente — observa bien lo que hicieron las partículas.'))}</strong> ${mode === 'salt'
+          ? escapeHtml(_('The solid fell apart into separate charged particles (ions: + and −) that spread through the water. Charged particles that are free to move carry the current, so the bulb lights.', 'El sólido se separó en partículas con carga individuales (iones: + y −) que se esparcieron por el agua. Las partículas con carga libres para moverse llevan la corriente, así que el foco se enciende.'))
+          : escapeHtml(_('The solid separated into whole molecules. Each molecule stays together as a small neutral unit — no charged particles are free to move, so the bulb stays dark.', 'El sólido se separó en moléculas completas. Cada molécula se mantiene unida como una pequeña unidad neutra — no hay partículas con carga libres para moverse, así que el foco sigue apagado.'))}</div>
+          <p class="eg-tip">${escapeHtml(_('Now compare the two tabs: what happened to the ORIGINAL pieces of the solid in each? That is the heart of worksheet Question 6.', 'Ahora compara las dos pestañas: ¿qué pasó con las piezas ORIGINALES del sólido en cada una? Ese es el centro de la Pregunta 6 de la hoja.'))}</p>`;
+        S.zoom[mode] = 1; paintTabs(); onChange();
+      }
+      function frame(ms) {
+        if (!alive || !svg.isConnected) return;
+        const t = ms / 1000;
+        if (started) { prog = Math.min(1, (ms - started) / (still ? 1 : 3200)); }
+        place(t);
+        if (started && prog >= 1 && !finished) finish();
+        if (!still || !finished) raf = requestAnimationFrame(frame);
+      }
+      raf = requestAnimationFrame(frame);
+      run = { stop() { alive = false; cancelAnimationFrame(raf); } };
+
+      body.querySelectorAll('[data-pred]').forEach(b => b.addEventListener('click', () => {
+        if (started) return;
+        pred = Number(b.getAttribute('data-pred'));
+        body.querySelectorAll('[data-pred]').forEach(x => x.classList.toggle('sel', x === b));
+        addBtn.disabled = false;
+      }));
+      addBtn.addEventListener('click', () => {
+        if (started || pred === null) return;
+        started = performance.now(); addBtn.disabled = true;
+        svg.querySelector('[data-water]').setAttribute('opacity', '0.6');
+        body.querySelectorAll('[data-pred]').forEach(x => { x.disabled = true; });
+        resetBtn.style.display = '';
+      });
+      resetBtn.addEventListener('click', () => paint());
+    }
+    paint();
+  }
+
+  // ---------------------------------------------------------------- state
+  function defaultState() {
+    return {
+      v: 1, ack0: 0,
+      viewed: {}, match: {}, ack1: 0,
+      sort: {}, sortErr: 0, ack2: 0,
+      chk: {}, ack3: 0,
+      zoom: {}, ack4: 0,
+      prac: {}, ack5: 0,
+      done: new Array(SECTION_COUNT).fill(0)
+    };
+  }
+  function loadState(progress) {
+    const d = defaultState();
+    const first = progress && progress.answers && progress.answers[0];
+    if (first && first.questionId === '_lab' && first.state && first.state.v === 1) {
+      const s = first.state;
+      Object.keys(d).forEach(k => {
+        if (s[k] === undefined) return;
+        const isObj = d[k] && typeof d[k] === 'object' && !Array.isArray(d[k]);
+        d[k] = isObj ? Object.assign(d[k], s[k]) : s[k];
+      });
+    }
+    if (!Array.isArray(d.done) || d.done.length !== SECTION_COUNT) d.done = new Array(SECTION_COUNT).fill(0);
+    return d;
+  }
+  const count = o => Object.keys(o).length;
+
+  // ---------------------------------------------------------------- main render
+  function render(host, ctx) {
+    ensureStylesInjected();
+    const lang = getLang();
+    const _ = T(lang);
+    const progress0 = ctx.getProgress();
+    const S = loadState(progress0);
+    let Q = ((progress0 && progress0.answers) || []).filter(a => a && a.questionId !== '_lab');
+    const mounted = new Array(SECTION_COUNT).fill(false);
+    let saveTimer = null;
+
+    function buildRecord() {
+      const cur = ctx.getProgress() || {};
+      const rec = {
+        status: (cur.status === 'completed' && Q.length >= QUESTIONS.length) ? 'completed' : 'in_progress',
+        score: Q.filter(a => a.correct).length,
+        totalQuestions: QUESTIONS.length,
+        answers: [{ questionId: '_lab', state: S }].concat(Q)
+      };
+      if (rec.status === 'completed' && cur.code) rec.code = cur.code;
+      return rec;
+    }
+    function save(now) {
+      clearTimeout(saveTimer);
+      const run = () => { saveTimer = null; ctx.saveProgress(buildRecord()); };
+      if (now) run(); else saveTimer = setTimeout(run, 450);
+    }
+    function flushSave() { if (saveTimer) save(true); }
+
+    const gates = [
+      () => !!S.ack0,
+      () => MODELS.every(m => S.viewed[m.id]) && MODELS.every(m => S.match[m.id]) && !!S.ack1,
+      () => count(S.sort) === CARDS.length && !!S.ack2,
+      () => count(S.chk) >= 6 && !!S.ack3,
+      () => !!(S.zoom.salt && S.zoom.sugar && S.ack4),
+      () => count(S.prac) === PRACTICE.length && !!S.ack5
+    ];
+    const gateHints = [
+      _('Write your name, date, and period on your packet, then check the box.', 'Escribe tu nombre, fecha y período en tu paquete y marca la casilla.'),
+      _('Turn on the valence electrons for all four models, match all four pictures, then answer Question 2 in your packet and check the box.', 'Activa los electrones de valencia en los cuatro modelos, relaciona las cuatro imágenes, responde la Pregunta 2 en tu paquete y marca la casilla.'),
+      _('Sort all 16 cards, copy your results into the table in your packet, then check the box.', 'Clasifica las 16 tarjetas, copia tus resultados en la tabla de tu paquete y marca la casilla.'),
+      _('Check the fit of at least 6 different cards, answer Questions 1 and 3 in your packet, then check the box.', 'Revisa el ajuste de al menos 6 tarjetas diferentes, responde las Preguntas 1 y 3 en tu paquete y marca la casilla.'),
+      _('Watch both salt and sugar dissolve, answer Questions 4–6 in your packet, then check the box.', 'Observa cómo se disuelven la sal y el azúcar, responde las Preguntas 4–6 en tu paquete y marca la casilla.'),
+      _('Finish all six formulas, answer Questions 7–9 in your packet, then check the box.', 'Termina las seis fórmulas, responde las Preguntas 7–9 en tu paquete y marca la casilla.')
+    ];
+    function prereq(i) { return i === 0 || gates[i - 1](); }
+
+    const P = (en, es) => escapeHtml(_(en, es));
+    const SECTIONS = [
+      { title: _('Mission Briefing', 'Informe de la Misión'), time: _('3 min', '3 min'), num: '★',
+        html: `
+        <h2>${P('Electron Glue: Bonding', 'Pegamento de electrones: el enlace')}</h2>
+        <div class="eg-write"><div class="eg-write-tag">✏️ ${P('How this works', 'Cómo funciona')}</div>
+          <p><strong>${P('The handout (Four Models of Bonding) and the 16 Substance Cards are right here on your screen.', 'La hoja (Cuatro Modelos de Enlace) y las 16 Tarjetas de Sustancias están aquí mismo en tu pantalla.')}</strong></p>
+          <p>${P('You explore, sort, and test your thinking here. Your answers to the worksheet go in your PACKET — whenever you see an orange box like this one, it tells you which worksheet question to write and where. Write your name, date, and period on your packet now.', 'Aquí exploras, clasificas y pruebas tu razonamiento. Tus respuestas a la hoja de trabajo van en tu PAQUETE — cuando veas una caja naranja como esta, te dice qué pregunta de la hoja escribir y dónde. Escribe ahora tu nombre, fecha y período en tu paquete.')}</p></div>
+        <p><strong>${P('Purpose:', 'Propósito:')}</strong> ${P('to investigate the different types of bonding found in substances and to relate bonding to the physical properties of substances.', 'investigar los diferentes tipos de enlace que hay en las sustancias y relacionar el enlace con las propiedades físicas de las sustancias.')}</p>
+        <p><strong>${P('Guiding question:', 'Pregunta guía:')}</strong> ${P('What holds atoms together — and how does that “electron glue” explain what a substance is like?', '¿Qué mantiene unidos a los átomos — y cómo explica ese “pegamento de electrones” cómo es una sustancia?')}</p>
+        <h3>🎯 ${P('Learning targets', 'Objetivos de aprendizaje')}</h3>
+        <ul class="objectives-list">
+          <li><span class="obj-check">✓</span><span>${P('I can describe the four models of bonding and what each one shows about valence electrons.', 'Puedo describir los cuatro modelos de enlace y lo que cada uno muestra sobre los electrones de valencia.')}</span></li>
+          <li><span class="obj-check">✓</span><span>${P('I can match a substance to a bonding model using its properties and the atoms in its formula.', 'Puedo relacionar una sustancia con un modelo de enlace usando sus propiedades y los átomos de su fórmula.')}</span></li>
+          <li><span class="obj-check">✓</span><span>${P('I can predict a substance\'s bonding and properties from its chemical formula.', 'Puedo predecir el enlace y las propiedades de una sustancia a partir de su fórmula química.')}</span></li>
+        </ul>
+        <div class="concept-box"><div class="concept-label">${P('Key words', 'Palabras clave')}</div>
+          <p><strong>${P('valence electrons', 'electrones de valencia')}</strong> — ${P('the outermost electrons of an atom; the ones that do the bonding.', 'los electrones más externos de un átomo; los que hacen el enlace.')}<br>
+          <strong>${P('bond', 'enlace')}</strong> — ${P('what holds atoms together in a substance.', 'lo que mantiene unidos los átomos en una sustancia.')}<br>
+          <strong>${P('metalloid', 'metaloide')}</strong> — ${P('an element along the staircase between metals and nonmetals (like Si).', 'un elemento a lo largo de la escalera entre los metales y los no metales (como el Si).')}</p></div>
+        <div class="eg-mount" data-mount="0"></div>` },
+      { title: _('The Handout: Four Models of Bonding', 'La Hoja: Cuatro Modelos de Enlace'), time: _('8 min', '8 min'), num: '01',
+        html: `
+        <p>${P('Each sphere in a picture is an atom. The gray shaded areas show places where the negatively charged valence electrons might be found with each type of bond. Read each model, then turn on the moving electrons to see what the shading means.', 'Cada esfera de una imagen es un átomo. Las zonas sombreadas en gris muestran dónde se podrían encontrar los electrones de valencia con carga negativa en cada tipo de enlace. Lee cada modelo y luego activa los electrones en movimiento para ver qué significa el sombreado.')}</p>
+        <div class="eg-mount" data-mount="1"></div>` },
+      { title: _('Substance Cards: Sort All 16', 'Tarjetas de Sustancias: Clasifica las 16'), time: _('10 min', '10 min'), num: '02',
+        html: `
+        <p>${P('Study each Substance Card, then match it to the bonding model on the handout that fits. Click a card, then click a box — or drag it there. Use the properties on the card AND the atoms in its formula.', 'Estudia cada Tarjeta de Sustancia y relaciónala con el modelo de enlace de la hoja que le corresponde. Haz clic en una tarjeta y luego en una caja — o arrástrala. Usa las propiedades de la tarjeta Y los átomos de su fórmula.')}</p>
+        <div class="eg-mount" data-mount="2"></div>` },
+      { title: _('Check the Fit', 'Revisa el Ajuste'), time: _('6 min', '6 min'), num: '03',
+        html: `
+        <p>${P('A category is only as good as its fit. Pick any card to compare it, property by property, with the model you sorted it into. Are there substances that don\'t seem to fit properly?', 'Una categoría es tan buena como su ajuste. Elige cualquier tarjeta para compararla, propiedad por propiedad, con el modelo en el que la clasificaste. ¿Hay sustancias que no parecen encajar bien?')}</p>
+        <div class="eg-mount" data-mount="3"></div>` },
+      { title: _('Zoom In: Salt vs. Sugar', 'Acércate: Sal vs. Azúcar'), time: _('7 min', '7 min'), num: '04',
+        html: `
+        <p>${P('Salt and sugar both dissolve in water — but they are bonded differently. Use the bonding models to see what the particles do when each one dissolves.', 'La sal y el azúcar se disuelven en agua, pero tienen enlaces diferentes. Usa los modelos de enlace para ver qué hacen las partículas cuando cada una se disuelve.')}</p>
+        <div class="eg-mount" data-mount="4"></div>` },
+      { title: _('Predict from the Formula', 'Predice a partir de la Fórmula'), time: _('8 min', '8 min'), num: '05',
+        html: `
+        <p>${P('If you know a substance\'s formula, you can work out the kinds of atoms in it, the bonding model, and so a lot about its properties. Try six new formulas.', 'Si conoces la fórmula de una sustancia, puedes deducir los tipos de átomos que tiene, el modelo de enlace y, por lo tanto, mucho sobre sus propiedades. Prueba seis fórmulas nuevas.')}</p>
+        <div class="eg-mount" data-mount="5"></div>` }
+    ];
+
+    const sectionsHtml = SECTIONS.map((sec, i) => `
+      <div class="section-card" id="eg-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${sec.num}</span>
+          <span class="section-title">${escapeHtml(sec.title)}</span>
+          <span class="section-time">${escapeHtml(sec.time)}</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          ${sec.html}
+          <button type="button" class="mark-done-btn" data-continue="${i}" disabled>${escapeHtml(_('Continue →', 'Continuar →'))}</button>
+          <p class="eg-gate-hint" data-gatehint="${i}"></p>
+        </div>
+      </div>`).join('');
+
+    host.innerHTML = `
+      <div class="eg-lesson">
+        <div class="eg-header">
+          <div class="eg-lang-toggle" role="group" aria-label="${escapeHtml(_('Language', 'Idioma'))}">
+            <button type="button" class="eg-lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="eg-lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="eg-header-label">${escapeHtml(_('Chapter 5 · Building with Matter · Lesson 26', 'Capítulo 5 · Construyendo con la Materia · Lección 26'))}</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="eg-header-meta">${escapeHtml(_('Handout + Substance Cards · ~45 Minutes · Explore here, answer in your packet', 'Hoja + Tarjetas de Sustancias · ~45 Minutos · Explora aquí, responde en tu paquete'))}</div>
+        </div>
+        <div class="eg-progress-wrap">
+          <span class="eg-progress-label">${escapeHtml(_('Progress', 'Progreso'))}</span>
+          <div class="eg-progress-track"><div class="eg-progress-fill" id="eg-progress-fill"></div></div>
+          <span class="eg-progress-count" id="eg-progress-count"></span>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="eg-sec-${QUIZ_INDEX}" data-section="${QUIZ_INDEX}">
+            <div class="section-header" data-toggle="${QUIZ_INDEX}">
+              <span class="section-num">✓</span>
+              <span class="section-title">${escapeHtml(_('Check for Understanding', 'Comprobación de Comprensión'))}</span>
+              <span class="section-time">${escapeHtml(_('5 min · graded', '5 min · calificado'))}</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">${_('Your packet holds your worksheet answers. This short check is different: it <strong>saves your score</strong> and reports it to your teacher, and it asks you to apply the bonding models to NEW substances. You can retake it any time; your most recent attempt is what\'s saved.', 'Tu paquete contiene tus respuestas de la hoja de trabajo. Esta breve comprobación es diferente: <strong>guarda tu puntaje</strong> y se lo reporta a tu maestro, y te pide aplicar los modelos de enlace a sustancias NUEVAS. Puedes repetirla en cualquier momento; se guarda tu intento más reciente.')}</div>
+              <div class="eg-mount" data-mount="${QUIZ_INDEX}"></div>
+            </div>
+          </div>
+        </main>
+      </div>`;
+    const root = host.querySelector('.eg-lesson');
+    const mountEl = i => root.querySelector(`[data-mount="${i}"]`);
+
+    // ---- progress / gate UI
+    function doneCount() { return S.done.filter(Boolean).length + (Q.length >= QUESTIONS.length ? 1 : 0); }
+    function updateUI() {
+      const n = doneCount();
+      root.querySelector('#eg-progress-fill').style.width = Math.round((n / SECTION_COUNT) * 100) + '%';
+      root.querySelector('#eg-progress-count').textContent = _(`${n} / ${SECTION_COUNT} sections`, `${n} / ${SECTION_COUNT} secciones`);
+      SECTIONS.forEach((sec, i) => {
+        const btn = root.querySelector(`[data-continue="${i}"]`);
+        const hint = root.querySelector(`[data-gatehint="${i}"]`);
+        const ok = gates[i]();
+        root.querySelector(`#eg-sec-${i}`).classList.toggle('done', !!S.done[i]);
+        if (S.done[i]) { btn.textContent = _('✓ Section complete', '✓ Sección completa'); btn.disabled = true; hint.textContent = ''; return; }
+        btn.textContent = _('Continue →', 'Continuar →');
+        btn.disabled = !ok;
+        hint.textContent = ok ? '' : gateHints[i];
+      });
+      root.querySelector(`#eg-sec-${QUIZ_INDEX}`).classList.toggle('done', Q.length >= QUESTIONS.length);
+    }
+    function onChange(now) { updateUI(); save(now === true); }
+
+    // ---- section open / lazy mount
+    function ensureMounted(i) {
+      const m = mountEl(i);
+      if (!m) return;
+      if (!prereq(i)) {
+        mounted[i] = false;
+        m.innerHTML = `<div class="eg-lock">🔒 ${escapeHtml(_('Finish the previous section first — you need its results for this one.', 'Termina primero la sección anterior — necesitas sus resultados para esta.'))}<br><button type="button" class="eg-btn secondary" style="margin-top:0.6rem" data-goto="${i - 1}">${escapeHtml(_('Go to previous section', 'Ir a la sección anterior'))}</button></div>`;
+        return;
+      }
+      if (mounted[i]) return;
+      mounted[i] = true;
+      MOUNTS[i](m);
+    }
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#eg-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      ensureMounted(i);
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    root.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', () => {
+        const i = Number(el.getAttribute('data-toggle'));
+        const card = root.querySelector(`#eg-sec-${i}`);
+        const body = card.querySelector('.section-body');
+        const open = body.classList.contains('open');
+        body.classList.toggle('open', !open); el.classList.toggle('open', !open);
+        if (!open) ensureMounted(i);
+      });
+    });
+    root.addEventListener('click', e => {
+      const g = e.target.closest('[data-goto]');
+      if (g) { openSection(Number(g.getAttribute('data-goto')), true); return; }
+      const c = e.target.closest('[data-continue]');
+      if (c && !c.disabled) {
+        const i = Number(c.getAttribute('data-continue'));
+        S.done[i] = 1; updateUI(); save(true);
+        setTimeout(() => openSection(i + 1, true), 250);
+      }
+    });
+    root.querySelectorAll('[data-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nl = btn.getAttribute('data-lang');
+        if (nl === lang) return;
+        flushSave(); setLang(nl); render(host, ctx);
+      });
+    });
+
+    // ---------------------------------------------------------------- section mounts
+    function mount0(m) {
+      mountAck(m, { label: _('I wrote my name, date, and period on my packet.', 'Escribí mi nombre, fecha y período en mi paquete.'), checked: !!S.ack0, onToggle: v => { S.ack0 = v ? 1 : 0; onChange(); } });
+    }
+
+    function mount1(m) {
+      const uid = 'hm' + Math.random().toString(36).slice(2, 6);
+      const ALL = [];
+      m.innerHTML = `
+        <div class="eg-legend" aria-hidden="true"><span><span class="eg-dot m"></span>${P('metal atom', 'átomo de metal')}</span><span><span class="eg-dot n"></span>${P('nonmetal atom', 'átomo de no metal')}</span><span><span class="eg-dot g"></span>${P('gray shading = where valence electrons might be', 'sombreado gris = dónde podrían estar los electrones de valencia')}</span><span><span class="eg-dot e"></span>${P('a valence electron, moving', 'un electrón de valencia, en movimiento')}</span></div>
+        <div class="eg-models">${MODELS.map(md => `
+          <div class="eg-model" style="--mc:${md.color}" data-model="${md.id}">
+            <h4>${P('Model', 'Modelo')} ${md.n}: ${escapeHtml(tr(md.name, lang))}</h4>
+            <p class="eg-lbl">${P('Properties:', 'Propiedades:')}</p>
+            <ul>${md.props.map(p => `<li>${escapeHtml(tr(p, lang))}</li>`).join('')}</ul>
+            ${modelSvg(md.id, uid + md.id, `${_('Model', 'Modelo')} ${md.n}: ${tr(md.name, lang)}`)}
+            <p class="eg-cap">${escapeHtml(tr(md.cap, lang))}</p>
+            <button type="button" class="eg-btn secondary" data-etoggle="${md.id}">${S.viewed[md.id] ? '✓ ' : ''}${P('⚡ Show valence electrons moving', '⚡ Mostrar electrones de valencia en movimiento')}</button>
+          </div>`).join('')}</div>
+        <h3>${P('Which picture is which?', '¿Qué imagen es cuál?')}</h3>
+        <p class="eg-tip">${P('Match each unlabeled picture to its model. Look at the shading!', 'Relaciona cada imagen sin nombre con su modelo. ¡Fíjate en el sombreado!')}</p>
+        <div data-match></div>
+        <div data-q2></div>`;
+      const ctrls = {};
+      m.querySelectorAll('[data-etoggle]').forEach(btn => btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-etoggle');
+        const svg = m.querySelector(`[data-model="${id}"] svg`);
+        if (ctrls[id]) {
+          ctrls[id].stop(); ctrls[id] = null;
+          btn.textContent = (S.viewed[id] ? '✓ ' : '') + _('⚡ Show valence electrons moving', '⚡ Mostrar electrones de valencia en movimiento');
+          return;
+        }
+        ctrls[id] = runElectrons(svg, id);
+        btn.textContent = '✓ ' + _('Hide the electrons', 'Ocultar los electrones');
+        if (!S.viewed[id]) { S.viewed[id] = 1; onChange(); }
+      }));
+      // picture match
+      const order = ['metallic', 'ionic', 'network', 'molecular'];
+      const matchEl = m.querySelector('[data-match]');
+      function paintMatch() {
+        matchEl.innerHTML = order.map((id, i) => `
+          <div class="eg-match${S.match[id] ? ' solved' : ''}" data-mrow="${id}">
+            ${modelSvg(id, uid + 'q' + id, _('Unlabeled bonding picture', 'Imagen de enlace sin nombre') + ' ' + (i + 1))}
+            <div><div class="eg-row">${MODELS.map(md => `<button type="button" class="eg-opt${S.match[id] && md.id === id ? ' good' : ''}" data-guess="${md.id}" ${S.match[id] ? 'disabled' : ''}>${escapeHtml(tr(md.name, lang))}</button>`).join('')}</div>
+              <div class="eg-flash" data-mfl>${S.match[id] ? '' : ''}</div>${S.match[id] ? `<p class="eg-tip" style="margin:0.4rem 0 0">✓ ${escapeHtml(tr(MODEL(id).cap, lang))}</p>` : ''}</div>
+          </div>`).join('');
+      }
+      paintMatch();
+      matchEl.addEventListener('click', e => {
+        const b = e.target.closest('[data-guess]');
+        const row = e.target.closest('[data-mrow]');
+        if (!b || !row || b.disabled) return;
+        const id = row.getAttribute('data-mrow'), g = b.getAttribute('data-guess');
+        if (g === id) { S.match[id] = 1; paintMatch(); onChange(); }
+        else {
+          b.classList.add('wrong'); b.disabled = true;
+          row.querySelector('[data-mfl]').textContent = tr(MODEL(id).hint, lang);
+        }
+      });
+      mountAck(m.querySelector('[data-q2]'), { label: _('I answered Question 2 in my packet.', 'Respondí la Pregunta 2 en mi paquete.'), checked: !!S.ack1, onToggle: v => { S.ack1 = v ? 1 : 0; onChange(); } });
+      m.querySelector('[data-q2]').insertAdjacentHTML('afterbegin', writeBox(_('In your packet — Question 2', 'En tu paquete — Pregunta 2'),
+        `<p>${P('Use the handout to answer: “What do the pictures of the four models of bonding attempt to show?” Write it in your own words.', 'Usa la hoja para responder: “¿Qué intentan mostrar las imágenes de los cuatro modelos de enlace?” Escríbelo con tus propias palabras.')}</p>`));
+    }
+
+    function mount2(m) {
+      m.innerHTML = `${handoutRef(lang)}${atomBar(lang, ['H', 'C', 'O', 'S', 'Cl', 'Si', 'Na', 'Mg', 'Cu', 'Hg', 'Pt'])}
+        <div data-sorter></div><div data-after></div>`;
+      const after = m.querySelector('[data-after]');
+      function afterSort() {
+        after.innerHTML = `<div data-box></div><div data-ack></div>`;
+        after.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — the results table', 'En tu paquete — la tabla de resultados'),
+          `<p>${P('Write the 16 substances into the table in your packet, in the column for the bonding type you sorted them into: Ionic, Network covalent, Metallic, or Molecular covalent. Use the formulas from the cards (like NaCl(aq) or C(s)).', 'Escribe las 16 sustancias en la tabla de tu paquete, en la columna del tipo de enlace en que las clasificaste: Iónico, Covalente de red, Metálico o Covalente molecular. Usa las fórmulas de las tarjetas (como NaCl(aq) o C(s)).')}</p>`);
+        mountAck(after.querySelector('[data-ack]'), { label: _('I copied all 16 substances into the results table in my packet.', 'Copié las 16 sustancias en la tabla de resultados de mi paquete.'), checked: !!S.ack2, onToggle: v => { S.ack2 = v ? 1 : 0; onChange(); } });
+      }
+      mountCardSorter(m.querySelector('[data-sorter]'), {
+        lang, placed: S.sort, onChange: () => onChange(), onWrong: () => { S.sortErr++; }, onDone: afterSort
+      });
+      if (count(S.sort) === CARDS.length) afterSort();
+    }
+
+    function mount3(m) {
+      m.innerHTML = `${handoutRef(lang)}
+        <p class="eg-tip">${P('Tap a card. You\'ll see how it measures up against each property on the handout for the model you sorted it into. Look at several — especially any that make you wonder.', 'Toca una tarjeta. Verás cómo se compara con cada propiedad de la hoja para el modelo en el que la clasificaste. Mira varias — sobre todo las que te hagan dudar.')}</p>
+        <div class="eg-pick" data-pick></div><div data-detail></div><div data-q></div>`;
+      const pick = m.querySelector('[data-pick]'), detail = m.querySelector('[data-detail]');
+      let cur = null;
+      const STAT = {
+        ok: ['✅', _('matches', 'coincide')], no: ['❌', _('does not match', 'no coincide')],
+        part: ['🟡', _('partly matches', 'coincide en parte')], na: ['➖', _('not shown on this card', 'no aparece en esta tarjeta')]
+      };
+      function paintPick() {
+        pick.innerHTML = CARDS.map(c => `<button type="button" class="eg-chip${cur === c.id ? ' sel' : ''}${S.chk[c.id] ? ' seen' : ''}" data-c="${c.id}">${c.icon} ${escapeHtml(tr(c.name, lang))} <span class="eg-fm">${c.f}${stateTag(c.s)}</span></button>`).join('');
+      }
+      function paintDetail() {
+        const c = CARDS.find(x => x.id === cur);
+        if (!c) { detail.innerHTML = ''; return; }
+        const md = MODEL(c.bin), tests = fitTests(c)[c.bin];
+        detail.innerHTML = `<div class="eg-match" style="grid-template-columns:minmax(170px,230px) 1fr;align-items:start"><span class="eg-card" style="cursor:default">${cardHtml(c, lang)}</span>
+          <div><p style="margin:0 0 0.3rem"><strong>${escapeHtml(_('You sorted it into:', 'La clasificaste en:'))}</strong> <span style="color:${md.color};font-weight:700">${escapeHtml(_('Model', 'Modelo'))} ${md.n}: ${escapeHtml(tr(md.name, lang))}</span></p>
+          <div class="eg-tablewrap"><table class="eg-fit"><thead><tr><th>${P('Handout property', 'Propiedad de la hoja')}</th><th>${P('This card', 'Esta tarjeta')}</th></tr></thead><tbody>
+          ${md.props.map((p, i) => `<tr><td>${escapeHtml(tr(p, lang))}</td><td class="${tests[i]}">${STAT[tests[i]][0]} ${escapeHtml(STAT[tests[i]][1])}</td></tr>`).join('')}</tbody></table></div></div></div>`;
+      }
+      pick.addEventListener('click', e => {
+        const b = e.target.closest('[data-c]');
+        if (!b) return;
+        cur = b.getAttribute('data-c');
+        if (!S.chk[cur]) { S.chk[cur] = 1; onChange(); }
+        paintPick(); paintDetail();
+      });
+      paintPick();
+      m.querySelector('[data-q]').innerHTML = `<div data-box></div><div data-ack></div>`;
+      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 1 and 3', 'En tu paquete — Preguntas 1 y 3'), `
+        <ol><li><strong>${P('Question 1:', 'Pregunta 1:')}</strong> ${P('Are there any substances that don\'t seem to fit properly in the categories you placed them in? List them and explain. (Tip: check every property, one at a time, and think about what is inside each formula.)', '¿Hay sustancias que no parecen encajar bien en las categorías en que las colocaste? Escríbelas y explica. (Consejo: revisa cada propiedad, una por una, y piensa en lo que hay dentro de cada fórmula.)')}</li>
+        <li><strong>${P('Question 3:', 'Pregunta 3:')}</strong> ${P('Use the handout to give the type of bonding for a substance made up entirely of metal atoms; for one made of both metal and nonmetal atoms; and for one made entirely of nonmetal atoms.', 'Usa la hoja para dar el tipo de enlace de una sustancia hecha totalmente de átomos de metal; de una hecha de átomos de metal y de no metal; y de una hecha totalmente de átomos de no metal.')}</li></ol>`);
+      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 1 and 3 in my packet.', 'Respondí las Preguntas 1 y 3 en mi paquete.'), checked: !!S.ack3, onToggle: v => { S.ack3 = v ? 1 : 0; onChange(); } });
+    }
+
+    function mount4(m) {
+      m.innerHTML = `${handoutRef(lang)}<div data-zoom></div><div data-q></div>`;
+      mountZoomIn(m.querySelector('[data-zoom]'), { lang, S, onChange: () => { onChange(); } });
+      m.querySelector('[data-q]').innerHTML = `<div data-box></div><div data-ack></div>`;
+      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 4, 5, and 6', 'En tu paquete — Preguntas 4, 5 y 6'), `
+        <ol start="4"><li>${P('Some substances made up entirely of nonmetal atoms are soluble in water, while others are not. Use the bonding models to explain why.', 'Algunas sustancias hechas totalmente de átomos de no metal son solubles en agua y otras no. Usa los modelos de enlace para explicar por qué.')}</li>
+        <li>${P('How might the model for network covalent bonding explain the incredible hardness of a diamond?', '¿Cómo podría el modelo de enlace covalente de red explicar la increíble dureza de un diamante?')}</li>
+        <li>${P('Both sugar and salt dissolve in water, but they bond differently. Use the models to explain how these two substances might be different after they dissolve.', 'Tanto el azúcar como la sal se disuelven en agua, pero tienen enlaces diferentes. Usa los modelos para explicar en qué podrían ser diferentes estas dos sustancias después de disolverse.')}</li></ol>`);
+      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 4–6 in my packet.', 'Respondí las Preguntas 4–6 en mi paquete.'), checked: !!S.ack4, onToggle: v => { S.ack4 = v ? 1 : 0; onChange(); } });
+    }
+
+    function mount5(m) {
+      m.innerHTML = `${handoutRef(lang)}
+        <div class="note-box"><span class="note-icon">🧭</span><span>${P('Step 1: tap what TYPE of atom each symbol is (use the periodic table: metals on the left, nonmetals on the right, metalloids along the staircase). Step 2: choose the bonding model.', 'Paso 1: toca qué TIPO de átomo es cada símbolo (usa la tabla periódica: metales a la izquierda, no metales a la derecha, metaloides a lo largo de la escalera). Paso 2: elige el modelo de enlace.')}</span></div>
+        <div data-list></div><div data-q></div>`;
+      const list = m.querySelector('[data-list]');
+      const typed = PRACTICE.map(() => ({})); // per formula: {elementIndex: true} once correct (not saved; cheap to redo)
+      function paintItem(i) {
+        const p = PRACTICE[i], el = list.querySelector(`[data-item="${i}"]`);
+        const typedAll = S.prac[i] || p.els.every((e, k) => typed[i][k]);
+        const solved = !!S.prac[i];
+        el.className = 'eg-prac' + (solved ? ' done' : '');
+        el.innerHTML = `<h4>${p.f}<small>${escapeHtml(tr(p.name, lang))} (${p.s})</small></h4>
+          <p class="eg-tip" style="margin:0 0 0.4rem">${escapeHtml(tr(p.clue, lang))}</p>
+          ${p.els.map((e, k) => `<div class="eg-el-row"><span class="eg-sym">${e[0]}</span>${['M', 'N', 'X'].map(t => `<button type="button" class="eg-opt${(solved || typed[i][k]) && e[1] === t ? ' good' : ''}" data-i="${i}" data-k="${k}" data-t="${t}" ${(solved || typed[i][k]) ? 'disabled' : ''}>${escapeHtml(tr(TYPE_NAME[t], lang))}</button>`).join('')}</div>`).join('')}
+          ${typedAll ? `<p style="margin:0.5rem 0 0.3rem"><strong>${escapeHtml(_('Atoms here:', 'Átomos aquí:'))}</strong> ${escapeHtml(tr(MK_NAME[p.mk], lang))}. <strong>${escapeHtml(_('Which bonding model?', '¿Qué modelo de enlace?'))}</strong></p>
+          <div class="eg-row">${BIN_ORDER.map(b => `<button type="button" class="eg-opt${solved && b === p.bin ? ' good' : ''}" data-i="${i}" data-m="${b}" ${solved ? 'disabled' : ''}>${escapeHtml(tr(BIN_NAME[b], lang))}</button>`).join('')}</div>` : ''}
+          <div class="eg-flash" data-fl></div>
+          ${solved ? `<p class="eg-tip" style="margin:0.4rem 0 0">✓ ${escapeHtml(tr(MODEL(p.bin).cap, lang))}</p>` : ''}`;
+      }
+      list.innerHTML = PRACTICE.map((p, i) => `<div data-item="${i}"></div>`).join('');
+      PRACTICE.forEach((p, i) => paintItem(i));
+      list.addEventListener('click', e => {
+        const b = e.target.closest('button[data-i]');
+        if (!b || b.disabled) return;
+        const i = Number(b.getAttribute('data-i')), p = PRACTICE[i];
+        if (b.hasAttribute('data-t')) {
+          const k = Number(b.getAttribute('data-k')), t = b.getAttribute('data-t');
+          if (p.els[k][1] === t) { typed[i][k] = true; paintItem(i); }
+          else { b.classList.add('wrong'); b.disabled = true; list.querySelector(`[data-item="${i}"] [data-fl]`).textContent = _('Not quite. Find that element on the periodic table: is it left of the staircase, right of it, or on it?', 'No exactamente. Busca ese elemento en la tabla periódica: ¿está a la izquierda de la escalera, a la derecha o sobre ella?'); }
+        } else {
+          const mdl = b.getAttribute('data-m');
+          if (mdl === p.bin) { S.prac[i] = 1; paintItem(i); onChange(); }
+          else { b.classList.add('wrong'); b.disabled = true; list.querySelector(`[data-item="${i}"] [data-fl]`).textContent = sortHint(p, mdl, lang); }
+        }
+      });
+      m.querySelector('[data-q]').innerHTML = `<div data-box></div><div data-ack></div>`;
+      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 7, 8, and 9', 'En tu paquete — Preguntas 7, 8 y 9'), `
+        <ol start="7"><li>${P('Which bonding model would you predict for KI, CO₂, Au, and Cl₂? Which are compounds and which are elements?', '¿Qué modelo de enlace predices para KI, CO₂, Au y Cl₂? ¿Cuáles son compuestos y cuáles son elementos?')}</li>
+        <li>${P('Which of the bonding models are found in elemental substances? Explain, using examples.', '¿Cuáles de los modelos de enlace se encuentran en sustancias elementales? Explica, usando ejemplos.')}</li>
+        <li><strong>${P('Making Sense:', 'Dándole sentido:')}</strong> ${P('If you have the chemical formula of a substance, what can you figure out about its properties? Explain. Use the compound silver nitrate, AgNO₃, as an example.', 'Si tienes la fórmula química de una sustancia, ¿qué puedes deducir sobre sus propiedades? Explica. Usa el compuesto nitrato de plata, AgNO₃, como ejemplo.')}</li></ol>`);
+      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 7–9 in my packet.', 'Respondí las Preguntas 7–9 en mi paquete.'), checked: !!S.ack5, onToggle: v => { S.ack5 = v ? 1 : 0; onChange(); } });
+    }
+
+    // ---- graded check
+    function renderQuiz(m) {
+      if (Q.length >= QUESTIONS.length && ctx.getProgress() && ctx.getProgress().status === 'completed') { renderSummary(m); return; }
+      if (Q.length >= QUESTIONS.length) { finishQuiz(m); return; }
+      renderQuestion(m, Q.length);
+    }
+    function renderQuestion(m, index) {
+      const q = QUESTIONS[index];
+      const pct = Math.round((index / QUESTIONS.length) * 100);
+      m.innerHTML = `
+        <div class="quiz-question-count">${escapeHtml(_(`Question ${index + 1} of ${QUESTIONS.length}`, `Pregunta ${index + 1} de ${QUESTIONS.length}`))}</div>
+        <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+        <p class="quiz-prompt">${escapeHtml(tr(q.prompt, lang))}</p>
+        <div data-answers>${q.choices.map((c, i) => `<button type="button" class="eg-choice" data-choice="${i}">${escapeHtml(tr(c, lang))}</button>`).join('')}</div>
+        <div data-fb></div>
+        <button type="button" class="eg-next-btn" data-next style="display:none">${escapeHtml(_('Next Question', 'Siguiente Pregunta'))}</button>`;
+      const fb = m.querySelector('[data-fb]'), nextBtn = m.querySelector('[data-next]');
+      let submitted = false;
+      m.querySelectorAll('[data-choice]').forEach(btn => btn.addEventListener('click', () => {
+        if (submitted) return;
+        submitted = true;
+        const resp = Number(btn.getAttribute('data-choice'));
+        const correct = resp === q.correct;
+        m.querySelectorAll('[data-choice]').forEach(el => {
+          el.disabled = true;
+          const v = Number(el.getAttribute('data-choice'));
+          if (v === q.correct) el.classList.add('selected-correct'); else if (el === btn) el.classList.add('selected-incorrect');
+        });
+        fb.innerHTML = `<div class="eg-feedback ${correct ? 'correct' : 'incorrect'}">${correct ? escapeHtml(_('✓ Correct!', '✓ ¡Correcto!')) : escapeHtml(_('✗ Not quite.', '✗ No exactamente.'))} ${escapeHtml(tr(q.explanation, lang))}</div>`;
+        Q = Q.concat([{ questionId: q.id, response: resp, correct }]);
+        save(true);
+        nextBtn.style.display = 'inline-block';
+        nextBtn.addEventListener('click', () => renderQuiz(m), { once: true });
+      }));
+    }
+    async function finishQuiz(m) {
+      await ctx.saveProgress(Object.assign(buildRecord(), { status: 'completed' }));
+      updateUI();
+      renderSummary(m);
+    }
+    function renderSummary(m) {
+      const progress = ctx.getProgress();
+      const score = Q.filter(a => a.correct).length;
+      const code = progress && progress.code ? progress.code : '';
+      m.innerHTML = `
+        <div class="eg-summary">
+          <div class="eg-score">${score} / ${QUESTIONS.length}</div>
+          ${code ? `<p class="eg-code-label">${escapeHtml(_('Your completion code', 'Tu código de finalización'))}</p><div class="eg-code">${escapeHtml(code)}</div>`
+                 : `<p><button type="button" class="eg-retake-btn" data-showcode>${escapeHtml(_('Show my code', 'Mostrar mi código'))}</button></p>`}
+          <p>${escapeHtml(_('Nice work! You can retake the check any time — your most recent attempt is what\'s saved and sent to your teacher. Keep your worksheet: it is part of today\'s lesson.', '¡Buen trabajo! Puedes repetir la comprobación en cualquier momento — se guarda y se envía a tu maestro tu intento más reciente. Guarda tu hoja de trabajo: es parte de la lección de hoy.'))}</p>
+          <button type="button" class="eg-retake-btn" data-retake>${escapeHtml(_('Retake the check', 'Repetir la comprobación'))}</button>
+        </div>`;
+      const showBtn = m.querySelector('[data-showcode]');
+      if (showBtn) showBtn.addEventListener('click', async () => {
+        showBtn.disabled = true;
+        await ctx.saveProgress(Object.assign({}, buildRecord(), { status: 'completed' }));
+        renderSummary(m);
+      });
+      m.querySelector('[data-retake]').addEventListener('click', async () => {
+        Q = [];
+        await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: QUESTIONS.length, answers: [{ questionId: '_lab', state: S }] });
+        updateUI(); renderQuiz(m);
+      });
+    }
+    function mount6(m) { renderQuiz(m); }
+
+    const MOUNTS = [mount0, mount1, mount2, mount3, mount4, mount5, mount6];
+
+    // ---- initial view: resume at the right place
+    updateUI();
+    let startAt = 0;
+    for (let i = 0; i < SECTIONS.length; i++) { if (!S.done[i]) { startAt = i; break; } startAt = i + 1; }
+    openSection(Math.min(startAt, QUIZ_INDEX), false);
+    if (Q.length >= QUESTIONS.length) updateUI();
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['electron-glue'] = { render };
+})();

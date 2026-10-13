@@ -62,6 +62,14 @@ const CONTENT = {
           title: 'Lesson 25: You Light Up My Life (Virtual Lab)',
           description: 'A virtual version of the conductivity and solubility lab — build the tester, then test ten substances at the bench while recording your predictions and results in your packet. Includes a sorting activity, the metal/nonmetal pattern, a test of your rule on new substances, and a short graded check.',
           estimatedMinutes: 40
+        },
+        {
+          id: 'electron-glue',
+          chapter: 'Chapter 5 · Building with Matter',
+          type: 'review',
+          title: 'Lesson 26: Electron Glue (Bonding)',
+          description: 'The Four Models of Bonding handout and the 16 Substance Cards, online — watch valence electrons move in each model, sort the cards into ionic, molecular covalent, metallic, and network covalent, watch salt and sugar dissolve, and predict bonding from formulas. Answer the worksheet in your packet; ends with a short graded check.',
+          estimatedMinutes: 45
         }
       ]
     }
