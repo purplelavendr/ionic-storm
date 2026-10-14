@@ -35,8 +35,9 @@
 <script src="../js/activities/moving-electrons-review.js"></script>
 <script src="../js/activities/conductivity-lab.js"></script>
 <script src="../js/activities/electron-glue.js"></script>
+<script src="../js/activities/unit1-review.js"></script>
 <script>
-  const ACTIVITY_ID = new URLSearchParams(location.search).get('a') || 'elements-review'; // or ?a=matter-review / ?a=atomic-models / ?a=particles-review / ?a=moving-electrons-review / ?a=conductivity-lab / ?a=electron-glue
+  const ACTIVITY_ID = new URLSearchParams(location.search).get('a') || 'elements-review'; // or ?a=matter-review / ?a=atomic-models / ?a=particles-review / ?a=moving-electrons-review / ?a=conductivity-lab / ?a=electron-glue / ?a=unit1-review
 
   const ACTIVITY_META = {
     'matter-review': { title: 'Chapter 1 Review: Defining Matter', unitId: 'unit1-alchemy' },
@@ -45,7 +46,8 @@
     'particles-review': { title: 'Chapter 3 Review: A World of Particles', unitId: 'unit1-alchemy' },
     'moving-electrons-review': { title: 'Chapter 4 Review: Moving Electrons', unitId: 'unit1-alchemy' },
     'conductivity-lab': { title: 'Lesson 25: You Light Up My Life (Virtual Lab)', unitId: 'unit1-alchemy' },
-    'electron-glue': { title: 'Lesson 26: Electron Glue (Bonding)', unitId: 'unit1-alchemy' }
+    'electron-glue': { title: 'Lesson 26: Electron Glue (Bonding)', unitId: 'unit1-alchemy' },
+    'unit1-review': { title: 'Unit 1 Review: Alchemy', unitId: 'unit1-alchemy' }
   };
 
   let progress = null; // in-memory, mimics one activity's saved record
