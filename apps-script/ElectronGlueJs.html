@@ -1,18 +1,18 @@
 <script>
 // "Lesson 26: Electron Glue — Bonding" (registered as CONTENT activity id 'electron-glue').
 // Puts the Four Models of Bonding handout and the 16 Substance Cards online and interactive.
-// Students still write their worksheet answers (Questions 1-9) in their paper packet; this
+// Students still write their worksheet answers (packet Questions 1-10) in their paper packet; this
 // activity is the handout + cards + the tools for thinking with them:
 //
 //   0 Mission briefing
 //   1 The handout, online: four bonding pictures with animated valence electrons, a
-//     "which picture is which model?" match, and a packet prompt for worksheet Q2
+//     "which picture is which model?" match, and a packet prompt for packet Q3
 //   2 The 16 substance cards: click-or-drag sort into the four bonding categories
 //     (the worksheet's results table), with the handout and an atom-type bar on hand
 //   3 Check the fit: compare any card with its model's property list, property by property
-//     (feeds worksheet Q1 "which ones don't fit?") + packet prompt for Q3
-//   4 Zoom in: salt vs. sugar dissolving (predict, then watch) + packet prompt for Q4-Q6
-//   5 Predict from the formula: new formulas, atom types -> bonding model, + prompt for Q7-Q9
+//     (feeds packet Q2 "which ones don't fit?") + packet prompt for Q4
+//   4 Zoom in: salt vs. sugar dissolving (predict, then watch) + packet prompt for Q5-Q7
+//   5 Predict from the formula: new formulas, atom types -> bonding model, + prompt for Q8-Q10
 //   6 Graded check (7 questions) with a completion code
 //
 // Learning targets:
@@ -736,7 +736,7 @@
         resultEl.innerHTML = `<div class="eg-result"><strong>${escapeHtml(right ? _('✓ Your prediction was right.', '✓ Tu predicción fue correcta.') : _('Your prediction was different — look closely at what the particles did.', 'Tu predicción fue diferente — observa bien lo que hicieron las partículas.'))}</strong> ${mode === 'salt'
           ? escapeHtml(_('The solid fell apart into separate charged particles (ions: + and −) that spread through the water. Charged particles that are free to move carry the current, so the bulb lights.', 'El sólido se separó en partículas con carga individuales (iones: + y −) que se esparcieron por el agua. Las partículas con carga libres para moverse llevan la corriente, así que el foco se enciende.'))
           : escapeHtml(_('The solid separated into whole molecules. Each molecule stays together as a small neutral unit — no charged particles are free to move, so the bulb stays dark.', 'El sólido se separó en moléculas completas. Cada molécula se mantiene unida como una pequeña unidad neutra — no hay partículas con carga libres para moverse, así que el foco sigue apagado.'))}</div>
-          <p class="eg-tip">${escapeHtml(_('Now compare the two tabs: what happened to the ORIGINAL pieces of the solid in each? That is the heart of worksheet Question 6.', 'Ahora compara las dos pestañas: ¿qué pasó con las piezas ORIGINALES del sólido en cada una? Ese es el centro de la Pregunta 6 de la hoja.'))}</p>`;
+          <p class="eg-tip">${escapeHtml(_('Now compare the two tabs: what happened to the ORIGINAL pieces of the solid in each? That is the heart of Question 7 in your packet.', 'Ahora compara las dos pestañas: ¿qué pasó con las piezas ORIGINALES del sólido en cada una? Ese es el centro de la Pregunta 7 de tu paquete.'))}</p>`;
         S.zoom[mode] = 1; paintTabs(); onChange();
       }
       function frame(ms) {
@@ -835,11 +835,11 @@
     ];
     const gateHints = [
       _('Write your name, date, and period on your packet, then check the box.', 'Escribe tu nombre, fecha y período en tu paquete y marca la casilla.'),
-      _('Turn on the valence electrons for all four models, match all four pictures, then answer Question 2 in your packet and check the box.', 'Activa los electrones de valencia en los cuatro modelos, relaciona las cuatro imágenes, responde la Pregunta 2 en tu paquete y marca la casilla.'),
-      _('Sort all 16 cards, copy your results into the table in your packet, then check the box.', 'Clasifica las 16 tarjetas, copia tus resultados en la tabla de tu paquete y marca la casilla.'),
-      _('Check the fit of at least 6 different cards, answer Questions 1 and 3 in your packet, then check the box.', 'Revisa el ajuste de al menos 6 tarjetas diferentes, responde las Preguntas 1 y 3 en tu paquete y marca la casilla.'),
-      _('Watch both salt and sugar dissolve, answer Questions 4–6 in your packet, then check the box.', 'Observa cómo se disuelven la sal y el azúcar, responde las Preguntas 4–6 en tu paquete y marca la casilla.'),
-      _('Finish all six formulas, answer Questions 7–9 in your packet, then check the box.', 'Termina las seis fórmulas, responde las Preguntas 7–9 en tu paquete y marca la casilla.')
+      _('Turn on the valence electrons for all four models, match all four pictures, then answer Question 3 in your packet and check the box.', 'Activa los electrones de valencia en los cuatro modelos, relaciona las cuatro imágenes, responde la Pregunta 3 en tu paquete y marca la casilla.'),
+      _('Sort all 16 cards, copy your results into the table in Question 1 of your packet, then check the box.', 'Clasifica las 16 tarjetas, copia tus resultados en la tabla de la Pregunta 1 de tu paquete y marca la casilla.'),
+      _('Check the fit of at least 6 different cards, answer Questions 2 and 4 in your packet, then check the box.', 'Revisa el ajuste de al menos 6 tarjetas diferentes, responde las Preguntas 2 y 4 en tu paquete y marca la casilla.'),
+      _('Watch both salt and sugar dissolve, answer Questions 5–7 in your packet, then check the box.', 'Observa cómo se disuelven la sal y el azúcar, responde las Preguntas 5–7 en tu paquete y marca la casilla.'),
+      _('Finish all six formulas, answer Questions 8–10 in your packet, then check the box.', 'Termina las seis fórmulas, responde las Preguntas 8–10 en tu paquete y marca la casilla.')
     ];
     function prereq(i) { return i === 0 || gates[i - 1](); }
 
@@ -1064,8 +1064,8 @@
           row.querySelector('[data-mfl]').textContent = tr(MODEL(id).hint, lang);
         }
       });
-      mountAck(m.querySelector('[data-q2]'), { label: _('I answered Question 2 in my packet.', 'Respondí la Pregunta 2 en mi paquete.'), checked: !!S.ack1, onToggle: v => { S.ack1 = v ? 1 : 0; onChange(); } });
-      m.querySelector('[data-q2]').insertAdjacentHTML('afterbegin', writeBox(_('In your packet — Question 2', 'En tu paquete — Pregunta 2'),
+      mountAck(m.querySelector('[data-q2]'), { label: _('I answered Question 3 in my packet.', 'Respondí la Pregunta 3 en mi paquete.'), checked: !!S.ack1, onToggle: v => { S.ack1 = v ? 1 : 0; onChange(); } });
+      m.querySelector('[data-q2]').insertAdjacentHTML('afterbegin', writeBox(_('In your packet — Question 3', 'En tu paquete — Pregunta 3'),
         `<p>${P('Use the handout to answer: “What do the pictures of the four models of bonding attempt to show?” Write it in your own words.', 'Usa la hoja para responder: “¿Qué intentan mostrar las imágenes de los cuatro modelos de enlace?” Escríbelo con tus propias palabras.')}</p>`));
     }
 
@@ -1075,9 +1075,9 @@
       const after = m.querySelector('[data-after]');
       function afterSort() {
         after.innerHTML = `<div data-box></div><div data-ack></div>`;
-        after.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — the results table', 'En tu paquete — la tabla de resultados'),
+        after.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Question 1 (the results table)', 'En tu paquete — Pregunta 1 (la tabla de resultados)'),
           `<p>${P('Write the 16 substances into the table in your packet, in the column for the bonding type you sorted them into: Ionic, Network covalent, Metallic, or Molecular covalent. Use the formulas from the cards (like NaCl(aq) or C(s)).', 'Escribe las 16 sustancias en la tabla de tu paquete, en la columna del tipo de enlace en que las clasificaste: Iónico, Covalente de red, Metálico o Covalente molecular. Usa las fórmulas de las tarjetas (como NaCl(aq) o C(s)).')}</p>`);
-        mountAck(after.querySelector('[data-ack]'), { label: _('I copied all 16 substances into the results table in my packet.', 'Copié las 16 sustancias en la tabla de resultados de mi paquete.'), checked: !!S.ack2, onToggle: v => { S.ack2 = v ? 1 : 0; onChange(); } });
+        mountAck(after.querySelector('[data-ack]'), { label: _('I copied all 16 substances into the table for Question 1 in my packet.', 'Copié las 16 sustancias en la tabla de la Pregunta 1 de mi paquete.'), checked: !!S.ack2, onToggle: v => { S.ack2 = v ? 1 : 0; onChange(); } });
       }
       mountCardSorter(m.querySelector('[data-sorter]'), {
         lang, placed: S.sort, onChange: () => onChange(), onWrong: () => { S.sortErr++; }, onDone: afterSort
@@ -1116,21 +1116,21 @@
       });
       paintPick();
       m.querySelector('[data-q]').innerHTML = `<div data-box></div><div data-ack></div>`;
-      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 1 and 3', 'En tu paquete — Preguntas 1 y 3'), `
-        <ol><li><strong>${P('Question 1:', 'Pregunta 1:')}</strong> ${P('Are there any substances that don\'t seem to fit properly in the categories you placed them in? List them and explain. (Tip: check every property, one at a time, and think about what is inside each formula.)', '¿Hay sustancias que no parecen encajar bien en las categorías en que las colocaste? Escríbelas y explica. (Consejo: revisa cada propiedad, una por una, y piensa en lo que hay dentro de cada fórmula.)')}</li>
-        <li><strong>${P('Question 3:', 'Pregunta 3:')}</strong> ${P('Use the handout to give the type of bonding for a substance made up entirely of metal atoms; for one made of both metal and nonmetal atoms; and for one made entirely of nonmetal atoms.', 'Usa la hoja para dar el tipo de enlace de una sustancia hecha totalmente de átomos de metal; de una hecha de átomos de metal y de no metal; y de una hecha totalmente de átomos de no metal.')}</li></ol>`);
-      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 1 and 3 in my packet.', 'Respondí las Preguntas 1 y 3 en mi paquete.'), checked: !!S.ack3, onToggle: v => { S.ack3 = v ? 1 : 0; onChange(); } });
+      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 2 and 4', 'En tu paquete — Preguntas 2 y 4'), `
+        <ol><li><strong>${P('Question 2:', 'Pregunta 2:')}</strong> ${P('Are there any substances that don\'t seem to fit properly in the categories you placed them in? List them and explain. (Tip: check every property, one at a time, and think about what is inside each formula.)', '¿Hay sustancias que no parecen encajar bien en las categorías en que las colocaste? Escríbelas y explica. (Consejo: revisa cada propiedad, una por una, y piensa en lo que hay dentro de cada fórmula.)')}</li>
+        <li><strong>${P('Question 4:', 'Pregunta 4:')}</strong> ${P('Use the handout to give the type of bonding for a substance made up entirely of metal atoms; for one made of both metal and nonmetal atoms; and for one made entirely of nonmetal atoms.', 'Usa la hoja para dar el tipo de enlace de una sustancia hecha totalmente de átomos de metal; de una hecha de átomos de metal y de no metal; y de una hecha totalmente de átomos de no metal.')}</li></ol>`);
+      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 2 and 4 in my packet.', 'Respondí las Preguntas 2 y 4 en mi paquete.'), checked: !!S.ack3, onToggle: v => { S.ack3 = v ? 1 : 0; onChange(); } });
     }
 
     function mount4(m) {
       m.innerHTML = `${handoutRef(lang)}<div data-zoom></div><div data-q></div>`;
       mountZoomIn(m.querySelector('[data-zoom]'), { lang, S, onChange: () => { onChange(); } });
       m.querySelector('[data-q]').innerHTML = `<div data-box></div><div data-ack></div>`;
-      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 4, 5, and 6', 'En tu paquete — Preguntas 4, 5 y 6'), `
-        <ol start="4"><li>${P('Some substances made up entirely of nonmetal atoms are soluble in water, while others are not. Use the bonding models to explain why.', 'Algunas sustancias hechas totalmente de átomos de no metal son solubles en agua y otras no. Usa los modelos de enlace para explicar por qué.')}</li>
+      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 5, 6, and 7', 'En tu paquete — Preguntas 5, 6 y 7'), `
+        <ol start="5"><li>${P('Some substances made up entirely of nonmetal atoms are soluble in water, while others are not. Use the bonding models to explain why.', 'Algunas sustancias hechas totalmente de átomos de no metal son solubles en agua y otras no. Usa los modelos de enlace para explicar por qué.')}</li>
         <li>${P('How might the model for network covalent bonding explain the incredible hardness of a diamond?', '¿Cómo podría el modelo de enlace covalente de red explicar la increíble dureza de un diamante?')}</li>
         <li>${P('Both sugar and salt dissolve in water, but they bond differently. Use the models to explain how these two substances might be different after they dissolve.', 'Tanto el azúcar como la sal se disuelven en agua, pero tienen enlaces diferentes. Usa los modelos para explicar en qué podrían ser diferentes estas dos sustancias después de disolverse.')}</li></ol>`);
-      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 4–6 in my packet.', 'Respondí las Preguntas 4–6 en mi paquete.'), checked: !!S.ack4, onToggle: v => { S.ack4 = v ? 1 : 0; onChange(); } });
+      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 5–7 in my packet.', 'Respondí las Preguntas 5–7 en mi paquete.'), checked: !!S.ack4, onToggle: v => { S.ack4 = v ? 1 : 0; onChange(); } });
     }
 
     function mount5(m) {
@@ -1169,11 +1169,11 @@
         }
       });
       m.querySelector('[data-q]').innerHTML = `<div data-box></div><div data-ack></div>`;
-      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 7, 8, and 9', 'En tu paquete — Preguntas 7, 8 y 9'), `
-        <ol start="7"><li>${P('Which bonding model would you predict for KI, CO₂, Au, and Cl₂? Which are compounds and which are elements?', '¿Qué modelo de enlace predices para KI, CO₂, Au y Cl₂? ¿Cuáles son compuestos y cuáles son elementos?')}</li>
+      m.querySelector('[data-box]').innerHTML = writeBox(_('In your packet — Questions 8, 9, and 10', 'En tu paquete — Preguntas 8, 9 y 10'), `
+        <ol start="8"><li>${P('Which bonding model would you predict for KI, CO₂, Au, and Cl₂? Which are compounds and which are elements?', '¿Qué modelo de enlace predices para KI, CO₂, Au y Cl₂? ¿Cuáles son compuestos y cuáles son elementos?')}</li>
         <li>${P('Which of the bonding models are found in elemental substances? Explain, using examples.', '¿Cuáles de los modelos de enlace se encuentran en sustancias elementales? Explica, usando ejemplos.')}</li>
         <li><strong>${P('Making Sense:', 'Dándole sentido:')}</strong> ${P('If you have the chemical formula of a substance, what can you figure out about its properties? Explain. Use the compound silver nitrate, AgNO₃, as an example.', 'Si tienes la fórmula química de una sustancia, ¿qué puedes deducir sobre sus propiedades? Explica. Usa el compuesto nitrato de plata, AgNO₃, como ejemplo.')}</li></ol>`);
-      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 7–9 in my packet.', 'Respondí las Preguntas 7–9 en mi paquete.'), checked: !!S.ack5, onToggle: v => { S.ack5 = v ? 1 : 0; onChange(); } });
+      mountAck(m.querySelector('[data-ack]'), { label: _('I answered Questions 8–10 in my packet.', 'Respondí las Preguntas 8–10 en mi paquete.'), checked: !!S.ack5, onToggle: v => { S.ack5 = v ? 1 : 0; onChange(); } });
     }
 
     // ---- graded check
