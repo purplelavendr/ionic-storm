@@ -1,3 +1,4 @@
+// GENERATED student build -- do not edit here. Edit the teacher source under dev/ and run its make-student.py.
 // "Unit 1 Review: Alchemy" (registered as CONTENT activity id 'unit1-review').
 //
 // A 100-minute, cumulative review for the Unit 1 Test, built around 19 of the 20
@@ -594,9 +595,6 @@
   .u1r-lesson table { font-size: 0.78rem; }
 }
 
-/* ---- teacher preview (?preview=1) ---- */
-.u1r-lesson .u1r-preview { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; background: #fef3c7; border: 1px dashed #d97706; border-radius: 8px; padding: 0.5rem 0.8rem; margin-bottom: 0.9rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #78350f; }
-.u1r-lesson .u1r-preview label { display: flex; align-items: center; gap: 0.35rem; }
 `;
     document.head.appendChild(style);
   }
@@ -1567,15 +1565,6 @@
   // Which guided part to revisit for each Key Question.
   const KQ_PART = { 1: 1, 2: 1, 3: 1, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4, 10: 4, 11: 5, 12: 5, 13: 6, 14: 6, 15: 7, 16: 7, 18: 8, 19: 9, 20: 9 };
 
-  // Teacher preview: open with ?preview=1 to click through the graded check with
-// Back / Skip / jump controls. Nothing is graded or saved in preview.
-const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
-  STRINGS.previewBar = { en: 'PREVIEW — nothing is graded or saved', es: 'VISTA PREVIA — nada se califica ni se guarda' };
-  STRINGS.previewBack = { en: '← Back', es: '← Atrás' };
-  STRINGS.previewSkip = { en: 'Skip →', es: 'Saltar →' };
-  STRINGS.previewJump = { en: 'Jump to', es: 'Ir a' };
-  STRINGS.previewDone = { en: 'That was the last question. Nothing was saved.', es: 'Esa fue la última pregunta. No se guardó nada.' };
-  STRINGS.previewRestart = { en: 'Start over', es: 'Empezar de nuevo' };
   STRINGS.answerAll = { en: 'Answer every item first.', es: 'Responde todos los elementos primero.' };
   STRINGS.pickAny = { en: 'Pick at least one.', es: 'Elige al menos uno.' };
   STRINGS.yourAnswersKey = { en: 'Correct answers:', es: 'Respuestas correctas:' };
@@ -1758,7 +1747,6 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
 
   // ---- Graded check engine ----
   function renderQuiz(mount, ctx) {
-    if (PREVIEW) { renderQuizQuestion(mount, ctx, [], 0); return; }
     const progress = ctx.getProgress();
     if (progress && progress.status === 'completed') { renderQuizSummary(mount, ctx); return; }
     const answers = (progress && progress.answers) || [];
@@ -1788,11 +1776,7 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
     const q = QUESTIONS[index];
     const pct = Math.round((index / QUESTIONS.length) * 100);
     const secName = { A: lang === 'es' ? 'A · Palabras que Debes Saber' : 'A · Words to Know', B: lang === 'es' ? 'B · Muestra la Destreza' : 'B · Show the Skill', C: lang === 'es' ? 'C · Corrige el Error' : 'C · Fix the Mistake', D: lang === 'es' ? 'D · Explícalo' : 'D · Explain It' }[q.sec];
-    const previewBar = PREVIEW ? `<div class="u1r-preview"><strong>${escapeHtml(t('previewBar', lang))}</strong>
-        <button type="button" class="u1r-btn secondary" data-pv="back"${index === 0 ? ' disabled' : ''}>${escapeHtml(t('previewBack', lang))}</button>
-        <button type="button" class="u1r-btn secondary" data-pv="skip">${escapeHtml(t('previewSkip', lang))}</button>
-        <label>${escapeHtml(t('previewJump', lang))} <select class="u1r-sel" data-pv="jump">${QUESTIONS.map((x, i) => `<option value="${i}"${i === index ? ' selected' : ''}>${i + 1}</option>`).join('')}</select></label></div>` : '';
-    mount.innerHTML = previewBar + `
+    mount.innerHTML = `
       <div class="quiz-question-count">${escapeHtml(t('questionCount', lang, index + 1, QUESTIONS.length, q.max || 1))} · ${escapeHtml(secName)}</div>
       <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
       <p class="quiz-prompt">${escapeHtml(tr(q.prompt, lang))}</p>
@@ -1830,7 +1814,7 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
       const prefix = g.correct ? t('correctPrefix', lang) : (g.points > 0 ? t('partialPrefix', lang) : t('incorrectPrefix', lang));
       fbArea.innerHTML = `<div class="cl-feedback ${cls}">${escapeHtml(prefix)} ${escapeHtml(tr(q.explanation, lang))}${keyHtml}</div>`;
       nextBtn.style.display = 'inline-block';
-      if (!PREVIEW) ctx.saveProgress({ status: 'in_progress', score: answers.reduce((s, a) => s + a.points, 0), totalQuestions: TOTAL_POINTS, answers });
+      ctx.saveProgress({ status: 'in_progress', score: answers.reduce((s, a) => s + a.points, 0), totalQuestions: TOTAL_POINTS, answers });
     }
 
     if (q.type === 'mc') {
@@ -1880,23 +1864,7 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
       });
     }
 
-    function goTo(i) {
-      if (i < 0) i = 0;
-      if (i >= QUESTIONS.length) {
-        mount.innerHTML = `<div class="cl-summary"><p>${escapeHtml(t('previewDone', lang))}</p><button type="button" class="cl-retake-btn" id="u1r-pv-restart">${escapeHtml(t('previewRestart', lang))}</button></div>`;
-        mount.querySelector('#u1r-pv-restart').addEventListener('click', () => renderQuizQuestion(mount, ctx, [], 0));
-        return;
-      }
-      renderQuizQuestion(mount, ctx, [], i);
-    }
-    if (PREVIEW) {
-      mount.querySelector('[data-pv="back"]').addEventListener('click', () => goTo(index - 1));
-      mount.querySelector('[data-pv="skip"]').addEventListener('click', () => goTo(index + 1));
-      mount.querySelector('[data-pv="jump"]').addEventListener('change', e => goTo(Number(e.target.value)));
-      nextBtn.addEventListener('click', () => goTo(index + 1));
-    } else {
-      nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
-    }
+    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
   }
 
   function sumPoints(answers) { return answers.reduce((s, a) => s + (a.points || 0), 0); }

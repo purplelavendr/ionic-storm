@@ -1,0 +1,1950 @@
+// "Unit 1 Review: Alchemy" (registered as CONTENT activity id 'unit1-review').
+//
+// A 100-minute, cumulative review for the Unit 1 Test, built around 19 of the 20
+// Key Questions (L1-L3, L6-L12, L17-L22, L24-L26) and the learning targets in the
+// Chapter 1-5 packets. Key Question 17 (L23, metals with more than one charge)
+// is intentionally left out. Plan (see PACE): Start Here -> nine guided parts
+// (each ends with one interactive mini-tool + practice) -> an ungraded "Explain
+// It" studio -> a graded check that mirrors the Chapter Check item types (Words
+// to Know, Show the Skill, Fix the Mistake, Explain It).
+//
+// Only the graded check's score is saved via ctx.saveProgress, and its
+// completion code is shown on the summary screen (see CLAUDE.md).
+//
+// Every scenario/element here is deliberately different from the real exam
+// forms and the chapter checks -- same skills, fresh specifics.
+//
+// EN/ES toggle: grading is by answer index/number, never by displayed text.
+(function () {
+  const STYLE_ID = 'u1r-lesson-styles';
+  const FONT_LINK_ID = 'u1r-lesson-fonts';
+  const LANG_KEY = 'ionicstorm_lang_v1';       // shared across every activity
+  const TIMER_KEY = 'ionicstorm_u1r_start_v1'; // when this student started the review
+  const CLASS_MINUTES = 100;
+
+  // Pace plan: [section index, minutes]. Section 0 = Start Here; 1-9 = guided
+  // parts; 10 = Explain It studio; 11 = graded check. Sums to CLASS_MINUTES.
+  const PACE = [3, 5, 6, 5, 6, 6, 7, 6, 5, 6, 10, 35];
+  const SECTION_COUNT = PACE.length;       // 12
+  const QUIZ_SECTION = SECTION_COUNT - 1;  // 11
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function getLang() {
+    try { return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'; } catch (e) { return 'en'; }
+  }
+  function setLang(lang) {
+    try { localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en'); } catch (e) { /* ignore */ }
+  }
+  function tr(field, lang) {
+    return (field && typeof field === 'object') ? (field[lang] || field.en) : field;
+  }
+  function t(key, lang, ...args) {
+    const entry = STRINGS[key] || {};
+    const val = entry[lang] || entry.en;
+    return typeof val === 'function' ? val(...args) : val;
+  }
+  // Subscript digits in a plain formula string: Al2(SO4)3 -> Al<sub>2</sub>(SO<sub>4</sub>)<sub>3</sub>
+  function fmt(formula) {
+    return escapeHtml(formula).replace(/(\d+)/g, '<sub>$1</sub>');
+  }
+  // Ion with charge: ion('SO4', -2) -> SO<sub>4</sub><sup>2−</sup>
+  function ionHtml(sym, charge) {
+    const mag = Math.abs(charge);
+    const sup = (mag === 1 ? '' : String(mag)) + (charge < 0 ? '−' : '+');
+    return fmt(sym) + '<sup>' + sup + '</sup>';
+  }
+
+  const DIFF_LABELS = {
+    en: { basic: 'Basic', medium: 'Medium', challenge: 'Challenge' },
+    es: { basic: 'Básico', medium: 'Medio', challenge: 'Desafío' }
+  };
+
+  const STRINGS = {
+    headerLabel: { en: 'Unit 1 Review · Alchemy · 100-Minute Review', es: 'Repaso de la Unidad 1 · Alquimia · Repaso de 100 Minutos' },
+    headerMeta: { en: 'Self-paced · Covers 19 of the 20 Key Questions · Prep for the Unit 1 Test', es: 'A tu propio ritmo · Cubre 19 de las 20 Preguntas Clave · Preparación para el Examen de la Unidad 1' },
+    langToggleAria: { en: 'Language', es: 'Idioma' },
+    progress: { en: 'Progress', es: 'Progreso' },
+    sectionCount: { en: (done, total) => `${done} / ${total} parts`, es: (done, total) => `${done} / ${total} partes` },
+    timerLabel: { en: (m) => `⏱ ${m} / ${CLASS_MINUTES} min`, es: (m) => `⏱ ${m} / ${CLASS_MINUTES} min` },
+    timerReset: { en: 'Restart clock', es: 'Reiniciar reloj' },
+    partWord: { en: 'Part', es: 'Parte' },
+    keyQuestions: { en: 'Key Questions', es: 'Preguntas Clave' },
+    targets: { en: 'Targets', es: 'Metas' },
+    wordWall: { en: 'Word Wall', es: 'Muro de Palabras' },
+    mustKnow: { en: 'Must know', es: 'Debes saber' },
+    revisit: { en: 'Need more help?', es: '¿Necesitas más ayuda?' },
+    tryIt: { en: 'Try it', es: 'Pruébalo' },
+    practice: { en: 'Practice', es: 'Práctica' },
+    checkForUnderstanding: { en: 'Graded Check', es: 'Comprobación Calificada' },
+    quizTimeGraded: { en: '35 min · graded', es: '35 min · calificado' },
+    quizNote: {
+      en: 'Unlike the parts above, this check <strong>saves your score</strong> and gives you a <strong>completion code</strong> to show your teacher. It mirrors the Chapter Check: Words to Know, Show the Skill, Fix the Mistake, and Explain It. You can retake it — your most recent attempt is what\'s saved.',
+      es: 'A diferencia de las partes anteriores, esta comprobación <strong>guarda tu puntaje</strong> y te da un <strong>código de finalización</strong> para mostrarle a tu maestro. Es como el Chapter Check: Palabras que Debes Saber, Muestra la Destreza, Corrige el Error y Explícalo. Puedes repetirla — se guarda tu intento más reciente.'
+    },
+    markSectionComplete: { en: '✓ Mark Part Complete', es: '✓ Marcar Parte como Completa' },
+    sectionComplete: { en: '✓ Part Complete', es: '✓ Parte Completa' },
+    hintShow: { en: '💡 Hint', es: '💡 Pista' },
+    hintHide: { en: '▲ Hide Hint', es: '▲ Ocultar Pista' },
+    revealAnswer: { en: 'Reveal Answer', es: 'Mostrar Respuesta' },
+    hideAnswer: { en: 'Hide Answer', es: 'Ocultar Respuesta' },
+    answerLabel: { en: '✓ Answer', es: '✓ Respuesta' },
+    questionCount: { en: (n, total, pts) => `Question ${n} of ${total} · ${pts} pt${pts === 1 ? '' : 's'}`, es: (n, total, pts) => `Pregunta ${n} de ${total} · ${pts} pt${pts === 1 ? '' : 's'}` },
+    nextQuestion: { en: 'Next Question', es: 'Siguiente Pregunta' },
+    checkAnswer: { en: 'Check My Answer', es: 'Revisar mi Respuesta' },
+    choose: { en: 'Choose…', es: 'Elige…' },
+    correctPrefix: { en: '✓ Correct!', es: '✓ ¡Correcto!' },
+    partialPrefix: { en: '◐ Partly right.', es: '◐ En parte correcto.' },
+    incorrectPrefix: { en: '✗ Not quite.', es: '✗ No exactamente.' },
+    rowsRight: { en: (r, n) => `${r} of ${n} correct.`, es: (r, n) => `${r} de ${n} correctas.` },
+    retakeQuiz: { en: 'Retake Check', es: 'Repetir la Comprobación' },
+    summaryText: {
+      en: 'Nice work! Anything you missed points to a Key Question to revisit in the parts above. You can retake this any time — your most recent attempt is what\'s saved and sent to your teacher.',
+      es: '¡Buen trabajo! Lo que fallaste señala una Pregunta Clave para repasar en las partes anteriores. Puedes repetirlo en cualquier momento — se guarda y se envía a tu maestro tu intento más reciente.'
+    },
+    showMyCode: { en: 'Show my code', es: 'Mostrar mi código' },
+    completionCode: { en: 'Your completion code — show this to your teacher:', es: 'Tu código de finalización — muéstraselo a tu maestro:' },
+    weakSpots: { en: 'Key Questions to revisit:', es: 'Preguntas Clave para repasar:' },
+    noWeakSpots: { en: 'No weak spots — every Key Question was fully correct. 🎉', es: 'Sin puntos débiles — todas las Preguntas Clave estuvieron completamente correctas. 🎉' }
+  };
+
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.u1r-lesson {
+  --navy: #0d1b2a;
+  --navy-mid: #1b2d42;
+  --navy-light: #253a52;
+  --teal: #2ec4b6;
+  --teal-dim: #1a8c83;
+  --amber: #f4a261;
+  --cream: #f7f3ec;
+  --cream-dark: #ede8df;
+  --text: #1a1a2e;
+  --text-muted: #5a6475;
+  --note-bg: #fff8e7;
+  --note-border: #f4a261;
+  --correct-bg: #e8f8f5;
+  --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.7;
+  background: var(--cream);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.u1r-lesson * { box-sizing: border-box; }
+.u1r-lesson .cl-header {
+  background: var(--navy);
+  color: var(--cream);
+  padding: 2rem 1.75rem 1.6rem;
+  position: relative;
+  overflow: hidden;
+}
+.u1r-lesson .cl-header::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  border: 32px solid rgba(46,196,182,0.12);
+}
+.u1r-lesson .cl-lang-toggle {
+  position: absolute;
+  top: 1.75rem;
+  right: 1.75rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.3rem;
+}
+.u1r-lesson .cl-lang-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(247,243,236,0.35);
+  color: rgba(247,243,236,0.65);
+  cursor: pointer;
+}
+.u1r-lesson .cl-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.u1r-lesson .cl-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
+.u1r-lesson .cl-header-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 0.5rem;
+  position: relative;
+}
+.u1r-lesson .cl-header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 0.4rem;
+  position: relative;
+}
+.u1r-lesson .cl-header h1 span { color: var(--teal); }
+.u1r-lesson .cl-header-meta {
+  font-size: 0.82rem;
+  color: rgba(247,243,236,0.65);
+  font-family: 'JetBrains Mono', monospace;
+  position: relative;
+}
+.u1r-lesson .cl-progress-wrap {
+  background: var(--navy-mid);
+  padding: 0.7rem 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.u1r-lesson .cl-progress-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.u1r-lesson .cl-progress-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.u1r-lesson .cl-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), var(--amber));
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+.u1r-lesson .cl-progress-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: rgba(247,243,236,0.55);
+  white-space: nowrap;
+}
+.u1r-lesson main {
+  padding: 1.5rem 1.25rem 2.5rem;
+}
+.u1r-lesson .section-card {
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 1.1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.u1r-lesson .section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.2rem;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+}
+.u1r-lesson .section-header:hover { background: #fafafa; }
+.u1r-lesson .section-header.open { border-bottom-color: var(--cream-dark); }
+.u1r-lesson .section-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  background: var(--navy);
+  border-radius: 6px;
+  padding: 0.22rem 0.5rem;
+  flex-shrink: 0;
+}
+.u1r-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.u1r-lesson .section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  flex: 1;
+}
+.u1r-lesson .section-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.u1r-lesson .section-arrow {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  transition: transform 0.25s;
+  flex-shrink: 0;
+}
+.u1r-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.u1r-lesson .section-body { display: none; padding: 1.3rem; }
+.u1r-lesson .section-body.open { display: block; animation: clFadeIn 0.25s ease; }
+@keyframes clFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.u1r-lesson h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem;
+  color: var(--navy);
+  margin: 0 0 0.6rem;
+}
+.u1r-lesson h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--navy-mid);
+  margin: 1.1rem 0 0.5rem;
+}
+.u1r-lesson p { margin: 0 0 0.85rem; }
+.u1r-lesson p:last-child { margin-bottom: 0; }
+.u1r-lesson .note-box {
+  background: var(--note-bg);
+  border-left: 4px solid var(--note-border);
+  border-radius: 0 8px 8px 0;
+  padding: 0.9rem 1.1rem;
+  margin: 1.1rem 0;
+  display: flex;
+  gap: 0.7rem;
+  font-size: 0.9rem;
+}
+.u1r-lesson .note-box .note-icon { font-size: 1.15rem; flex-shrink: 0; }
+.u1r-lesson .concept-box {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+  color: var(--cream);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin: 1.1rem 0;
+}
+.u1r-lesson .concept-box .concept-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--teal);
+  margin-bottom: 0.4rem;
+}
+.u1r-lesson .concept-box p { color: rgba(247,243,236,0.92); margin-bottom: 0; }
+.u1r-lesson .info-panel {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  margin: 1.1rem 0;
+  font-size: 0.9rem;
+}
+.u1r-lesson .info-panel .panel-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #0369a1;
+  margin-bottom: 0.35rem;
+}
+.u1r-lesson .diagram-wrap {
+  background: var(--cream-dark);
+  border-radius: 10px;
+  padding: 1.1rem;
+  margin: 1.1rem 0;
+  text-align: center;
+}
+.u1r-lesson .diagram-wrap svg { max-width: 100%; height: auto; }
+.u1r-lesson .diagram-caption {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+.u1r-lesson table { width: 100%; border-collapse: collapse; margin: 0.9rem 0; font-size: 0.85rem; }
+.u1r-lesson th {
+  background: var(--navy);
+  color: var(--cream);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+.u1r-lesson td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cream-dark); }
+.u1r-lesson tr:nth-child(even) td { background: #fafafa; }
+.u1r-lesson ul, .u1r-lesson ol { padding-left: 1.3rem; margin: 0 0 0.85rem; }
+.u1r-lesson li { margin-bottom: 0.3rem; font-size: 0.93rem; }
+.u1r-lesson .objectives-list { list-style: none; padding: 0; margin: 0.4rem 0; }
+.u1r-lesson .objectives-list li {
+  display: flex; align-items: flex-start; gap: 0.55rem;
+  padding: 0.4rem 0; font-size: 0.92rem;
+  border-bottom: 1px solid var(--cream-dark);
+}
+.u1r-lesson .objectives-list li:last-child { border-bottom: none; }
+.u1r-lesson .obj-check { color: var(--teal); flex-shrink: 0; }
+.u1r-lesson .practice-problem {
+  border: 1.5px solid var(--cream-dark);
+  border-radius: 10px;
+  margin-bottom: 1.1rem;
+  overflow: hidden;
+}
+.u1r-lesson .pp-header {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.85rem 1.1rem;
+  background: #fafafa;
+  border-bottom: 1px solid var(--cream-dark);
+}
+.u1r-lesson .pp-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; font-weight: 700; color: white;
+  background: var(--amber);
+  border-radius: 6px; padding: 0.18rem 0.45rem; flex-shrink: 0;
+}
+.u1r-lesson .pp-difficulty {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+  margin-left: auto;
+}
+.u1r-lesson .diff-basic { color: #16a34a; }
+.u1r-lesson .diff-medium { color: #d97706; }
+.u1r-lesson .diff-challenge { color: #dc2626; }
+.u1r-lesson .pp-body { padding: 0.95rem 1.1rem; }
+.u1r-lesson .pp-body p { font-size: 0.92rem; }
+.u1r-lesson .hint-btn, .u1r-lesson .reveal-btn, .u1r-lesson .mark-done-btn, .u1r-lesson .cl-choice, .u1r-lesson .cl-next-btn, .u1r-lesson .cl-retake-btn {
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  border: none;
+}
+.u1r-lesson .hint-btn, .u1r-lesson .reveal-btn {
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.u1r-lesson .hint-btn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; margin-right: 0.5rem; }
+.u1r-lesson .hint-btn:hover { background: #fde68a; }
+.u1r-lesson .reveal-btn { background: var(--navy); color: white; }
+.u1r-lesson .reveal-btn:hover { background: var(--navy-light); }
+.u1r-lesson .hint-box, .u1r-lesson .answer-box {
+  border-radius: 7px; padding: 0.75rem 0.95rem; margin-top: 0.7rem;
+  font-size: 0.87rem; display: none;
+}
+.u1r-lesson .hint-box.open, .u1r-lesson .answer-box.open { display: block; animation: clFadeIn 0.2s ease; }
+.u1r-lesson .hint-box { background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; }
+.u1r-lesson .answer-box { background: var(--correct-bg); border: 1px solid var(--correct-border); color: #065f46; }
+.u1r-lesson .answer-box .answer-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim);
+  margin-bottom: 0.35rem; font-weight: 700;
+}
+.u1r-lesson .mark-done-btn {
+  display: block; width: 100%; margin-top: 1.2rem;
+  background: var(--navy); color: var(--cream);
+  border-radius: 8px; padding: 0.75rem 1rem;
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  transition: background 0.2s;
+}
+.u1r-lesson .mark-done-btn:hover { background: var(--teal-dim); }
+.u1r-lesson .mark-done-btn:disabled { background: var(--teal-dim); cursor: default; opacity: 0.85; }
+.u1r-lesson .quiz-note {
+  background: var(--note-bg);
+  border-left: 4px solid var(--note-border);
+  border-radius: 0 8px 8px 0;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.1rem;
+  font-size: 0.88rem;
+}
+.u1r-lesson .quiz-progress-bar {
+  height: 6px; background: var(--cream-dark); border-radius: 999px; overflow: hidden; margin: 0.6rem 0 0.9rem;
+}
+.u1r-lesson .quiz-progress-fill {
+  height: 100%; background: linear-gradient(90deg, var(--navy), var(--teal)); transition: width 0.2s ease;
+}
+.u1r-lesson .quiz-question-count {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted);
+}
+.u1r-lesson .quiz-prompt {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem; font-weight: 700; color: var(--navy);
+  margin: 0.5rem 0 1rem;
+}
+.u1r-lesson .cl-choice {
+  display: block; width: 100%; text-align: left;
+  background: white; border: 1.5px solid var(--cream-dark);
+  border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem;
+  font-size: 0.93rem; color: var(--text); font-family: 'Source Serif 4', serif;
+  transition: border-color 0.15s, background 0.15s;
+}
+.u1r-lesson .cl-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.u1r-lesson .cl-choice:disabled { cursor: default; }
+.u1r-lesson .cl-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.u1r-lesson .cl-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.u1r-lesson .cl-feedback {
+  border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600;
+}
+.u1r-lesson .cl-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.u1r-lesson .cl-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.u1r-lesson .cl-next-btn, .u1r-lesson .cl-retake-btn {
+  background: var(--navy); color: white; border-radius: 8px;
+  padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem;
+}
+.u1r-lesson .cl-next-btn:hover, .u1r-lesson .cl-retake-btn:hover { background: var(--navy-light); }
+.u1r-lesson .cl-summary { text-align: center; padding: 1rem 0.5rem; }
+.u1r-lesson .cl-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0;
+}
+
+/* ---- 100-minute pacing, badges, word wall ---- */
+.u1r-lesson .cl-timer { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--cream); background: rgba(255,255,255,0.12); border-radius: 999px; padding: 0.2rem 0.65rem; white-space: nowrap; }
+.u1r-lesson .cl-timer.late { background: var(--amber); color: var(--navy); font-weight: 700; }
+.u1r-lesson .cl-timer-reset { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: rgba(247,243,236,0.55); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
+.u1r-lesson .u1r-badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.9rem; }
+.u1r-lesson .u1r-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.04em; border-radius: 999px; padding: 0.15rem 0.6rem; background: var(--navy); color: var(--cream); }
+.u1r-lesson .u1r-badge.alt { background: var(--cream-dark); color: var(--navy-mid); }
+.u1r-lesson .u1r-words { margin: 0.4rem 0 0.9rem; font-size: 0.82rem; }
+.u1r-lesson .u1r-words-label { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-right: 0.4rem; }
+.u1r-lesson .u1r-word { display: inline-block; background: var(--correct-bg); border: 1px solid var(--correct-border); border-radius: 6px; padding: 0 0.45rem; margin: 0.15rem 0.25rem 0.15rem 0; font-size: 0.8rem; }
+.u1r-lesson .u1r-revisit { font-size: 0.82rem; color: var(--text-muted); border-top: 1px dashed var(--cream-dark); margin-top: 1rem; padding-top: 0.6rem; }
+.u1r-lesson .u1r-pace td:last-child, .u1r-lesson .u1r-pace th:last-child { text-align: right; white-space: nowrap; }
+.u1r-lesson .u1r-h-tool { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal-dim); margin: 1.2rem 0 0.4rem; }
+
+/* ---- interactive mini-tools ---- */
+.u1r-lesson .u1r-tool { background: var(--cream-dark); border-radius: 12px; padding: 1.1rem 1.2rem; margin: 0.6rem 0 1.1rem; }
+.u1r-lesson .u1r-tool p { font-size: 0.9rem; }
+.u1r-lesson .u1r-btn { font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none; background: var(--navy); color: white; border-radius: 8px; padding: 0.5rem 0.95rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin: 0.2rem 0.4rem 0.2rem 0; }
+.u1r-lesson .u1r-btn:hover:not(:disabled) { background: var(--navy-light); }
+.u1r-lesson .u1r-btn:disabled { background: #d9d4c8; color: var(--text-muted); cursor: not-allowed; }
+.u1r-lesson .u1r-btn.secondary { background: white; color: var(--navy); border: 1.5px solid var(--navy-light); }
+.u1r-lesson .u1r-fb { font-size: 0.88rem; font-weight: 600; min-height: 1.4em; margin: 0.4rem 0; }
+.u1r-lesson .u1r-fb.ok { color: var(--teal-dim); }
+.u1r-lesson .u1r-fb.bad { color: #b45309; }
+.u1r-lesson .u1r-rows { display: flex; flex-direction: column; gap: 0.45rem; margin: 0.5rem 0 0.7rem; }
+.u1r-lesson .u1r-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.45rem 0.7rem; }
+.u1r-lesson .u1r-row.good { border-color: var(--teal); background: var(--correct-bg); }
+.u1r-lesson .u1r-row.bad { border-color: #dc2626; background: #fef2f2; }
+.u1r-lesson .u1r-row-label { flex: 1 1 180px; font-size: 0.9rem; }
+.u1r-lesson .u1r-row-label.mono { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.u1r-lesson select.u1r-sel, .u1r-lesson input.u1r-num { font-family: 'Source Serif 4', Georgia, serif; font-size: 0.88rem; border: 1.5px solid var(--navy-light); border-radius: 6px; padding: 0.3rem 0.45rem; background: white; color: var(--text); max-width: 100%; }
+.u1r-lesson input.u1r-num { width: 4.2rem; text-align: center; font-family: 'JetBrains Mono', monospace; }
+.u1r-lesson input.u1r-txt { width: 100%; max-width: 380px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; border: 1.5px solid var(--navy-light); border-radius: 6px; padding: 0.4rem 0.5rem; }
+.u1r-lesson .u1r-fields { display: flex; flex-wrap: wrap; gap: 0.8rem; margin: 0.5rem 0 0.7rem; }
+.u1r-lesson .u1r-field { display: flex; flex-direction: column; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); gap: 0.2rem; }
+.u1r-lesson .u1r-field.good input { border-color: var(--teal); background: var(--correct-bg); }
+.u1r-lesson .u1r-field.bad input { border-color: #dc2626; background: #fef2f2; }
+.u1r-lesson .u1r-big { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700; color: var(--navy); }
+.u1r-lesson .u1r-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.6rem; margin: 0.5rem 0; }
+.u1r-lesson .u1r-card { background: white; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.6rem 0.7rem; }
+.u1r-lesson .u1r-card.good { border-color: var(--teal); background: var(--correct-bg); }
+.u1r-lesson .u1r-card.bad { border-color: #dc2626; background: #fef2f2; }
+.u1r-lesson .u1r-card-title { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.3rem; }
+.u1r-lesson .u1r-card-meta { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.4rem; line-height: 1.4; }
+.u1r-lesson .u1r-flame-swatch { width: 74px; height: 74px; border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; margin: 0.2rem auto 0.5rem; box-shadow: 0 0 22px var(--sw, #999); background: var(--sw, #999); }
+.u1r-lesson .u1r-shell-svg { max-width: 190px; width: 100%; height: auto; display: block; margin: 0.4rem auto; }
+.u1r-lesson .u1r-bal { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center; margin: 0.4rem 0 0.8rem; }
+.u1r-lesson .u1r-bal label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.2rem; }
+.u1r-lesson .u1r-bal-out { background: white; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.8rem 1rem; text-align: center; }
+.u1r-lesson .u1r-bal-formula { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 700; color: var(--navy); }
+.u1r-lesson .u1r-bal-name { font-size: 1rem; font-weight: 600; margin: 0.1rem 0 0.4rem; }
+.u1r-lesson .u1r-bal-math { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--navy-mid); }
+.u1r-lesson .u1r-bal-math.zero { color: var(--teal-dim); font-weight: 700; }
+.u1r-lesson .u1r-ec-line { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 700; color: var(--navy); background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.4rem 0.8rem; margin: 0.4rem 0; }
+
+/* ---- Explain It studio ---- */
+.u1r-lesson .u1r-cer { border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1.1rem; background: white; }
+.u1r-lesson .u1r-cer-prompt { font-weight: 600; font-size: 0.95rem; }
+.u1r-lesson .u1r-cer textarea { width: 100%; min-height: 4.5rem; font-family: 'Source Serif 4', Georgia, serif; font-size: 0.9rem; border: 1.5px solid var(--navy-light); border-radius: 8px; padding: 0.5rem 0.6rem; margin: 0.3rem 0 0.5rem; resize: vertical; }
+.u1r-lesson .u1r-cer-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim); font-weight: 700; margin-top: 0.4rem; }
+.u1r-lesson .u1r-cer-model { display: none; margin-top: 0.7rem; background: var(--correct-bg); border: 1px solid var(--correct-border); border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.88rem; }
+.u1r-lesson .u1r-cer-model.open { display: block; }
+.u1r-lesson .u1r-cer-model ul { margin-bottom: 0.4rem; }
+.u1r-lesson .u1r-self { margin: 0.4rem 0 0; font-size: 0.85rem; }
+.u1r-lesson .u1r-self label { display: block; cursor: pointer; }
+
+/* ---- graded check extras ---- */
+.u1r-lesson .u1r-qhint { font-size: 0.82rem; color: var(--text-muted); margin: -0.5rem 0 0.8rem; }
+.u1r-lesson .u1r-multi .cl-choice.picked { border-color: var(--navy); background: #eef2f7; }
+.u1r-lesson .cl-feedback.partial { background: #fff8e7; color: #92400e; }
+.u1r-lesson .u1r-code-label { margin: 0.6rem 0 0.2rem; font-weight: 600; }
+.u1r-lesson .u1r-code { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--navy); border: 2px dashed var(--navy); border-radius: 10px; padding: 0.3rem 1rem; margin-bottom: 0.8rem; user-select: all; }
+.u1r-lesson .u1r-weak { text-align: left; max-width: 520px; margin: 0.6rem auto; font-size: 0.9rem; }
+.u1r-lesson .u1r-weak li { font-size: 0.88rem; }
+
+/* ---- small screens ---- */
+.u1r-lesson .section-body { overflow-x: auto; }
+.u1r-lesson .cl-progress-wrap { flex-wrap: wrap; row-gap: 0.4rem; padding-left: 1rem; padding-right: 1rem; }
+.u1r-lesson .cl-progress-track { min-width: 80px; }
+@media (max-width: 520px) {
+  .u1r-lesson .cl-header { padding-left: 1.1rem; padding-right: 1.1rem; }
+  .u1r-lesson .cl-header h1 { font-size: 1.55rem; padding-right: 3.2rem; }
+  .u1r-lesson main { padding-left: 0.7rem; padding-right: 0.7rem; }
+  .u1r-lesson table { font-size: 0.78rem; }
+}
+
+/* ---- teacher preview (?preview=1) ---- */
+.u1r-lesson .u1r-preview { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; background: #fef3c7; border: 1px dashed #d97706; border-radius: 8px; padding: 0.5rem 0.8rem; margin-bottom: 0.9rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #78350f; }
+.u1r-lesson .u1r-preview label { display: flex; align-items: center; gap: 0.35rem; }
+`;
+    document.head.appendChild(style);
+  }
+
+  // ---- Guided parts ----
+  // Each part is data: the layout (badges, word wall, must-know, tool, practice,
+  // revisit) is built once in sectionBody(). `tools` names a widget in WIDGETS.
+
+  function practiceProblem(lang, idSuffix, prompt, difficulty, hint, answer) {
+    const diffClass = { basic: 'diff-basic', medium: 'diff-medium', challenge: 'diff-challenge' }[difficulty] || 'diff-basic';
+    const diffLabel = (DIFF_LABELS[lang] || DIFF_LABELS.en)[difficulty] || difficulty;
+    return `
+      <div class="practice-problem">
+        <div class="pp-header">
+          <span class="pp-num">Q</span>
+          <span class="pp-difficulty ${diffClass}">● ${escapeHtml(diffLabel)}</span>
+        </div>
+        <div class="pp-body">
+          <p><strong>${escapeHtml(prompt)}</strong></p>
+          <button type="button" class="hint-btn" data-hint-target="hint-${idSuffix}">${escapeHtml(t('hintShow', lang))}</button>
+          <button type="button" class="reveal-btn" data-answer-target="ans-${idSuffix}">${escapeHtml(t('revealAnswer', lang))}</button>
+          <div class="hint-box" id="hint-${idSuffix}">${escapeHtml(hint)}</div>
+          <div class="answer-box" id="ans-${idSuffix}">
+            <div class="answer-label">${escapeHtml(t('answerLabel', lang))}</div>
+            ${escapeHtml(answer)}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const SECTIONS = [
+    // ---------------------------------------------------------------- 0
+    {
+      id: 'start',
+      title: { en: 'Start Here: Your 100-Minute Plan', es: 'Empieza Aquí: Tu Plan de 100 Minutos' },
+      customBody: {
+        en: `
+        <p>This review covers <strong>19 of the 20 Key Questions</strong> on the Unit 1 Test — from lab tools in Chapter 1 to bonding in Chapter 5. (Key Question 17, metals that can have more than one charge, is not part of this review — use your Lesson 23 notes for it.) It is built to fit one <strong>100-minute</strong> class period, and it follows the same order as your chapter packets.</p>
+        <div data-pace></div>
+        <p><strong>In every part you will:</strong></p>
+        <ul>
+          <li>See the <strong>Key Questions</strong> and packet <strong>learning targets</strong> it covers, plus the <strong>Word Wall</strong> terms.</li>
+          <li>Read the short <strong>Must know</strong> list, then use the <strong>mini-tool</strong> — it makes a new problem every time, so keep going until you get a few right in a row.</li>
+          <li>Try the <strong>practice</strong> before you click <em>Reveal Answer</em>.</li>
+          <li>Use the <strong>Need more help?</strong> line to jump back to the matching Chapter Review or packet Check-In.</li>
+        </ul>
+        <div class="note-box">
+          <span class="note-icon">⏱</span>
+          <div class="note-text">The clock in the top bar starts when you open this review. If you are behind a checkpoint, skip the optional practice (<em>Challenge</em>) and keep moving — save at least <strong>35 minutes</strong> for the graded check.</div>
+        </div>
+        <p>On the real test, a correct answer with <strong>no reason</strong> earns about half credit. That is why <em>Explain It Studio</em> (Part 10) is part of this review.</p>`,
+        es: `
+        <p>Este repaso cubre <strong>19 de las 20 Preguntas Clave</strong> del Examen de la Unidad 1 — desde las herramientas del laboratorio en el Capítulo 1 hasta el enlace químico en el Capítulo 5. (La Pregunta Clave 17, los metales que pueden tener más de una carga, no es parte de este repaso — usa tus notas de la Lección 23.) Está diseñado para un período de clase de <strong>100 minutos</strong> y sigue el mismo orden que tus paquetes de capítulo.</p>
+        <div data-pace></div>
+        <p><strong>En cada parte vas a:</strong></p>
+        <ul>
+          <li>Ver las <strong>Preguntas Clave</strong> y las <strong>metas de aprendizaje</strong> del paquete que cubre, además de los términos del <strong>Muro de Palabras</strong>.</li>
+          <li>Leer la lista corta <strong>Debes saber</strong> y luego usar la <strong>mini-herramienta</strong> — crea un problema nuevo cada vez, así que sigue hasta acertar varias seguidas.</li>
+          <li>Intentar la <strong>práctica</strong> antes de hacer clic en <em>Mostrar Respuesta</em>.</li>
+          <li>Usar la línea <strong>¿Necesitas más ayuda?</strong> para volver al Repaso de Capítulo o al Check-In del paquete correspondiente.</li>
+        </ul>
+        <div class="note-box">
+          <span class="note-icon">⏱</span>
+          <div class="note-text">El reloj de la barra superior empieza cuando abres este repaso. Si vas atrasado respecto a un punto de control, salta la práctica opcional (<em>Desafío</em>) y sigue avanzando — guarda al menos <strong>35 minutos</strong> para la comprobación calificada.</div>
+        </div>
+        <p>En el examen real, una respuesta correcta <strong>sin explicación</strong> recibe aproximadamente la mitad del crédito. Por eso el <em>Estudio de Explícalo</em> (Parte 10) es parte de este repaso.</p>`
+      }
+    },
+    // ---------------------------------------------------------------- 1
+    {
+      id: 'matter',
+      title: { en: 'Lab Tools, Chemistry & Matter', es: 'Herramientas, Química y Materia' },
+      kq: '1–3', targets: '1.1–1.3 · 2.1–2.3 · 3.1–3.2',
+      words: { en: ['observation', 'hypothesis', 'chemistry', 'property', 'matter', 'volume'], es: ['observación', 'hipótesis', 'química', 'propiedad', 'materia', 'volumen'] },
+      know: [
+        { en: '<strong>Right tool + a reason.</strong> Graduated cylinder = <em>precise</em> liquid volume (fine markings). Balance = mass. Beakers and flasks hold and mix, but give only rough volume.', es: '<strong>La herramienta correcta + una razón.</strong> Probeta graduada = volumen líquido <em>preciso</em> (marcas finas). Balanza = masa. Los vasos y matraces contienen y mezclan, pero dan solo un volumen aproximado.' },
+        { en: '<strong>Observation</strong> = what you see, measure, or smell. <strong>Hypothesis</strong> = a testable “if…then” explanation for why. A hypothesis does not have to be right — it has to be testable.', es: '<strong>Observación</strong> = lo que ves, mides o hueles. <strong>Hipótesis</strong> = una explicación comprobable tipo “si…entonces” de por qué. Una hipótesis no tiene que ser correcta — tiene que ser comprobable.' },
+        { en: '<strong>Chemistry</strong> is the study of matter and how it changes.', es: 'La <strong>química</strong> es el estudio de la materia y cómo cambia.' },
+        { en: '<strong>Matter</strong> has mass and takes up space (volume). Energy (light, heat, sound) and thoughts are <em>not</em> matter. Gases are matter even when you cannot see them.', es: 'La <strong>materia</strong> tiene masa y ocupa espacio (volumen). La energía (luz, calor, sonido) y los pensamientos <em>no</em> son materia. Los gases son materia aunque no los veas.' }
+      ],
+      tools: [{ name: 'matterSort', intro: { en: 'Decide fast: <strong>matter</strong> or <strong>not matter</strong>? Say the reason out loud (mass? volume?).', es: 'Decide rápido: ¿<strong>materia</strong> o <strong>no es materia</strong>? Di la razón en voz alta (¿masa? ¿volumen?).' } }],
+      practice: [
+        { d: 'basic', q: { en: 'You need exactly 12 mL of vinegar. Which tool would you use, and what reason earns full credit?', es: 'Necesitas exactamente 12 mL de vinagre. ¿Qué herramienta usarías y qué razón merece crédito completo?' }, h: { en: 'Which tool is built for precision, not just holding liquid?', es: '¿Qué herramienta está hecha para la precisión y no solo para contener líquido?' }, a: { en: 'A graduated cylinder — its fine markings measure volume more precisely than a beaker or flask, which only give a rough estimate.', es: 'Una probeta graduada — sus marcas finas miden el volumen con más precisión que un vaso o un matraz, que solo dan una estimación aproximada.' } },
+        { d: 'medium', q: { en: '“The liquid turned pink because the acid reacted with the dye.” Is this an observation or a hypothesis? Rewrite it as the other kind.', es: '“El líquido se volvió rosa porque el ácido reaccionó con el colorante.” ¿Es una observación o una hipótesis? Reescríbela como el otro tipo.' }, h: { en: 'Does it say what happened, or why it happened?', es: '¿Dice qué pasó, o por qué pasó?' }, a: { en: 'It is a hypothesis (it explains why). As an observation: “The liquid turned pink.” As a testable hypothesis: “If I use less dye, then the pink color will be lighter.”', es: 'Es una hipótesis (explica por qué). Como observación: “El líquido se volvió rosa.” Como hipótesis comprobable: “Si uso menos colorante, entonces el color rosa será más claro.”' } },
+        { d: 'challenge', q: { en: 'Fix the mistake: “Sound is matter, because you can hear it travel through the air.”', es: 'Corrige el error: “El sonido es materia, porque se puede oír viajar por el aire.”' }, h: { en: 'Apply the definition: does sound itself have mass and volume?', es: 'Aplica la definición: ¿el sonido en sí tiene masa y volumen?' }, a: { en: 'Sound is energy, not matter — it has no mass and takes up no space. The air it travels through is matter, but the sound is not. Correct: “Sound is not matter; it is energy carried through matter.”', es: 'El sonido es energía, no materia — no tiene masa ni ocupa espacio. El aire por el que viaja es materia, pero el sonido no. Correcto: “El sonido no es materia; es energía transportada a través de la materia.”' } }
+      ],
+      revisit: { en: 'Chapter 1 Review (all sections) · Chapter 1 packet: Word Wall and Lesson 1–3 Check-Ins', es: 'Repaso del Capítulo 1 (todas las secciones) · Paquete del Capítulo 1: Muro de Palabras y Check-Ins de las Lecciones 1–3' }
+    },
+    // ---------------------------------------------------------------- 2
+    {
+      id: 'formulas',
+      title: { en: 'Formulas & Chemical Change', es: 'Fórmulas y Cambio Químico' },
+      kq: '4–6', targets: '6.1–6.3 · 7.2 · 8.1–8.2',
+      words: { en: ['element', 'compound', 'aqueous', 'chemical change', 'law of conservation of mass'], es: ['elemento', 'compuesto', 'acuoso', 'cambio químico', 'ley de conservación de la masa'] },
+      know: [
+        { en: '<strong>Element</strong> = one symbol (Fe, He). <strong>Compound</strong> = two or more element symbols in a fixed ratio (NaCl, H₂O). Two-letter symbols: capital + lowercase (Co ≠ CO).', es: '<strong>Elemento</strong> = un símbolo (Fe, He). <strong>Compuesto</strong> = dos o más símbolos de elementos en proporción fija (NaCl, H₂O). Símbolos de dos letras: mayúscula + minúscula (Co ≠ CO).' },
+        { en: 'Phase labels: <strong>(s)</strong> solid · <strong>(l)</strong> liquid · <strong>(g)</strong> gas · <strong>(aq)</strong> dissolved in water.', es: 'Etiquetas de fase: <strong>(s)</strong> sólido · <strong>(l)</strong> líquido · <strong>(g)</strong> gas · <strong>(aq)</strong> disuelto en agua.' },
+        { en: 'A subscript counts the atom just before it; <strong>parentheses multiply</strong> everything inside: Ca(NO₃)₂ has 1 Ca, 2 N, 6 O.', es: 'Un subíndice cuenta el átomo justo antes de él; los <strong>paréntesis multiplican</strong> todo lo de adentro: Ca(NO₃)₂ tiene 1 Ca, 2 N, 6 O.' },
+        { en: '<strong>Evidence of chemical change:</strong> color change, gas bubbles, a new solid, temperature change, a new smell.', es: '<strong>Evidencia de cambio químico:</strong> cambio de color, burbujas de gas, un sólido nuevo, cambio de temperatura, un olor nuevo.' },
+        { en: 'Two (aq) solutions make a solid? The solid is built from the <em>leftover pieces</em> once the other (aq) product is accounted for.', es: '¿Dos soluciones (aq) forman un sólido? El sólido se arma con las <em>piezas sobrantes</em> cuando se cuenta el otro producto (aq).' },
+        { en: '<strong>Conservation of mass:</strong> atoms rearrange; they are not created or destroyed. If mass seems to change, look for a <em>gas</em> that escaped or joined in, or material lost in handling.', es: '<strong>Conservación de la masa:</strong> los átomos se reorganizan; no se crean ni se destruyen. Si la masa parece cambiar, busca un <em>gas</em> que escapó o se unió, o material perdido al manipularlo.' }
+      ],
+      tools: [{ name: 'formulaDecode', intro: { en: 'Count the atoms. Remember: parentheses multiply!', es: 'Cuenta los átomos. ¡Recuerda: los paréntesis multiplican!' } }],
+      practice: [
+        { d: 'basic', q: { en: 'How many atoms of each element are in Mg(OH)₂?', es: '¿Cuántos átomos de cada elemento hay en Mg(OH)₂?' }, h: { en: 'The 2 outside the parentheses multiplies both O and H.', es: 'El 2 fuera de los paréntesis multiplica tanto al O como al H.' }, a: { en: 'Mg: 1 · O: 2 · H: 2', es: 'Mg: 1 · O: 2 · H: 2' } },
+        { d: 'medium', q: { en: 'CaCl₂(aq) is mixed with Na₂CO₃(aq). The products are NaCl(aq) and a white solid. Write the formula and phase of the solid, and name the evidence of chemical change.', es: 'Se mezcla CaCl₂(aq) con Na₂CO₃(aq). Los productos son NaCl(aq) y un sólido blanco. Escribe la fórmula y la fase del sólido, y nombra la evidencia de cambio químico.' }, h: { en: 'Which pieces are left once NaCl is accounted for?', es: '¿Qué piezas sobran cuando se cuenta el NaCl?' }, a: { en: 'CaCO₃(s) — Ca and CO₃ are left over once Na and Cl form NaCl(aq). Evidence: a new solid (precipitate) formed.', es: 'CaCO₃(s) — Ca y CO₃ sobran cuando Na y Cl forman NaCl(aq). Evidencia: se formó un sólido nuevo (precipitado).' } },
+        { d: 'challenge', q: { en: 'Magnesium ribbon (0.50 g) burns in an open dish. The white powder left weighs 0.83 g. Did the law of conservation of mass break? Explain.', es: 'Una cinta de magnesio (0.50 g) se quema en un plato abierto. El polvo blanco restante pesa 0.83 g. ¿Se rompió la ley de conservación de la masa? Explica.' }, h: { en: 'What in the air could join the magnesium and add mass?', es: '¿Qué hay en el aire que podría unirse al magnesio y agregar masa?' }, a: { en: 'No. The magnesium combined with oxygen gas from the air (forming MgO), so the extra 0.33 g is oxygen that was not weighed at the start. Total mass is conserved.', es: 'No. El magnesio se combinó con oxígeno gaseoso del aire (formando MgO), así que los 0.33 g extra son oxígeno que no se pesó al inicio. La masa total se conserva.' } }
+      ],
+      revisit: { en: 'Chapter 2 Review (Elements, Compounds & Formulas · Chemical Change) · Chapter 2 packet: Lessons 6–8 Check-Ins', es: 'Repaso del Capítulo 2 (Elementos, Compuestos y Fórmulas · Cambio Químico) · Paquete del Capítulo 2: Check-Ins de las Lecciones 6–8' }
+    },
+    // ---------------------------------------------------------------- 3
+    {
+      id: 'ptable',
+      title: { en: 'The Periodic Table', es: 'La Tabla Periódica' },
+      kq: '7–8', targets: '9.1–9.2 · 10.1–10.3',
+      words: { en: ['group', 'period', 'reactivity', 'alkali metal', 'halogen', 'noble gas', 'metalloid', 'transition element'], es: ['grupo', 'período', 'reactividad', 'metal alcalino', 'halógeno', 'gas noble', 'metaloide', 'elemento de transición'] },
+      know: [
+        { en: 'Mendeleev ordered elements by <strong>atomic mass</strong> and lined them up by <strong>reactivity</strong> — gaps predicted elements not yet discovered.', es: 'Mendeléyev ordenó los elementos por <strong>masa atómica</strong> y los alineó por <strong>reactividad</strong> — los huecos predijeron elementos aún no descubiertos.' },
+        { en: '<strong>Group</strong> (column) = similar reactivity and the same compound pattern (all Group 1A form 1:1 chlorides). <strong>Period</strong> (row) = same number of electron shells.', es: '<strong>Grupo</strong> (columna) = reactividad similar y el mismo patrón de compuestos (todo el Grupo 1A forma cloruros 1:1). <strong>Período</strong> (fila) = mismo número de capas de electrones.' },
+        { en: 'Location tells you the properties: <strong>metal / nonmetal / metalloid</strong> and which elements will behave alike.', es: 'La ubicación te dice las propiedades: <strong>metal / no metal / metaloide</strong> y qué elementos se comportarán de forma parecida.' }
+      ],
+      extra: {
+        en: `<table><thead><tr><th>Where</th><th>Family</th><th>Behavior</th></tr></thead><tbody>
+          <tr><td>Group 1A</td><td>alkali metals</td><td>soft, silvery, <em>violent</em> with water</td></tr>
+          <tr><td>Group 2A</td><td>alkaline earth metals</td><td>silvery, slower with water</td></tr>
+          <tr><td>Middle block</td><td>transition elements</td><td>metals, often colorful compounds</td></tr>
+          <tr><td>Stair-step line</td><td>metalloids</td><td>between metal and nonmetal</td></tr>
+          <tr><td>Group 7A</td><td>halogens</td><td>reactive nonmetals</td></tr>
+          <tr><td>Group 8A</td><td>noble gases</td><td>unreactive gases</td></tr></tbody></table>`,
+        es: `<table><thead><tr><th>Dónde</th><th>Familia</th><th>Comportamiento</th></tr></thead><tbody>
+          <tr><td>Grupo 1A</td><td>metales alcalinos</td><td>blandos, plateados, <em>violentos</em> con el agua</td></tr>
+          <tr><td>Grupo 2A</td><td>metales alcalinotérreos</td><td>plateados, más lentos con el agua</td></tr>
+          <tr><td>Bloque central</td><td>elementos de transición</td><td>metales, a menudo con compuestos coloridos</td></tr>
+          <tr><td>Línea escalonada</td><td>metaloides</td><td>entre metal y no metal</td></tr>
+          <tr><td>Grupo 7A</td><td>halógenos</td><td>no metales reactivos</td></tr>
+          <tr><td>Grupo 8A</td><td>gases nobles</td><td>gases no reactivos</td></tr></tbody></table>`
+      },
+      tools: [{ name: 'familySort', intro: { en: 'Name each element’s family. Use a periodic table — this is the skill from the Chapter 2 Check.', es: 'Nombra la familia de cada elemento. Usa una tabla periódica — esta es la destreza del Chapter Check del Capítulo 2.' } }],
+      practice: [
+        { d: 'basic', q: { en: 'Element X sits directly below fluorine, F. Is it a metal or nonmetal, and which elements will it act most like?', es: 'El elemento X está justo debajo del flúor, F. ¿Es un metal o un no metal, y a qué elementos se parecerá más?' }, h: { en: 'Same column = same group.', es: 'Misma columna = mismo grupo.' }, a: { en: 'A nonmetal (a halogen, Group 7A). It acts like F, Br, and I. Directly below F is chlorine, Cl.', es: 'Un no metal (un halógeno, Grupo 7A). Se parece al F, Br y I. Justo debajo del F está el cloro, Cl.' } },
+        { d: 'medium', q: { en: 'Which element should behave most like calcium, Ca: K, Mg, Cl, or Ne? Explain.', es: '¿Qué elemento debería comportarse más como el calcio, Ca: K, Mg, Cl o Ne? Explica.' }, h: { en: 'Find calcium’s group first.', es: 'Primero encuentra el grupo del calcio.' }, a: { en: 'Mg — it is in the same group (2A, alkaline earth metals), so it has similar properties and reactivity.', es: 'Mg — está en el mismo grupo (2A, metales alcalinotérreos), así que tiene propiedades y reactividad similares.' } },
+        { d: 'challenge', q: { en: 'Four elements: E = colorless gas, no reaction with water, no chlorine compound · F = silvery metal, slow with water, FCl₂ · G = soft silvery metal, violent with water, GCl · H = silvery metal, slow with water, HCl₂. Which two belong in the same group, and what two pieces of data show it?', es: 'Cuatro elementos: E = gas incoloro, no reacciona con el agua, sin compuesto de cloro · F = metal plateado, lento con el agua, FCl₂ · G = metal plateado blando, violento con el agua, GCl · H = metal plateado, lento con el agua, HCl₂. ¿Cuáles dos pertenecen al mismo grupo y qué dos datos lo muestran?' }, h: { en: 'Look for matching reactivity AND matching chloride formula.', es: 'Busca reactividad igual Y fórmula de cloruro igual.' }, a: { en: 'F and H. Both are silvery metals that react slowly with water (same reactivity), and both form a 1 : 2 chloride (XCl₂).', es: 'F y H. Ambos son metales plateados que reaccionan lentamente con el agua (misma reactividad), y ambos forman un cloruro 1 : 2 (XCl₂).' } }
+      ],
+      revisit: { en: 'Chapter 2 Review (How the Periodic Table Is Organized · Reading the Periodic Table) · Chapter 2 packet: Lessons 9–10 Check-Ins', es: 'Repaso del Capítulo 2 (Cómo Está Organizada la Tabla Periódica · Leyendo la Tabla Periódica) · Paquete del Capítulo 2: Check-Ins de las Lecciones 9–10' }
+    },
+    // ---------------------------------------------------------------- 4
+    {
+      id: 'atoms',
+      title: { en: 'Atoms: Models & Numbers', es: 'Átomos: Modelos y Números' },
+      kq: '9–10', targets: '11.1–11.3 · 12.1–12.3',
+      words: { en: ['atom', 'nucleus', 'proton', 'neutron', 'electron', 'atomic number', 'atomic mass'], es: ['átomo', 'núcleo', 'protón', 'neutrón', 'electrón', 'número atómico', 'masa atómica'] },
+      know: [
+        { en: '<strong>Models change when new evidence does not fit the old one</strong> — that is the whole story of the atom.', es: '<strong>Los modelos cambian cuando la nueva evidencia no encaja con el anterior</strong> — esa es toda la historia del átomo.' },
+        { en: '<strong>Atomic number = number of protons.</strong> It is what makes an element that element. In a neutral atom, electrons = protons. Neutrons ≈ rounded atomic mass − protons.', es: '<strong>Número atómico = número de protones.</strong> Es lo que hace que un elemento sea ese elemento. En un átomo neutro, electrones = protones. Neutrones ≈ masa atómica redondeada − protones.' }
+      ],
+      extra: {
+        en: `<table><thead><tr><th>Model</th><th>Who</th><th>Evidence that built or broke it</th></tr></thead><tbody>
+          <tr><td>Solid sphere</td><td>Dalton</td><td>Atoms combine in fixed ratios — treated as indivisible</td></tr>
+          <tr><td>Plum pudding</td><td>Thomson</td><td>Beams bend toward + plate → tiny <em>negative</em> electrons come out of atoms</td></tr>
+          <tr><td>Nuclear</td><td>Rutherford</td><td>Gold foil: most particles pass through, a few bounce back → tiny, dense, <em>positive</em> nucleus; mostly empty space</td></tr>
+          <tr><td>Solar system</td><td>Bohr</td><td>Electrons sit in shells (levels) at set distances</td></tr></tbody></table>
+          <table><thead><tr><th>Particle</th><th>Charge</th><th>Where</th></tr></thead><tbody>
+          <tr><td>proton</td><td>+</td><td>nucleus</td></tr><tr><td>neutron</td><td>0</td><td>nucleus</td></tr><tr><td>electron</td><td>−</td><td>outside the nucleus</td></tr></tbody></table>`,
+        es: `<table><thead><tr><th>Modelo</th><th>Quién</th><th>Evidencia que lo construyó o lo rompió</th></tr></thead><tbody>
+          <tr><td>Esfera sólida</td><td>Dalton</td><td>Los átomos se combinan en proporciones fijas — se trataban como indivisibles</td></tr>
+          <tr><td>Pudín de ciruelas</td><td>Thomson</td><td>Los haces se desvían hacia la placa + → diminutos electrones <em>negativos</em> salen de los átomos</td></tr>
+          <tr><td>Nuclear</td><td>Rutherford</td><td>Lámina de oro: la mayoría de las partículas pasa, unas pocas rebotan → núcleo diminuto, denso y <em>positivo</em>; en su mayoría espacio vacío</td></tr>
+          <tr><td>Sistema solar</td><td>Bohr</td><td>Los electrones están en capas (niveles) a distancias fijas</td></tr></tbody></table>
+          <table><thead><tr><th>Partícula</th><th>Carga</th><th>Dónde</th></tr></thead><tbody>
+          <tr><td>protón</td><td>+</td><td>núcleo</td></tr><tr><td>neutrón</td><td>0</td><td>núcleo</td></tr><tr><td>electrón</td><td>−</td><td>fuera del núcleo</td></tr></tbody></table>`
+      },
+      tools: [{ name: 'atomChecker', intro: { en: 'Use the periodic table: find the protons, electrons, and neutrons for each element.', es: 'Usa la tabla periódica: encuentra los protones, electrones y neutrones de cada elemento.' } }],
+      practice: [
+        { d: 'basic', q: { en: 'Calcium has atomic number 20 and an atomic mass of about 40. How many protons, electrons, and neutrons does a neutral calcium atom have?', es: 'El calcio tiene número atómico 20 y una masa atómica de aproximadamente 40. ¿Cuántos protones, electrones y neutrones tiene un átomo neutro de calcio?' }, h: { en: 'Neutrons = mass − protons.', es: 'Neutrones = masa − protones.' }, a: { en: '20 protons, 20 electrons, 20 neutrons (40 − 20).', es: '20 protones, 20 electrones, 20 neutrones (40 − 20).' } },
+        { d: 'medium', q: { en: 'In a gold-foil experiment, a few particles bounce almost straight back. Which earlier model could NOT explain this, and why?', es: 'En un experimento con lámina de oro, unas pocas partículas rebotan casi directamente hacia atrás. ¿Qué modelo anterior NO podía explicarlo, y por qué?' }, h: { en: 'What would have to be concentrated in one spot to make a particle bounce?', es: '¿Qué tendría que estar concentrado en un solo lugar para hacer rebotar una partícula?' }, a: { en: 'The plum pudding model — it spreads the positive charge evenly through the atom, so nothing is dense enough to bounce a particle back. A small, dense, positive nucleus (nuclear model) explains it.', es: 'El modelo del pudín de ciruelas — reparte la carga positiva uniformemente por el átomo, así que nada es lo bastante denso para rebotar una partícula. Un núcleo pequeño, denso y positivo (modelo nuclear) lo explica.' } },
+        { d: 'challenge', q: { en: 'Fix the mistake: “An atom with 17 protons and 18 neutrons is argon, because its mass is 35.”', es: 'Corrige el error: “Un átomo con 17 protones y 18 neutrones es argón, porque su masa es 35.”' }, h: { en: 'What identifies an element: protons, neutrons, or mass?', es: '¿Qué identifica a un elemento: protones, neutrones o masa?' }, a: { en: 'The number of protons identifies the element, not the mass. 17 protons = chlorine, Cl (not argon, which has 18 protons).', es: 'El número de protones identifica al elemento, no la masa. 17 protones = cloro, Cl (no argón, que tiene 18 protones).' } }
+      ],
+      revisit: { en: 'Chapter 3 Review (The Atomic Model Through Time · Protons, Neutrons & Electrons · Atomic Number) · Lesson 11 “Atomic Pudding” · Chapter 3 packet: Lessons 11–12', es: 'Repaso del Capítulo 3 (El Modelo Atómico a Través del Tiempo · Protones, Neutrones y Electrones · Número Atómico) · Lección 11 “Atomic Pudding” · Paquete del Capítulo 3: Lecciones 11–12' }
+    },
+    // ---------------------------------------------------------------- 5
+    {
+      id: 'shells',
+      title: { en: 'Flame Tests & Shell Models', es: 'Pruebas de Llama y Modelos de Capas' },
+      kq: '11–12', targets: '17.1–17.2 · 18.1–18.3',
+      words: { en: ['flame test', 'electron shell', 'valence shell', 'valence electron', 'core electron'], es: ['prueba de llama', 'capa de electrones', 'capa de valencia', 'electrón de valencia', 'electrón del núcleo interno'] },
+      know: [
+        { en: '<strong>Flame color comes from the metal atom.</strong> Same metal → same color. A flame test can name the metal, but <em>cannot</em> tell you the nonmetal part of the compound.', es: '<strong>El color de la llama proviene del átomo del metal.</strong> Mismo metal → mismo color. Una prueba de llama puede nombrar el metal, pero <em>no puede</em> decirte la parte no metálica del compuesto.' },
+        { en: '<strong>Shells hold 2, 8, 8…</strong> electrons, filled from the inside out. <strong>Valence electrons</strong> = outer shell. <strong>Core electrons</strong> = all the rest (total − valence).', es: '<strong>Las capas aceptan 2, 8, 8…</strong> electrones, llenándose de adentro hacia afuera. <strong>Electrones de valencia</strong> = capa externa. <strong>Electrones del núcleo interno</strong> = todos los demás (total − valencia).' },
+        { en: '<strong>Same group = same number of valence electrons</strong> = similar reactions. Valence electrons = group number (main groups). Period number = number of shells.', es: '<strong>Mismo grupo = mismo número de electrones de valencia</strong> = reacciones similares. Electrones de valencia = número de grupo (grupos principales). Número de período = número de capas.' }
+      ],
+      tools: [
+        { name: 'flameMatch', intro: { en: 'Flame tests: match the color to the metal atom.', es: 'Pruebas de llama: relaciona el color con el átomo del metal.' } },
+        { name: 'shellCheck', intro: { en: 'Shell models: fill in the shells, then the valence and core electrons.', es: 'Modelos de capas: llena las capas y luego los electrones de valencia y del núcleo interno.' } }
+      ],
+      practice: [
+        { d: 'basic', q: { en: 'Two unknown salts both burn with the same apple-green flame as barium chloride. What can you conclude, and what can you NOT conclude?', es: 'Dos sales desconocidas arden con la misma llama verde manzana que el cloruro de bario. ¿Qué puedes concluir y qué NO puedes concluir?' }, h: { en: 'The color comes from only one part of the compound.', es: 'El color proviene de una sola parte del compuesto.' }, a: { en: 'Both probably contain barium (the metal sets the flame color). You cannot tell what the nonmetal part is, or whether the two unknowns are the same compound.', es: 'Ambas probablemente contienen bario (el metal determina el color de la llama). No puedes saber cuál es la parte no metálica, ni si las dos desconocidas son el mismo compuesto.' } },
+        { d: 'medium', q: { en: 'Draw (describe) the shell model for oxygen (atomic number 8). How many valence and core electrons does it have?', es: 'Dibuja (describe) el modelo de capas del oxígeno (número atómico 8). ¿Cuántos electrones de valencia y del núcleo interno tiene?' }, h: { en: 'Fill shell 1 (2), then put the rest in shell 2.', es: 'Llena la capa 1 (2) y pon el resto en la capa 2.' }, a: { en: 'Shells: 2, 6. Valence = 6 (outer shell). Core = 2 (inner shell).', es: 'Capas: 2, 6. Valencia = 6 (capa externa). Núcleo interno = 2 (capa interna).' } },
+        { d: 'challenge', q: { en: 'Lithium (Li) and potassium (K) are both in Group 1A. Use valence electrons to explain why they react in similar ways, even though potassium has many more electrons.', es: 'El litio (Li) y el potasio (K) están ambos en el Grupo 1A. Usa los electrones de valencia para explicar por qué reaccionan de forma similar, aunque el potasio tiene muchos más electrones.' }, h: { en: 'Compare only the outer shells.', es: 'Compara solo las capas externas.' }, a: { en: 'Both have exactly 1 valence electron. Reactions involve the outer electrons, so both behave alike; the extra electrons in potassium are core electrons that do not take part.', es: 'Ambos tienen exactamente 1 electrón de valencia. Las reacciones involucran a los electrones externos, así que ambos se comportan igual; los electrones extra del potasio son electrones del núcleo interno que no participan.' } }
+      ],
+      revisit: { en: 'Chapter 4 Review (Flame Tests · Building Shell (Bohr) Models) · Chapter 4 packet: Lessons 17–18 Check-Ins', es: 'Repaso del Capítulo 4 (Pruebas de Llama · Construyendo Modelos de Capas) · Paquete del Capítulo 4: Check-Ins de las Lecciones 17–18' }
+    },
+    // ---------------------------------------------------------------- 6
+    {
+      id: 'ions',
+      title: { en: 'Ions & Predicting Formulas', es: 'Iones y Predicción de Fórmulas' },
+      kq: '13–14', targets: '19.1–19.3 · 20.1–20.2 · 21.1',
+      words: { en: ['ion', 'cation', 'anion', 'ionic compound', 'rule of zero charge', 'noble gas'], es: ['ion', 'catión', 'anión', 'compuesto iónico', 'regla de carga cero', 'gas noble'] },
+      know: [
+        { en: 'Atoms <strong>gain or lose valence electrons</strong> to match the nearest noble gas (8 in the outer shell). Metals <strong>lose</strong> → <strong>cations (+)</strong>. Nonmetals <strong>gain</strong> → <strong>anions (−)</strong>.', es: 'Los átomos <strong>ganan o pierden electrones de valencia</strong> para igualar al gas noble más cercano (8 en la capa externa). Los metales <strong>pierden</strong> → <strong>cationes (+)</strong>. Los no metales <strong>ganan</strong> → <strong>aniones (−)</strong>.' },
+        { en: '<strong>Charge from the group:</strong> 1A → +1 · 2A → +2 · 3A → +3 · 5A → −3 · 6A → −2 · 7A → −1.', es: '<strong>Carga según el grupo:</strong> 1A → +1 · 2A → +2 · 3A → +3 · 5A → −3 · 6A → −2 · 7A → −1.' },
+        { en: '<strong>Rule of zero charge:</strong> in an ionic compound the total + equals the total −. Use the smallest whole numbers of each ion that make the charges cancel.', es: '<strong>Regla de carga cero:</strong> en un compuesto iónico la carga total + es igual a la total −. Usa los números enteros más pequeños de cada ion que hagan que las cargas se cancelen.' }
+      ],
+      tools: [{ name: 'chargeBalancer', opts: { set: 'simple' }, intro: { en: 'Pick a cation and an anion. Watch the charges balance to zero and the formula appear.', es: 'Elige un catión y un anión. Observa cómo las cargas se equilibran a cero y aparece la fórmula.' } }],
+      practice: [
+        { d: 'basic', q: { en: 'Phosphorus has 5 valence electrons. What ion does it form, and why?', es: 'El fósforo tiene 5 electrones de valencia. ¿Qué ion forma y por qué?' }, h: { en: 'Is it easier to gain 3 or lose 5 to reach a noble-gas arrangement?', es: '¿Es más fácil ganar 3 o perder 5 para llegar a un arreglo de gas noble?' }, a: { en: 'P³⁻. It gains 3 electrons to reach 8 valence electrons (like argon), so it becomes a negative ion (an anion).', es: 'P³⁻. Gana 3 electrones para llegar a 8 electrones de valencia (como el argón), así que se vuelve un ion negativo (un anión).' } },
+        { d: 'medium', q: { en: 'Predict the formula for barium and fluorine. Show each ion’s charge and how the charges add to zero.', es: 'Predice la fórmula del bario y el flúor. Muestra la carga de cada ion y cómo las cargas suman cero.' }, h: { en: 'Ba is in Group 2A; F is in Group 7A.', es: 'El Ba está en el Grupo 2A; el F está en el Grupo 7A.' }, a: { en: 'Ba²⁺ and F⁻. One Ba²⁺ (+2) needs two F⁻ (−2): BaF₂. (+2) + 2(−1) = 0.', es: 'Ba²⁺ y F⁻. Un Ba²⁺ (+2) necesita dos F⁻ (−2): BaF₂. (+2) + 2(−1) = 0.' } },
+        { d: 'challenge', q: { en: 'Fix the mistake: “Magnesium fluoride is MgF.” What is wrong, and what is the correct formula?', es: 'Corrige el error: “El fluoruro de magnesio es MgF.” ¿Qué está mal y cuál es la fórmula correcta?' }, h: { en: 'Do the charges in MgF add to zero?', es: '¿Las cargas en MgF suman cero?' }, a: { en: 'Mg forms Mg²⁺ but F is only F⁻, so MgF totals +1 (not zero). Correct: MgF₂ — (+2) + 2(−1) = 0.', es: 'El Mg forma Mg²⁺ pero el F es solo F⁻, así que MgF suma +1 (no cero). Correcto: MgF₂ — (+2) + 2(−1) = 0.' } }
+      ],
+      revisit: { en: 'Chapter 4 Review (Ions & the Octet Rule · Ionic Compounds & the Rule of Zero Charge) · Chapter 4 packet: Lessons 19–21 Check-Ins · Lesson 21 “Salty Eights”', es: 'Repaso del Capítulo 4 (Iones y la Regla del Octeto · Compuestos Iónicos y la Regla de Carga Cero) · Paquete del Capítulo 4: Check-Ins de las Lecciones 19–21 · Lección 21 “Salty Eights”' }
+    },
+    // ---------------------------------------------------------------- 7
+    {
+      id: 'names',
+      title: { en: 'Names & Polyatomic Ions', es: 'Nombres e Iones Poliatómicos' },
+      kq: '15–16', targets: '21.2 · 22.1–22.2',
+      words: { en: ['monatomic ion', 'polyatomic ion'], es: ['ion monoatómico', 'ion poliatómico'] },
+      know: [
+        { en: '<strong>Binary ionic names:</strong> metal name + nonmetal root + <em>-ide</em> (calcium chloride). <strong>No prefixes</strong> like di- or tri-.', es: '<strong>Nombres iónicos binarios:</strong> nombre del metal + raíz del no metal + <em>-uro</em> (cloruro de calcio). <strong>Sin prefijos</strong> como di- o tri-.' },
+        { en: '<strong>Polyatomic ion</strong> = a group of atoms with one overall charge that stays together. Use parentheses when you need more than one: Ca(NO₃)₂. Name it by inserting the ion’s name (barium nitrate).', es: '<strong>Ion poliatómico</strong> = un grupo de átomos con una sola carga total que permanece unido. Usa paréntesis cuando necesites más de uno: Ca(NO₃)₂. Se nombra insertando el nombre del ion (nitrato de bario).' }
+      ],
+      extra: {
+        en: `<table><thead><tr><th>Ion</th><th>Name</th><th>Ion</th><th>Name</th></tr></thead><tbody>
+          <tr><td>OH⁻</td><td>hydroxide</td><td>PO₄³⁻</td><td>phosphate</td></tr>
+          <tr><td>NO₃⁻</td><td>nitrate</td><td>NH₄⁺</td><td>ammonium</td></tr>
+          <tr><td>CO₃²⁻</td><td>carbonate</td><td>SO₄²⁻</td><td>sulfate</td></tr></tbody></table>`,
+        es: `<table><thead><tr><th>Ion</th><th>Nombre</th><th>Ion</th><th>Nombre</th></tr></thead><tbody>
+          <tr><td>OH⁻</td><td>hidróxido</td><td>PO₄³⁻</td><td>fosfato</td></tr>
+          <tr><td>NO₃⁻</td><td>nitrato</td><td>NH₄⁺</td><td>amonio</td></tr>
+          <tr><td>CO₃²⁻</td><td>carbonato</td><td>SO₄²⁻</td><td>sulfato</td></tr></tbody></table>`
+      },
+      tools: [{ name: 'chargeBalancer', opts: { set: 'full' }, intro: { en: 'Same tool, bigger menu: now try polyatomic ions. Notice the parentheses when you need more than one.', es: 'La misma herramienta, con más opciones: ahora prueba iones poliatómicos. Fíjate en los paréntesis cuando necesitas más de uno.' } }],
+      practice: [
+        { d: 'basic', q: { en: 'Write the formula for aluminum hydroxide.', es: 'Escribe la fórmula del hidróxido de aluminio.' }, h: { en: 'Al³⁺ and OH⁻. How many hydroxides cancel +3?', es: 'Al³⁺ y OH⁻. ¿Cuántos hidróxidos cancelan +3?' }, a: { en: 'Al(OH)₃ — one Al³⁺ (+3) and three OH⁻ (−3); parentheses show 3 hydroxide ions.', es: 'Al(OH)₃ — un Al³⁺ (+3) y tres OH⁻ (−3); los paréntesis muestran 3 iones hidróxido.' } },
+        { d: 'medium', q: { en: 'Name Ba(NO₃)₂ and list the ions in it with their charges.', es: 'Nombra Ba(NO₃)₂ y enumera los iones que contiene con sus cargas.' }, h: { en: 'The 2 outside the parentheses tells you how many nitrate ions.', es: 'El 2 fuera de los paréntesis te dice cuántos iones nitrato hay.' }, a: { en: 'Barium nitrate. One Ba²⁺ and two NO₃⁻ (each 1−): (+2) + 2(−1) = 0.', es: 'Nitrato de bario. Un Ba²⁺ y dos NO₃⁻ (cada uno 1−): (+2) + 2(−1) = 0.' } },
+        { d: 'challenge', q: { en: 'Fix the mistake: “Ammonium sulfate is NH₄SO₄.” What is wrong, and what is the correct formula?', es: 'Corrige el error: “El sulfato de amonio es NH₄SO₄.” ¿Qué está mal y cuál es la fórmula correcta?' }, h: { en: 'NH₄⁺ is 1+ and SO₄²⁻ is 2−. Do they cancel as written?', es: 'NH₄⁺ es 1+ y SO₄²⁻ es 2−. ¿Se cancelan tal como está escrito?' }, a: { en: 'NH₄SO₄ totals (+1) + (−2) = −1, not zero. It takes two ammonium ions: (NH₄)₂SO₄ — (+2) + (−2) = 0, with parentheses around the polyatomic ion.', es: 'NH₄SO₄ suma (+1) + (−2) = −1, no cero. Se necesitan dos iones amonio: (NH₄)₂SO₄ — (+2) + (−2) = 0, con paréntesis alrededor del ion poliatómico.' } }
+      ],
+      revisit: { en: 'Chapter 4 Review (Naming Binary Ionic Compounds · Polyatomic Ions) · Chapter 4 packet: Lessons 21–22 Check-Ins', es: 'Repaso del Capítulo 4 (Nombrando Compuestos Iónicos Binarios · Iones Poliatómicos) · Paquete del Capítulo 4: Check-Ins de las Lecciones 21–22' }
+    },
+    // ---------------------------------------------------------------- 8
+    {
+      id: 'config',
+      title: { en: 'Electron Configuration', es: 'Configuración Electrónica' },
+      kq: '18', targets: '24.1–24.3',
+      words: { en: ['subshell', 'electron configuration', 'periodic table block'], es: ['subcapa', 'configuración electrónica', 'bloque de la tabla periódica'] },
+      know: [
+        { en: 'Each shell splits into <strong>subshells</strong>: s (holds 2), p (6), d (10). Shell 1 = 1s · shell 2 = 2s 2p · shell 3 = 3s 3p (3d comes later).', es: 'Cada capa se divide en <strong>subcapas</strong>: s (aguanta 2), p (6), d (10). Capa 1 = 1s · capa 2 = 2s 2p · capa 3 = 3s 3p (3d viene después).' },
+        { en: '<strong>Fill order:</strong> 1s 2s 2p 3s 3p 4s 3d 4p. The superscripts add up to the atomic number: sulfur → 1s² 2s² 2p⁶ 3s² 3p⁴ = 16.', es: '<strong>Orden de llenado:</strong> 1s 2s 2p 3s 3p 4s 3d 4p. Los superíndices suman el número atómico: azufre → 1s² 2s² 2p⁶ 3s² 3p⁴ = 16.' },
+        { en: '<strong>The table gives the last subshell.</strong> Period = shell number. Block: groups 1–2 = s-block · groups 13–18 = p-block · middle = d-block. Count across the block to get the electrons.', es: '<strong>La tabla da la última subcapa.</strong> Período = número de capa. Bloque: grupos 1–2 = bloque s · grupos 13–18 = bloque p · centro = bloque d. Cuenta a lo largo del bloque para obtener los electrones.' }
+      ],
+      tools: [{ name: 'configTool', intro: { en: 'Write the configuration, then check it. Use the fill order above.', es: 'Escribe la configuración y luego revísala. Usa el orden de llenado de arriba.' } }],
+      practice: [
+        { d: 'basic', q: { en: 'Write the electron configuration for aluminum (atomic number 13).', es: 'Escribe la configuración electrónica del aluminio (número atómico 13).' }, h: { en: '2 + 2 + 6 + 2 = 12 so far; where does number 13 go?', es: '2 + 2 + 6 + 2 = 12 hasta ahora; ¿dónde va el número 13?' }, a: { en: '1s² 2s² 2p⁶ 3s² 3p¹', es: '1s² 2s² 2p⁶ 3s² 3p¹' } },
+        { d: 'medium', q: { en: 'Identify the element: 1s² 2s² 2p⁶ 3s² 3p⁶ 4s². How do you know?', es: 'Identifica el elemento: 1s² 2s² 2p⁶ 3s² 3p⁶ 4s². ¿Cómo lo sabes?' }, h: { en: 'Add the superscripts.', es: 'Suma los superíndices.' }, a: { en: 'Calcium, Ca. The electrons add to 2 + 2 + 6 + 2 + 6 + 2 = 20, and element 20 is calcium (period 4, s-block, group 2A).', es: 'Calcio, Ca. Los electrones suman 2 + 2 + 6 + 2 + 6 + 2 = 20, y el elemento 20 es el calcio (período 4, bloque s, grupo 2A).' } },
+        { d: 'challenge', q: { en: 'Selenium, Se, is in period 4, the p-block, and the 4th column of the p-block. Use its location to name its last subshell and how many electrons are in it.', es: 'El selenio, Se, está en el período 4, el bloque p, y la 4.ª columna del bloque p. Usa su ubicación para nombrar su última subcapa y cuántos electrones tiene.' }, h: { en: 'Period gives the shell number; block gives the letter; the column count gives the superscript.', es: 'El período da el número de capa; el bloque da la letra; la cuenta de columnas da el superíndice.' }, a: { en: '4p⁴ — period 4 (shell 4), p-block, 4th column → 4 electrons in the 4p subshell.', es: '4p⁴ — período 4 (capa 4), bloque p, 4.ª columna → 4 electrones en la subcapa 4p.' } }
+      ],
+      revisit: { en: 'Chapter 4 Review (Electron Configurations & Subshells) · Lesson 24 “Shell Game” · Chapter 4 packet: Lesson 24 Check-In', es: 'Repaso del Capítulo 4 (Configuraciones Electrónicas y Subcapas) · Lección 24 “Shell Game” · Paquete del Capítulo 4: Check-In de la Lección 24' }
+    },
+    // ---------------------------------------------------------------- 9
+    {
+      id: 'bonding',
+      title: { en: 'Categories & Bonding', es: 'Categorías y Enlaces' },
+      kq: '19–20', targets: '25.1–25.3 · 26.1–26.3',
+      words: { en: ['soluble', 'insoluble', 'conductivity', 'chemical bond', 'molecule', 'ionic · metallic · covalent'], es: ['soluble', 'insoluble', 'conductividad', 'enlace químico', 'molécula', 'iónico · metálico · covalente'] },
+      know: [
+        { en: 'Sort with two tests: <strong>Does it dissolve?</strong> <strong>Does it conduct</strong> (as a solid? dissolved?). Conducting needs charged particles free to move.', es: 'Clasifica con dos pruebas: <strong>¿Se disuelve?</strong> <strong>¿Conduce</strong> (como sólido? ¿disuelto?). Conducir necesita partículas con carga libres para moverse.' },
+        { en: '<strong>Formula first:</strong> metal + nonmetal (or a polyatomic ion) → ionic · only metals → metallic · only nonmetals → covalent (small molecule or giant network).', es: '<strong>Primero la fórmula:</strong> metal + no metal (o un ion poliatómico) → iónico · solo metales → metálico · solo no metales → covalente (molécula pequeña o red gigante).' }
+      ],
+      extra: {
+        en: `<div><table><thead><tr><th>Bonding</th><th>Dissolves?</th><th>Conducts?</th><th>Other clues</th></tr></thead><tbody>
+          <tr><td>Ionic</td><td>often</td><td>only when dissolved (or melted)</td><td>brittle, high melting point</td></tr>
+          <tr><td>Metallic</td><td>no</td><td>solid ✓</td><td>shiny, bendable</td></tr>
+          <tr><td>Molecular covalent</td><td>often</td><td>never</td><td>soft, low melting point</td></tr>
+          <tr><td>Network covalent</td><td>no</td><td>never</td><td>very hard, very high melting point</td></tr></tbody></table></div>`,
+        es: `<div><table><thead><tr><th>Enlace</th><th>¿Se disuelve?</th><th>¿Conduce?</th><th>Otras pistas</th></tr></thead><tbody>
+          <tr><td>Iónico</td><td>a menudo</td><td>solo disuelto (o fundido)</td><td>quebradizo, punto de fusión alto</td></tr>
+          <tr><td>Metálico</td><td>no</td><td>sólido ✓</td><td>brillante, maleable</td></tr>
+          <tr><td>Covalente molecular</td><td>a menudo</td><td>nunca</td><td>blando, punto de fusión bajo</td></tr>
+          <tr><td>Covalente de red</td><td>no</td><td>nunca</td><td>muy duro, punto de fusión muy alto</td></tr></tbody></table></div>`
+      },
+      tools: [{ name: 'substanceSorter', intro: { en: 'Use both the data and the formula to name each substance’s bonding type.', es: 'Usa tanto los datos como la fórmula para nombrar el tipo de enlace de cada sustancia.' } }],
+      practice: [
+        { d: 'basic', q: { en: 'Will NaNO₃(aq) conduct electricity? Explain your reasoning.', es: '¿Conducirá electricidad el NaNO₃(aq)? Explica tu razonamiento.' }, h: { en: 'Is Na a metal? Is NO₃ a polyatomic ion? Is it dissolved?', es: '¿Es el Na un metal? ¿Es el NO₃ un ion poliatómico? ¿Está disuelto?' }, a: { en: 'Yes. NaNO₃ is an ionic compound (metal + polyatomic ion), and it is dissolved in water, so its ions are free to move and carry charge.', es: 'Sí. El NaNO₃ es un compuesto iónico (metal + ion poliatómico), y está disuelto en agua, así que sus iones están libres para moverse y transportar carga.' } },
+        { d: 'medium', q: { en: 'A white solid does not dissolve, does not conduct, and can scratch glass. What type of bonding does it most likely have, and why?', es: 'Un sólido blanco no se disuelve, no conduce y puede rayar el vidrio. ¿Qué tipo de enlace tiene más probablemente y por qué?' }, h: { en: 'Which type is very hard, insoluble, and never conducts?', es: '¿Qué tipo es muy duro, insoluble y nunca conduce?' }, a: { en: 'Network covalent — its atoms are locked in one giant network, so it is very hard, insoluble, and has no free-moving charges.', es: 'Covalente de red — sus átomos están fijos en una red gigante, así que es muy duro, insoluble y no tiene cargas libres para moverse.' } },
+        { d: 'challenge', q: { en: 'Predict the properties of CaF₂(s) from its formula alone.', es: 'Predice las propiedades de CaF₂(s) solo a partir de su fórmula.' }, h: { en: 'Metal + nonmetal → which bonding type?', es: 'Metal + no metal → ¿qué tipo de enlace?' }, a: { en: 'Ionic: a brittle, hard solid with a high melting point; it does not conduct as a solid, but its ions can carry charge if it is melted or dissolved.', es: 'Iónico: un sólido quebradizo y duro con punto de fusión alto; no conduce como sólido, pero sus iones pueden transportar carga si se funde o se disuelve.' } }
+      ],
+      revisit: { en: 'Lesson 25 “You Light Up My Life” (virtual lab) · Lesson 26 “Electron Glue” · Chapter 5 packet: Lessons 25–26 Check-Ins', es: 'Lección 25 “You Light Up My Life” (laboratorio virtual) · Lección 26 “Electron Glue” · Paquete del Capítulo 5: Check-Ins de las Lecciones 25–26' }
+    },
+    // ---------------------------------------------------------------- 10
+    {
+      id: 'cer',
+      title: { en: 'Explain It Studio', es: 'Estudio de Explícalo' },
+      customBody: {
+        en: `
+        <p>On the test, a right answer needs a <strong>reason</strong>. Practice the <strong>claim – evidence – reasoning</strong> routine on at least <strong>three</strong> of these. Type your answer, then compare it with the model and check off what yours included. (Nothing here is graded or saved.)</p>
+        <div class="note-box">
+          <span class="note-icon">✍️</span>
+          <div class="note-text"><strong>Claim</strong> = your answer in one sentence. <strong>Evidence</strong> = specific data or observations. <strong>Reasoning</strong> = the chemistry rule that connects them (“because…”).</div>
+        </div>
+        <div data-widget="cerStudio"></div>`,
+        es: `
+        <p>En el examen, una respuesta correcta necesita una <strong>razón</strong>. Practica la rutina <strong>afirmación – evidencia – razonamiento</strong> en al menos <strong>tres</strong> de estas. Escribe tu respuesta, compárala con el modelo y marca lo que incluyó la tuya. (Nada de esto se califica ni se guarda.)</p>
+        <div class="note-box">
+          <span class="note-icon">✍️</span>
+          <div class="note-text"><strong>Afirmación</strong> = tu respuesta en una oración. <strong>Evidencia</strong> = datos u observaciones específicos. <strong>Razonamiento</strong> = la regla química que los conecta (“porque…”).</div>
+        </div>
+        <div data-widget="cerStudio"></div>`
+      }
+    }
+  ];
+
+  // Explain It Studio prompts (ungraded). Each has a model answer to compare with.
+  const CER_PROMPTS = [
+    {
+      kq: '6',
+      q: { en: 'A student heats 4.0 g of baking soda in an open dish and is left with 2.5 g of solid. A partner says 1.5 g of matter was destroyed. Do you agree?', es: 'Un estudiante calienta 4.0 g de bicarbonato de sodio en un plato abierto y le quedan 2.5 g de sólido. Un compañero dice que se destruyeron 1.5 g de materia. ¿Estás de acuerdo?' },
+      model: {
+        claim: { en: 'No — the matter was not destroyed.', es: 'No — la materia no se destruyó.' },
+        evidence: { en: 'Heating baking soda gives off gases (carbon dioxide and water vapor). In an open dish those gases escaped into the air, so they were not on the scale at the end.', es: 'Calentar bicarbonato libera gases (dióxido de carbono y vapor de agua). En un plato abierto esos gases escaparon al aire, así que no estaban en la balanza al final.' },
+        reasoning: { en: 'The law of conservation of mass says atoms are rearranged, not destroyed. The “missing” 1.5 g is the mass of the escaped gases; in a sealed container the total mass would not change.', es: 'La ley de conservación de la masa dice que los átomos se reorganizan, no se destruyen. Los 1.5 g “perdidos” son la masa de los gases que escaparon; en un recipiente sellado la masa total no cambiaría.' }
+      }
+    },
+    {
+      kq: '9',
+      q: { en: 'In 1897 Thomson found that a beam inside a glass tube bends toward a positive plate, and the same particles came from every metal he tried. How did this evidence change the model of the atom?', es: 'En 1897 Thomson encontró que un haz dentro de un tubo de vidrio se desvía hacia una placa positiva, y las mismas partículas salían de todos los metales que probó. ¿Cómo cambió esta evidencia el modelo del átomo?' },
+      model: {
+        claim: { en: 'Atoms are not solid, indivisible spheres — they contain smaller negative particles.', es: 'Los átomos no son esferas sólidas e indivisibles — contienen partículas negativas más pequeñas.' },
+        evidence: { en: 'The beam bent toward the positive plate, so it was made of negative particles (electrons), and they came out of every kind of metal.', es: 'El haz se desvió hacia la placa positiva, así que estaba hecho de partículas negativas (electrones), y salían de todo tipo de metal.' },
+        reasoning: { en: 'Dalton’s solid-sphere model could not explain particles coming out of atoms, so it was replaced by the plum pudding model (electrons scattered in a positive “pudding”). Models change when new evidence does not fit.', es: 'El modelo de esfera sólida de Dalton no podía explicar partículas saliendo de los átomos, así que fue reemplazado por el modelo del pudín de ciruelas (electrones dispersos en un “pudín” positivo). Los modelos cambian cuando la nueva evidencia no encaja.' }
+      }
+    },
+    {
+      kq: '13',
+      q: { en: 'Why does an oxygen atom form an O²⁻ ion but never an O⁺ ion?', es: '¿Por qué un átomo de oxígeno forma un ion O²⁻ pero nunca un ion O⁺?' },
+      model: {
+        claim: { en: 'Oxygen gains 2 electrons to form O²⁻ because that gives it a noble-gas arrangement.', es: 'El oxígeno gana 2 electrones para formar O²⁻ porque eso le da un arreglo de gas noble.' },
+        evidence: { en: 'Oxygen is in Group 6A, so it has 6 valence electrons (shells 2, 6). Gaining 2 gives 8 valence electrons (2, 8) — the same arrangement as neon.', es: 'El oxígeno está en el Grupo 6A, así que tiene 6 electrones de valencia (capas 2, 6). Ganar 2 da 8 electrones de valencia (2, 8) — el mismo arreglo que el neón.' },
+        reasoning: { en: 'Atoms gain or lose electrons to reach the stable arrangement of a noble gas, taking the shorter trip. Gaining 2 is much easier than losing 6, and losing just 1 (O⁺) would not reach a stable arrangement at all.', es: 'Los átomos ganan o pierden electrones para alcanzar el arreglo estable de un gas noble, tomando el camino más corto. Ganar 2 es mucho más fácil que perder 6, y perder solo 1 (O⁺) no alcanzaría ningún arreglo estable.' }
+      }
+    },
+    {
+      kq: '19–20',
+      q: { en: 'Compound Q is brittle and has a high melting point. As a solid it does not conduct electricity, but a solution of Q in water does. Its formula is LiBr. What kind of bonding does Q have?', es: 'El compuesto Q es quebradizo y tiene un punto de fusión alto. Como sólido no conduce electricidad, pero una solución de Q en agua sí. Su fórmula es LiBr. ¿Qué tipo de enlace tiene Q?' },
+      model: {
+        claim: { en: 'Q has ionic bonding.', es: 'Q tiene enlace iónico.' },
+        evidence: { en: 'Formula: LiBr is a metal (Li) plus a nonmetal (Br). Properties: brittle, high melting point, conducts only when dissolved.', es: 'Fórmula: LiBr es un metal (Li) más un no metal (Br). Propiedades: quebradizo, punto de fusión alto, conduce solo cuando está disuelto.' },
+        reasoning: { en: 'Ionic compounds are made of ions locked in place in a solid, so they cannot carry charge; once dissolved the ions move freely and conduct. A metal + nonmetal formula plus these properties matches ionic bonding.', es: 'Los compuestos iónicos están hechos de iones fijos en el sólido, así que no pueden transportar carga; una vez disueltos los iones se mueven libremente y conducen. Una fórmula metal + no metal más estas propiedades coincide con el enlace iónico.' }
+      }
+    }
+  ];
+
+  // ---- Interactive mini-tools (ungraded practice; each makes fresh problems) ----
+
+  const W = {
+    check: { en: 'Check', es: 'Revisar' },
+    next: { en: 'New problem', es: 'Problema nuevo' },
+    show: { en: 'Show answer', es: 'Mostrar respuesta' },
+    matter: { en: 'Matter', es: 'Materia' },
+    notMatter: { en: 'Not matter', es: 'No es materia' },
+    allRight: { en: 'All correct — nice!', es: '¡Todo correcto — muy bien!' },
+    someRight: { en: (r, n) => `${r} of ${n} correct. Fix the red ones and check again.`, es: (r, n) => `${r} de ${n} correctas. Corrige las rojas y revisa de nuevo.` },
+    protons: { en: 'protons', es: 'protones' },
+    electrons: { en: 'electrons', es: 'electrones' },
+    neutrons: { en: 'neutrons', es: 'neutrones' }
+  };
+  function w(key, lang, ...a) { const e = W[key]; const v = e[lang] || e.en; return typeof v === 'function' ? v(...a) : v; }
+  function rnd(n) { return Math.floor(Math.random() * n); }
+  function pick(arr, n) {
+    const pool = arr.slice(); const out = [];
+    while (out.length < n && pool.length) out.push(pool.splice(rnd(pool.length), 1)[0]);
+    return out;
+  }
+  function selectHtml(options, lang, cls) {
+    return `<select class="u1r-sel ${cls || ''}"><option value="">${escapeHtml(t('choose', lang))}</option>${options.map((o, i) => `<option value="${i}">${escapeHtml(tr(o, lang))}</option>`).join('')}</select>`;
+  }
+
+  // Periodic data for the first 20 elements (rounded mass), used by several tools.
+  const EL = [
+    null,
+    { s: 'H', n: { en: 'hydrogen', es: 'hidrógeno' }, m: 1 }, { s: 'He', n: { en: 'helium', es: 'helio' }, m: 4 },
+    { s: 'Li', n: { en: 'lithium', es: 'litio' }, m: 7 }, { s: 'Be', n: { en: 'beryllium', es: 'berilio' }, m: 9 },
+    { s: 'B', n: { en: 'boron', es: 'boro' }, m: 11 }, { s: 'C', n: { en: 'carbon', es: 'carbono' }, m: 12 },
+    { s: 'N', n: { en: 'nitrogen', es: 'nitrógeno' }, m: 14 }, { s: 'O', n: { en: 'oxygen', es: 'oxígeno' }, m: 16 },
+    { s: 'F', n: { en: 'fluorine', es: 'flúor' }, m: 19 }, { s: 'Ne', n: { en: 'neon', es: 'neón' }, m: 20 },
+    { s: 'Na', n: { en: 'sodium', es: 'sodio' }, m: 23 }, { s: 'Mg', n: { en: 'magnesium', es: 'magnesio' }, m: 24 },
+    { s: 'Al', n: { en: 'aluminum', es: 'aluminio' }, m: 27 }, { s: 'Si', n: { en: 'silicon', es: 'silicio' }, m: 28 },
+    { s: 'P', n: { en: 'phosphorus', es: 'fósforo' }, m: 31 }, { s: 'S', n: { en: 'sulfur', es: 'azufre' }, m: 32 },
+    { s: 'Cl', n: { en: 'chlorine', es: 'cloro' }, m: 35 }, { s: 'Ar', n: { en: 'argon', es: 'argón' }, m: 40 },
+    { s: 'K', n: { en: 'potassium', es: 'potasio' }, m: 39 }, { s: 'Ca', n: { en: 'calcium', es: 'calcio' }, m: 40 }
+  ];
+
+  // Shared "Check / New problem" footer and per-widget feedback line.
+  function toolFooter(lang, withNew) {
+    return `<div><button type="button" class="u1r-btn" data-act="check">${escapeHtml(w('check', lang))}</button>${withNew ? `<button type="button" class="u1r-btn secondary" data-act="new">${escapeHtml(w('next', lang))}</button>` : ''}</div><div class="u1r-fb" data-fb></div>`;
+  }
+  function setFb(mount, ok, text) {
+    const fb = mount.querySelector('[data-fb]');
+    fb.className = 'u1r-fb ' + (ok ? 'ok' : 'bad');
+    fb.textContent = text;
+  }
+
+  const WIDGETS = {};
+
+  // 1. Matter or not? ---------------------------------------------------------
+  const MATTER_ITEMS = [
+    { l: { en: 'steam rising from a pot', es: 'vapor que sale de una olla' }, m: true },
+    { l: { en: 'the sound of a clap', es: 'el sonido de un aplauso' }, m: false },
+    { l: { en: 'a puff of dust', es: 'una nube de polvo' }, m: true },
+    { l: { en: 'warmth from sunlight', es: 'el calor de la luz del sol' }, m: false },
+    { l: { en: 'a drop of vinegar', es: 'una gota de vinagre' }, m: true },
+    { l: { en: 'an idea', es: 'una idea' }, m: false },
+    { l: { en: 'helium inside a balloon', es: 'helio dentro de un globo' }, m: true },
+    { l: { en: 'a beam from a flashlight', es: 'el haz de una linterna' }, m: false }
+  ];
+  WIDGETS.matterSort = function (mount, lang) {
+    let items = pick(MATTER_ITEMS, 5);
+    function draw() {
+      mount.innerHTML = `<div class="u1r-rows">${items.map((it, i) => `
+        <div class="u1r-row" data-i="${i}"><span class="u1r-row-label">${escapeHtml(tr(it.l, lang))}</span>
+        <select class="u1r-sel"><option value="">${escapeHtml(t('choose', lang))}</option><option value="1">${escapeHtml(w('matter', lang))}</option><option value="0">${escapeHtml(w('notMatter', lang))}</option></select></div>`).join('')}</div>${toolFooter(lang, true)}`;
+      mount.querySelector('[data-act="new"]').onclick = () => { items = pick(MATTER_ITEMS, 5); draw(); };
+      mount.querySelector('[data-act="check"]').onclick = () => {
+        let right = 0;
+        mount.querySelectorAll('.u1r-row').forEach(row => {
+          const v = row.querySelector('select').value;
+          const ok = v !== '' && (v === '1') === items[Number(row.getAttribute('data-i'))].m;
+          row.classList.toggle('good', ok); row.classList.toggle('bad', !ok); if (ok) right++;
+        });
+        setFb(mount, right === items.length, right === items.length ? w('allRight', lang) : w('someRight', lang, right, items.length));
+      };
+    }
+    draw();
+  };
+
+  // 2. Formula decoder: count atoms, parentheses multiply ---------------------
+  const FORMULAS = ['Al2(SO4)3', '(NH4)2CO3', 'Ca3(PO4)2', 'Mg(OH)2', 'Fe2(CO3)3', 'Ba(NO3)2', 'NH4NO3', 'Al(OH)3'];
+  function countAtoms(formula) {
+    const stack = [{}];
+    const re = /([A-Z][a-z]?)(\d*)|(\()|(\))(\d*)/g; let m;
+    while ((m = re.exec(formula))) {
+      if (m[1]) { const c = stack[stack.length - 1]; c[m[1]] = (c[m[1]] || 0) + (m[2] ? +m[2] : 1); }
+      else if (m[3]) stack.push({});
+      else { const inner = stack.pop(); const mult = m[5] ? +m[5] : 1; const c = stack[stack.length - 1]; Object.keys(inner).forEach(k => { c[k] = (c[k] || 0) + inner[k] * mult; }); }
+    }
+    return stack[0];
+  }
+  WIDGETS.formulaDecode = function (mount, lang) {
+    let f = FORMULAS[rnd(FORMULAS.length)];
+    function draw() {
+      const counts = countAtoms(f); const els = Object.keys(counts);
+      mount.innerHTML = `<p class="u1r-big">${fmt(f)}</p><div class="u1r-fields">${els.map(e => `<label class="u1r-field" data-el="${e}">${e}<input type="number" min="0" class="u1r-num" inputmode="numeric"></label>`).join('')}</div>${toolFooter(lang, true)}`;
+      mount.querySelector('[data-act="new"]').onclick = () => { let g; do { g = FORMULAS[rnd(FORMULAS.length)]; } while (g === f); f = g; draw(); };
+      mount.querySelector('[data-act="check"]').onclick = () => {
+        let right = 0;
+        mount.querySelectorAll('.u1r-field').forEach(fl => {
+          const ok = Number(fl.querySelector('input').value) === counts[fl.getAttribute('data-el')] && fl.querySelector('input').value !== '';
+          fl.classList.toggle('good', ok); fl.classList.toggle('bad', !ok); if (ok) right++;
+        });
+        setFb(mount, right === els.length, right === els.length ? w('allRight', lang) : w('someRight', lang, right, els.length));
+      };
+    }
+    draw();
+  };
+
+  // 3. Family sort ------------------------------------------------------------
+  const FAMILIES = [
+    { en: 'alkali metal', es: 'metal alcalino' }, { en: 'alkaline earth metal', es: 'metal alcalinotérreo' },
+    { en: 'transition element', es: 'elemento de transición' }, { en: 'metalloid', es: 'metaloide' },
+    { en: 'halogen', es: 'halógeno' }, { en: 'noble gas', es: 'gas noble' }
+  ];
+  const FAMILY_POOL = [
+    ['Li', 0], ['K', 0], ['Rb', 0], ['Be', 1], ['Ba', 1], ['Sr', 1], ['Fe', 2], ['Cu', 2], ['Zn', 2], ['Ni', 2],
+    ['B', 3], ['Si', 3], ['Ge', 3], ['As', 3], ['F', 4], ['Br', 4], ['I', 4], ['Ne', 5], ['Kr', 5], ['Xe', 5]
+  ];
+  WIDGETS.familySort = function (mount, lang) {
+    let set = pick(FAMILY_POOL, 6);
+    function draw() {
+      mount.innerHTML = `<div class="u1r-rows">${set.map((e, i) => `<div class="u1r-row" data-i="${i}"><span class="u1r-row-label mono">${e[0]}</span>${selectHtml(FAMILIES, lang)}</div>`).join('')}</div>${toolFooter(lang, true)}`;
+      mount.querySelector('[data-act="new"]').onclick = () => { set = pick(FAMILY_POOL, 6); draw(); };
+      mount.querySelector('[data-act="check"]').onclick = () => {
+        let right = 0;
+        mount.querySelectorAll('.u1r-row').forEach(row => {
+          const v = row.querySelector('select').value;
+          const ok = v !== '' && Number(v) === set[Number(row.getAttribute('data-i'))][1];
+          row.classList.toggle('good', ok); row.classList.toggle('bad', !ok); if (ok) right++;
+        });
+        setFb(mount, right === set.length, right === set.length ? w('allRight', lang) : w('someRight', lang, right, set.length));
+      };
+    }
+    draw();
+  };
+
+  // 4. Atom checker: protons / electrons / neutrons ---------------------------
+  WIDGETS.atomChecker = function (mount, lang) {
+    let z = 3 + rnd(18);
+    function draw() {
+      const e = EL[z];
+      mount.innerHTML = `<p><strong>${escapeHtml(tr(e.n, lang))}</strong> (${e.s}) — atomic number ${z}, ${lang === 'es' ? 'masa atómica redondeada' : 'rounded atomic mass'} ${e.m}</p>
+        <div class="u1r-fields">${[['p', 'protons'], ['e', 'electrons'], ['n', 'neutrons']].map(([k, label]) => `<label class="u1r-field" data-k="${k}">${escapeHtml(w(label, lang))}<input type="number" min="0" class="u1r-num" inputmode="numeric"></label>`).join('')}</div>${toolFooter(lang, true)}`;
+      mount.querySelector('[data-act="new"]').onclick = () => { let n; do { n = 3 + rnd(18); } while (n === z); z = n; draw(); };
+      mount.querySelector('[data-act="check"]').onclick = () => {
+        const ans = { p: z, e: z, n: e.m - z }; let right = 0;
+        mount.querySelectorAll('.u1r-field').forEach(fl => {
+          const inp = fl.querySelector('input'); const ok = inp.value !== '' && Number(inp.value) === ans[fl.getAttribute('data-k')];
+          fl.classList.toggle('good', ok); fl.classList.toggle('bad', !ok); if (ok) right++;
+        });
+        setFb(mount, right === 3, right === 3 ? w('allRight', lang) : w('someRight', lang, right, 3));
+      };
+    }
+    draw();
+  };
+
+  // 5. Flame match ------------------------------------------------------------
+  const FLAMES = [
+    { m: { en: 'lithium (Li)', es: 'litio (Li)' }, c: '#e8384f', cn: { en: 'crimson red', es: 'rojo carmesí' } },
+    { m: { en: 'sodium (Na)', es: 'sodio (Na)' }, c: '#ffc300', cn: { en: 'bright yellow-orange', es: 'amarillo-anaranjado brillante' } },
+    { m: { en: 'potassium (K)', es: 'potasio (K)' }, c: '#b07cf2', cn: { en: 'lilac', es: 'lila' } },
+    { m: { en: 'calcium (Ca)', es: 'calcio (Ca)' }, c: '#ff7849', cn: { en: 'orange-red (brick red)', es: 'rojo anaranjado (rojo ladrillo)' } },
+    { m: { en: 'barium (Ba)', es: 'bario (Ba)' }, c: '#7ed957', cn: { en: 'apple green', es: 'verde manzana' } },
+    { m: { en: 'copper (Cu)', es: 'cobre (Cu)' }, c: '#17d3c2', cn: { en: 'blue-green', es: 'verde azulado' } }
+  ];
+  WIDGETS.flameMatch = function (mount, lang) {
+    let order = pick(FLAMES.map((f, i) => i), 3);
+    function draw() {
+      mount.innerHTML = `<div class="u1r-cards">${order.map((fi, i) => `<div class="u1r-card" data-i="${i}"><div class="u1r-flame-swatch" style="--sw:${FLAMES[fi].c}"></div><div class="u1r-card-meta" style="text-align:center">${escapeHtml(tr(FLAMES[fi].cn, lang))}</div>${selectHtml(FLAMES.map(f => f.m), lang)}</div>`).join('')}</div>${toolFooter(lang, true)}`;
+      mount.querySelector('[data-act="new"]').onclick = () => { order = pick(FLAMES.map((f, i) => i), 3); draw(); };
+      mount.querySelector('[data-act="check"]').onclick = () => {
+        let right = 0;
+        mount.querySelectorAll('.u1r-card').forEach(card => {
+          const v = card.querySelector('select').value; const ok = v !== '' && Number(v) === order[Number(card.getAttribute('data-i'))];
+          card.classList.toggle('good', ok); card.classList.toggle('bad', !ok); if (ok) right++;
+        });
+        setFb(mount, right === 3, right === 3 ? w('allRight', lang) : w('someRight', lang, right, 3));
+      };
+    }
+    draw();
+  };
+
+  // 6. Shell check: shells, valence, core -------------------------------------
+  function shellsFor(n) {
+    const caps = [2, 8, 8]; const out = []; let left = n;
+    for (const c of caps) { if (left <= 0) break; const k = Math.min(c, left); out.push(k); left -= k; }
+    return out;
+  }
+  function shellSvg(shells, sym) {
+    let svg = '<svg class="u1r-shell-svg" viewBox="-70 -70 140 140" xmlns="http://www.w3.org/2000/svg">';
+    shells.forEach((count, si) => {
+      const r = 22 + si * 18;
+      svg += `<circle r="${r}" fill="none" stroke="#253a52" stroke-width="1.2" opacity="0.45"/>`;
+      for (let k = 0; k < count; k++) {
+        const a = (2 * Math.PI * k) / count - Math.PI / 2;
+        svg += `<circle cx="${(r * Math.cos(a)).toFixed(1)}" cy="${(r * Math.sin(a)).toFixed(1)}" r="3.6" fill="${si === shells.length - 1 ? '#f4a261' : '#2ec4b6'}"/>`;
+      }
+    });
+    return svg + `<circle r="14" fill="#0d1b2a"/><text y="4" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" font-family="JetBrains Mono, monospace">${escapeHtml(sym)}</text></svg>`;
+  }
+  WIDGETS.shellCheck = function (mount, lang) {
+    let z = 3 + rnd(16);
+    function draw() {
+      const e = EL[z];
+      const lab = lang === 'es' ? ['Capa 1', 'Capa 2', 'Capa 3', 'Valencia', 'Núcleo interno'] : ['Shell 1', 'Shell 2', 'Shell 3', 'Valence', 'Core'];
+      mount.innerHTML = `<p><strong>${escapeHtml(tr(e.n, lang))}</strong> (${e.s}) — ${lang === 'es' ? 'número atómico' : 'atomic number'} ${z}</p>
+        <div class="u1r-fields">${['s1', 's2', 's3', 'val', 'core'].map((k, i) => `<label class="u1r-field" data-k="${k}">${lab[i]}<input type="number" min="0" class="u1r-num" inputmode="numeric"></label>`).join('')}</div>${toolFooter(lang, true)}<div data-svg></div>`;
+      mount.querySelector('[data-act="new"]').onclick = () => { let n; do { n = 3 + rnd(16); } while (n === z); z = n; draw(); };
+      mount.querySelector('[data-act="check"]').onclick = () => {
+        const sh = shellsFor(z); const ans = { s1: sh[0] || 0, s2: sh[1] || 0, s3: sh[2] || 0, val: sh[sh.length - 1], core: z - sh[sh.length - 1] };
+        let right = 0;
+        mount.querySelectorAll('.u1r-field').forEach(fl => {
+          const inp = fl.querySelector('input'); const ok = inp.value !== '' && Number(inp.value) === ans[fl.getAttribute('data-k')];
+          fl.classList.toggle('good', ok); fl.classList.toggle('bad', !ok); if (ok) right++;
+        });
+        setFb(mount, right === 5, right === 5 ? w('allRight', lang) : w('someRight', lang, right, 5));
+        mount.querySelector('[data-svg]').innerHTML = shellSvg(sh, e.s);
+      };
+    }
+    draw();
+  };
+
+  // 7. Charge balancer (ions -> formula + name) -------------------------------
+  const ION_SIMPLE_CAT = [
+    { s: 'Li', c: 1, n: { en: 'lithium', es: 'litio' } }, { s: 'K', c: 1, n: { en: 'potassium', es: 'potasio' } },
+    { s: 'Mg', c: 2, n: { en: 'magnesium', es: 'magnesio' } }, { s: 'Ca', c: 2, n: { en: 'calcium', es: 'calcio' } },
+    { s: 'Ba', c: 2, n: { en: 'barium', es: 'bario' } }, { s: 'Al', c: 3, n: { en: 'aluminum', es: 'aluminio' } }
+  ];
+  const ION_SIMPLE_AN = [
+    { s: 'F', c: -1, n: { en: 'fluoride', es: 'fluoruro' } }, { s: 'Cl', c: -1, n: { en: 'chloride', es: 'cloruro' } },
+    { s: 'Br', c: -1, n: { en: 'bromide', es: 'bromuro' } }, { s: 'O', c: -2, n: { en: 'oxide', es: 'óxido' } },
+    { s: 'S', c: -2, n: { en: 'sulfide', es: 'sulfuro' } }, { s: 'N', c: -3, n: { en: 'nitride', es: 'nitruro' } },
+    { s: 'P', c: -3, n: { en: 'phosphide', es: 'fosfuro' } }
+  ];
+  const ION_FULL_CAT = ION_SIMPLE_CAT.concat([
+    { s: 'NH4', c: 1, poly: true, n: { en: 'ammonium', es: 'amonio' } }
+  ]);
+  const ION_FULL_AN = ION_SIMPLE_AN.concat([
+    { s: 'OH', c: -1, poly: true, n: { en: 'hydroxide', es: 'hidróxido' } }, { s: 'NO3', c: -1, poly: true, n: { en: 'nitrate', es: 'nitrato' } },
+    { s: 'CO3', c: -2, poly: true, n: { en: 'carbonate', es: 'carbonato' } }, { s: 'SO4', c: -2, poly: true, n: { en: 'sulfate', es: 'sulfato' } },
+    { s: 'PO4', c: -3, poly: true, n: { en: 'phosphate', es: 'fosfato' } }
+  ]);
+  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+  function part(ion, n) {
+    const body = fmt(ion.s);
+    if (n === 1) return body;
+    return (ion.poly ? '(' + body + ')' : body) + '<sub>' + n + '</sub>';
+  }
+  function balance(cat, an) {
+    const L = (Math.abs(cat.c) * Math.abs(an.c)) / gcd(Math.abs(cat.c), Math.abs(an.c));
+    return { nc: L / Math.abs(cat.c), na: L / Math.abs(an.c) };
+  }
+  function ionLabel(i, lang) {
+    const sub = i.s.replace(/\d/g, d => '₀₁₂₃₄₅₆₇₈₉'[d]);
+    const sup = (Math.abs(i.c) === 1 ? '' : '²³'[Math.abs(i.c) - 2]) + (i.c < 0 ? '⁻' : '⁺');
+    return tr(i.n, lang) + ' — ' + sub + sup;
+  }
+  WIDGETS.chargeBalancer = function (mount, lang, opts) {
+    const cats = opts && opts.set === 'full' ? ION_FULL_CAT : ION_SIMPLE_CAT;
+    const ans = opts && opts.set === 'full' ? ION_FULL_AN : ION_SIMPLE_AN;
+    const lab = lang === 'es' ? ['Catión (+)', 'Anión (−)'] : ['Cation (+)', 'Anion (−)'];
+    mount.innerHTML = `<div class="u1r-bal">
+        <label>${lab[0]}<select class="u1r-sel" data-cat>${cats.map((c, i) => `<option value="${i}">${escapeHtml(ionLabel(c, lang))}</option>`).join('')}</select></label>
+        <label>${lab[1]}<select class="u1r-sel" data-an>${ans.map((a, i) => `<option value="${i}">${escapeHtml(ionLabel(a, lang))}</option>`).join('')}</select></label>
+        <button type="button" class="u1r-btn secondary" data-act="rand">${lang === 'es' ? 'Par al azar (¡predice primero!)' : 'Random pair (predict first!)'}</button></div>
+      <div class="u1r-bal-out" data-out></div>`;
+    const selC = mount.querySelector('[data-cat]'); const selA = mount.querySelector('[data-an]'); const out = mount.querySelector('[data-out]');
+    let hidden = false;
+    function show() {
+      const c = cats[+selC.value]; const a = ans[+selA.value]; const b = balance(c, a);
+      const name = lang === 'es' ? `${tr(a.n, lang)} de ${tr(c.n, lang)}` : `${tr(c.n, lang)} ${tr(a.n, lang)}`;
+      out.innerHTML = `<div class="u1r-bal-formula">${part(c, b.nc)}${part(a, b.na)}</div><div class="u1r-bal-name">${escapeHtml(name)}</div>
+        <div class="u1r-bal-math zero">${b.nc}(${c.c > 0 ? '+' : ''}${c.c}) + ${b.na}(${a.c}) = ${b.nc * c.c + b.na * a.c} ✓</div>`;
+    }
+    function hide() { out.innerHTML = `<button type="button" class="u1r-btn" data-act="reveal">${lang === 'es' ? 'Mostrar fórmula y nombre' : 'Reveal formula and name'}</button>`; out.querySelector('[data-act="reveal"]').onclick = () => { hidden = false; show(); }; }
+    selC.onchange = selA.onchange = () => { hidden = false; show(); };
+    mount.querySelector('[data-act="rand"]').onclick = () => { selC.value = rnd(cats.length); selA.value = rnd(ans.length); hidden = true; hide(); };
+    show();
+  };
+
+  // 8. Electron configuration tool --------------------------------------------
+  const FILL = [[1, 's', 2], [2, 's', 2], [2, 'p', 6], [3, 's', 2], [3, 'p', 6], [4, 's', 2], [3, 'd', 10], [4, 'p', 6]];
+  const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+  function configParts(z) {
+    const out = []; let left = z;
+    for (const [n, l, cap] of FILL) { if (left <= 0) break; const k = Math.min(cap, left); out.push([n, l, k]); left -= k; }
+    return out;
+  }
+  function configText(z, sup) { return configParts(z).map(([n, l, k]) => n + l + (sup ? String(k).split('').map(d => SUP[d]).join('') : k)).join(' '); }
+  const CONFIG_POOL = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 33, 34, 35];
+  const EXTRA_NAMES = { 33: ['As', { en: 'arsenic', es: 'arsénico' }], 34: ['Se', { en: 'selenium', es: 'selenio' }], 35: ['Br', { en: 'bromine', es: 'bromo' }] };
+  function normConfig(s) {
+    return s.split('').map(ch => { const i = SUP.indexOf(ch); return i >= 0 ? String(i) : ch; }).join('').replace(/[\s^]/g, '').toLowerCase();
+  }
+  WIDGETS.configTool = function (mount, lang) {
+    let z = CONFIG_POOL[rnd(CONFIG_POOL.length)];
+    function info(z) { return z <= 20 ? [EL[z].s, EL[z].n] : EXTRA_NAMES[z]; }
+    function where(z) {
+      const last = configParts(z).pop(); const period = last[0];
+      const block = last[1] === 'd' ? 'p' : last[1];
+      return lang === 'es' ? `período ${period}, bloque ${block}` : `period ${period}, ${block}-block`;
+    }
+    function draw() {
+      const [sym, nm] = info(z);
+      mount.innerHTML = `<p><strong>${escapeHtml(tr(nm, lang))}</strong> (${sym}) — ${lang === 'es' ? 'número atómico' : 'atomic number'} ${z}</p>
+        <input type="text" class="u1r-txt" placeholder="1s2 2s2 2p6 …" autocomplete="off" spellcheck="false">
+        <p class="u1r-qhint" style="margin-top:0.4rem">${lang === 'es' ? 'Escribe los superíndices como números: 1s2 2s2 2p6…' : 'Type superscripts as plain numbers: 1s2 2s2 2p6…'}</p>
+        ${toolFooter(lang, true)}<button type="button" class="u1r-btn secondary" data-act="show">${escapeHtml(w('show', lang))}</button><div data-ans></div>`;
+      mount.querySelector('[data-act="new"]').onclick = () => { let n; do { n = CONFIG_POOL[rnd(CONFIG_POOL.length)]; } while (n === z); z = n; draw(); };
+      mount.querySelector('[data-act="check"]').onclick = () => {
+        const v = normConfig(mount.querySelector('input').value); const ok = v === normConfig(configText(z, false));
+        setFb(mount, ok, ok ? w('allRight', lang) : (lang === 'es' ? 'Todavía no. Revisa el orden de llenado y que los superíndices sumen ' + z + '.' : 'Not yet. Check the fill order and that the superscripts add to ' + z + '.'));
+      };
+      mount.querySelector('[data-act="show"]').onclick = () => {
+        mount.querySelector('[data-ans]').innerHTML = `<div class="u1r-ec-line">${configText(z, true)}</div><p class="u1r-qhint">${where(z)}</p>`;
+      };
+    }
+    draw();
+  };
+
+  // 9. Substance sorter: data + formula -> bonding type -----------------------
+  const BOND_TYPES = [
+    { en: 'ionic', es: 'iónico' }, { en: 'metallic', es: 'metálico' },
+    { en: 'molecular covalent', es: 'covalente molecular' }, { en: 'network covalent', es: 'covalente de red' }
+  ];
+  const SUBSTANCES = [
+    { f: 'LiF', dis: 1, sol: 0, aq: 1, c: 0 }, { f: 'NH4Cl', dis: 1, sol: 0, aq: 1, c: 0 }, { f: 'Ca(NO3)2', dis: 1, sol: 0, aq: 1, c: 0 },
+    { f: 'Zn', dis: 0, sol: 1, aq: null, c: 1 }, { f: 'Al', dis: 0, sol: 1, aq: null, c: 1 }, { f: 'Ni', dis: 0, sol: 1, aq: null, c: 1 },
+    { f: 'C6H12O6', dis: 1, sol: 0, aq: 0, c: 2 }, { f: 'C12H22O11', dis: 1, sol: 0, aq: 0, c: 2 },
+    { f: 'SiC', dis: 0, sol: 0, aq: null, c: 3 }, { f: 'SiO2', dis: 0, sol: 0, aq: null, c: 3 }
+  ];
+  function yn(v, lang) { return v === null ? '—' : (v ? (lang === 'es' ? 'sí' : 'yes') : 'no'); }
+  WIDGETS.substanceSorter = function (mount, lang) {
+    let set = pick(SUBSTANCES, 4);
+    function draw() {
+      const L = lang === 'es' ? ['¿Se disuelve?', '¿Conduce sólido?', '¿Conduce disuelto?'] : ['Dissolves?', 'Conducts as solid?', 'Conducts dissolved?'];
+      mount.innerHTML = `<div class="u1r-cards">${set.map((s, i) => `<div class="u1r-card" data-i="${i}"><div class="u1r-card-title">${fmt(s.f)}</div>
+        <div class="u1r-card-meta">${L[0]} ${yn(s.dis, lang)}<br>${L[1]} ${yn(s.sol, lang)}<br>${L[2]} ${yn(s.aq, lang)}</div>${selectHtml(BOND_TYPES, lang)}</div>`).join('')}</div>${toolFooter(lang, true)}`;
+      mount.querySelector('[data-act="new"]').onclick = () => { set = pick(SUBSTANCES, 4); draw(); };
+      mount.querySelector('[data-act="check"]').onclick = () => {
+        let right = 0;
+        mount.querySelectorAll('.u1r-card').forEach(card => {
+          const v = card.querySelector('select').value; const ok = v !== '' && Number(v) === set[Number(card.getAttribute('data-i'))].c;
+          card.classList.toggle('good', ok); card.classList.toggle('bad', !ok); if (ok) right++;
+        });
+        setFb(mount, right === set.length, right === set.length ? w('allRight', lang) : w('someRight', lang, right, set.length));
+      };
+    }
+    draw();
+  };
+
+  // 10. Explain It studio (ungraded) ------------------------------------------
+  WIDGETS.cerStudio = function (mount, lang) {
+    const L = lang === 'es'
+      ? { claim: 'Afirmación', ev: 'Evidencia', re: 'Razonamiento', cmp: 'Comparar con el modelo', model: 'Respuesta modelo', c1: 'Mi afirmación respondió la pregunta', c2: 'Mi evidencia fue específica (datos u observaciones)', c3: 'Mi razonamiento usó una regla química (“porque…”)', ph: 'Escribe aquí…', kq: 'Pregunta Clave' }
+      : { claim: 'Claim', ev: 'Evidence', re: 'Reasoning', cmp: 'Compare with the model', model: 'Model answer', c1: 'My claim answered the question', c2: 'My evidence was specific (data or observations)', c3: 'My reasoning used a chemistry rule (“because…”)', ph: 'Type here…', kq: 'Key Question' };
+    mount.innerHTML = CER_PROMPTS.map((p, i) => `<div class="u1r-cer">
+      <div class="u1r-cer-prompt">${L.kq} ${p.kq} · ${escapeHtml(tr(p.q, lang))}</div>
+      ${[['claim', L.claim], ['ev', L.ev], ['re', L.re]].map(([k, label]) => `<div class="u1r-cer-label">${label}</div><textarea placeholder="${escapeHtml(L.ph)}" data-k="${k}"></textarea>`).join('')}
+      <button type="button" class="u1r-btn" data-cmp="${i}">${L.cmp}</button>
+      <div class="u1r-cer-model" id="u1r-model-${i}"><div class="u1r-cer-label">${L.model}</div>
+        <ul><li><strong>${L.claim}:</strong> ${escapeHtml(tr(p.model.claim, lang))}</li><li><strong>${L.ev}:</strong> ${escapeHtml(tr(p.model.evidence, lang))}</li><li><strong>${L.re}:</strong> ${escapeHtml(tr(p.model.reasoning, lang))}</li></ul>
+        <div class="u1r-self"><label><input type="checkbox"> ${L.c1}</label><label><input type="checkbox"> ${L.c2}</label><label><input type="checkbox"> ${L.c3}</label></div></div></div>`).join('');
+    mount.querySelectorAll('[data-cmp]').forEach(btn => {
+      btn.addEventListener('click', () => mount.querySelector('#u1r-model-' + btn.getAttribute('data-cmp')).classList.toggle('open'));
+    });
+  };
+
+  // ---- Graded check (mirrors the Chapter Check item types) ----
+  // type 'mc'      : one correct choice index                 (1 pt)
+  // type 'multi'   : pick every correct choice                (max pts, minus 1 per mistake)
+  // type 'rows'    : a <select> per row; row.opts overrides the shared opts
+  // type 'numbers' : a number box per field
+  // Partial credit for rows/numbers = floor(max * right / total). `kq` lists the
+  // Key Questions a miss points back to (summary uses it to say what to revisit).
+  const E = (en, es) => ({ en, es });
+  const BOND_OPTS = [E('ionic', 'iónico'), E('metallic', 'metálico'), E('molecular covalent', 'covalente molecular'), E('network covalent', 'covalente de red')];
+  const OH_OPTS = [E('Observation', 'Observación'), E('Hypothesis', 'Hipótesis')];
+  const EC_OPTS = [E('Element', 'Elemento'), E('Compound', 'Compuesto')];
+
+  const QUESTIONS = [
+    // ---- A. Words to Know ----
+    {
+      sec: 'A', kq: [], type: 'rows', max: 3,
+      prompt: E('Match each term to its meaning.', 'Relaciona cada término con su significado.'),
+      opts: [
+        E('an ion with a net negative charge', 'un ion con carga neta negativa'),
+        E('the number of protons in the nucleus', 'el número de protones en el núcleo'),
+        E('a testable explanation for an observation', 'una explicación comprobable de una observación'),
+        E('an ion made of a group of atoms with one overall charge', 'un ion formado por un grupo de átomos con una sola carga total'),
+        E('dissolved in water', 'disuelto en agua'),
+        E('an electron in the outermost shell of an atom', 'un electrón en la capa más externa de un átomo'),
+        E('matter cannot be created or destroyed in a chemical reaction', 'la materia no se puede crear ni destruir en una reacción química'),
+        E('an ion with a net positive charge', 'un ion con carga neta positiva')
+      ],
+      rows: [
+        { l: E('hypothesis', 'hipótesis'), a: 2 }, { l: E('aqueous', 'acuoso'), a: 4 }, { l: E('atomic number', 'número atómico'), a: 1 },
+        { l: E('valence electron', 'electrón de valencia'), a: 5 }, { l: E('cation', 'catión'), a: 7 }, { l: E('polyatomic ion', 'ion poliatómico'), a: 3 }
+      ],
+      explanation: E('These are the Word Wall terms from Chapters 1–4. Two meanings were extras (anion and the law of conservation of mass).', 'Estos son los términos del Muro de Palabras de los Capítulos 1–4. Dos significados sobraban (anión y la ley de conservación de la masa).')
+    },
+    // ---- B. Show the Skill ----
+    {
+      sec: 'B', kq: [1], type: 'rows', max: 2,
+      prompt: E('Match each tool to its job.', 'Relaciona cada herramienta con su función.'),
+      opts: [E('measures mass', 'mide la masa'), E('precisely measures liquid volume', 'mide con precisión el volumen de un líquido'), E('flushes chemicals out of your eyes', 'enjuaga los químicos de tus ojos'), E('heats substances', 'calienta sustancias'), E('holds liquid for rough mixing', 'contiene líquido para mezclar de forma aproximada')],
+      rows: [{ l: E('graduated cylinder', 'probeta graduada'), a: 1 }, { l: E('balance', 'balanza'), a: 0 }, { l: E('Bunsen burner', 'mechero Bunsen'), a: 3 }, { l: E('eye wash station', 'estación de lavado de ojos'), a: 2 }],
+      explanation: E('The graduated cylinder is the precise one; a beaker only “holds liquid for rough mixing.”', 'La probeta graduada es la precisa; un vaso de precipitados solo “contiene líquido para mezclar de forma aproximada.”')
+    },
+    {
+      sec: 'B', kq: [2], type: 'rows', max: 2,
+      prompt: E('Label each statement as an observation or a hypothesis.', 'Marca cada enunciado como observación o hipótesis.'),
+      opts: OH_OPTS,
+      rows: [
+        { l: E('The solution fizzed and the beaker felt cold.', 'La solución burbujeó y el vaso se sintió frío.'), a: 0 },
+        { l: E('The fizzing happened because a gas was released.', 'El burbujeo ocurrió porque se liberó un gas.'), a: 1 },
+        { l: E('The mass of the sample is 12.4 g.', 'La masa de la muestra es 12.4 g.'), a: 0 },
+        { l: E('If I add more acid, then it will fizz longer.', 'Si agrego más ácido, entonces burbujeará por más tiempo.'), a: 1 }
+      ],
+      explanation: E('Observations say what you sense or measure; hypotheses explain why or predict (“because…”, “if…then”).', 'Las observaciones dicen lo que percibes o mides; las hipótesis explican por qué o predicen (“porque…”, “si…entonces”).')
+    },
+    {
+      sec: 'B', kq: [3], type: 'multi', max: 2,
+      prompt: E('Select every item that is matter.', 'Selecciona todo lo que sea materia.'),
+      choices: [E('carbon dioxide gas', 'dióxido de carbono gaseoso'), E('moonlight', 'la luz de la luna'), E('a thought', 'un pensamiento'), E('a drop of vinegar', 'una gota de vinagre'), E('heat from a stove', 'el calor de una estufa'), E('a grain of salt', 'un grano de sal')],
+      correct: [0, 3, 5],
+      explanation: E('Matter has mass and takes up space. Light, thoughts, and heat are not matter — and gases are, even when invisible.', 'La materia tiene masa y ocupa espacio. La luz, los pensamientos y el calor no son materia — y los gases sí lo son, aunque sean invisibles.')
+    },
+    {
+      sec: 'B', kq: [4], type: 'rows', max: 2,
+      prompt: E('Element or compound? Decide from the formula alone.', '¿Elemento o compuesto? Decide solo con la fórmula.'),
+      opts: EC_OPTS,
+      rows: [{ l: 'Ne', a: 0 }, { l: 'KBr', a: 1 }, { l: 'Cu', a: 0 }, { l: 'C6H12O6', a: 1 }, { l: 'O2', a: 0 }, { l: 'NaOH', a: 1 }],
+      explanation: E('One element symbol (even O₂) = element. Two or more different symbols = compound.', 'Un símbolo de elemento (incluso O₂) = elemento. Dos o más símbolos diferentes = compuesto.')
+    },
+    {
+      sec: 'B', kq: [4], type: 'numbers', max: 2,
+      prompt: E('How many atoms of each element are in one unit of Mg₃(PO₄)₂?', '¿Cuántos átomos de cada elemento hay en una unidad de Mg₃(PO₄)₂?'),
+      fields: [{ l: 'Mg', a: 3 }, { l: 'P', a: 2 }, { l: 'O', a: 8 }],
+      explanation: E('The 2 outside the parentheses multiplies everything inside: P = 1 × 2, O = 4 × 2 = 8.', 'El 2 fuera de los paréntesis multiplica todo lo de adentro: P = 1 × 2, O = 4 × 2 = 8.')
+    },
+    {
+      sec: 'B', kq: [5], type: 'mc', max: 1,
+      prompt: E('Lead nitrate, Pb(NO₃)₂(aq), is mixed with sodium sulfate, Na₂SO₄(aq). The products are NaNO₃(aq) and a white solid. What are the formula and phase of the solid?', 'Se mezcla nitrato de plomo, Pb(NO₃)₂(aq), con sulfato de sodio, Na₂SO₄(aq). Los productos son NaNO₃(aq) y un sólido blanco. ¿Cuáles son la fórmula y la fase del sólido?'),
+      choices: ['Na₂SO₄(s)', 'PbSO₄(s)', 'NaNO₃(s)', 'Pb(NO₃)₂(aq)'],
+      correct: 1,
+      explanation: E('Once Na and NO₃ are accounted for in NaNO₃(aq), Pb and SO₄ are left to form the solid: PbSO₄(s). The new solid is the evidence of chemical change.', 'Cuando Na y NO₃ se cuentan en NaNO₃(aq), Pb y SO₄ quedan para formar el sólido: PbSO₄(s). El sólido nuevo es la evidencia del cambio químico.')
+    },
+    {
+      sec: 'B', kq: [6], type: 'mc', max: 1,
+      prompt: E('A steel nail is sealed in a jar of moist air. After a week the nail has rusted. What happened to the total mass of the sealed jar and everything in it?', 'Un clavo de acero se sella en un frasco con aire húmedo. Después de una semana el clavo se oxidó. ¿Qué pasó con la masa total del frasco sellado y todo lo que contiene?'),
+      choices: [E('It increased, because rust is a new substance', 'Aumentó, porque el óxido es una sustancia nueva'), E('It stayed the same, because nothing entered or left the sealed jar', 'Se mantuvo igual, porque nada entró ni salió del frasco sellado'), E('It decreased, because the nail was used up', 'Disminuyó, porque el clavo se consumió'), E('It cannot be predicted', 'No se puede predecir')],
+      correct: 1,
+      explanation: E('Rusting rearranges atoms (iron + oxygen from the air), but in a sealed jar no matter enters or leaves, so total mass is conserved.', 'Oxidarse reorganiza átomos (hierro + oxígeno del aire), pero en un frasco sellado no entra ni sale materia, así que la masa total se conserva.')
+    },
+    {
+      sec: 'B', kq: [7], type: 'mc', max: 1,
+      prompt: E('Which element should behave most like sulfur, S?', '¿Qué elemento debería comportarse más como el azufre, S?'),
+      choices: ['Se', 'Cl', 'P', 'Ar'],
+      correct: 0,
+      explanation: E('Se is in the same group (6A) as sulfur, so it has the same number of valence electrons and similar reactivity.', 'El Se está en el mismo grupo (6A) que el azufre, así que tiene el mismo número de electrones de valencia y reactividad similar.')
+    },
+    {
+      sec: 'B', kq: [8], type: 'rows', max: 2,
+      prompt: E('Classify each element by its family.', 'Clasifica cada elemento según su familia.'),
+      opts: [E('alkali metal', 'metal alcalino'), E('alkaline earth metal', 'metal alcalinotérreo'), E('transition element', 'elemento de transición'), E('metalloid', 'metaloide'), E('halogen', 'halógeno'), E('noble gas', 'gas noble')],
+      rows: [{ l: 'Rb', a: 0 }, { l: 'Sr', a: 1 }, { l: 'Zn', a: 2 }, { l: 'As', a: 3 }, { l: 'Br', a: 4 }, { l: 'Ar', a: 5 }],
+      explanation: E('Group 1A alkali · 2A alkaline earth · middle block transition · stair-step metalloids · 7A halogens · 8A noble gases.', 'Grupo 1A alcalinos · 2A alcalinotérreos · bloque central transición · metaloides en la línea escalonada · 7A halógenos · 8A gases nobles.')
+    },
+    {
+      sec: 'B', kq: [9], type: 'rows', max: 2,
+      prompt: E('Put the models of the atom in the order they were proposed.', 'Ordena los modelos del átomo en el orden en que se propusieron.'),
+      opts: [E('1st (oldest)', '1.º (el más antiguo)'), E('2nd', '2.º'), E('3rd', '3.º'), E('4th (newest)', '4.º (el más nuevo)')],
+      rows: [{ l: E('nuclear model', 'modelo nuclear'), a: 2 }, { l: E('solid sphere model', 'modelo de esfera sólida'), a: 0 }, { l: E('solar system model', 'modelo del sistema solar'), a: 3 }, { l: E('plum pudding model', 'modelo del pudín de ciruelas'), a: 1 }],
+      explanation: E('Solid sphere (Dalton) → plum pudding (Thomson) → nuclear (Rutherford) → solar system (Bohr). Each change followed new evidence.', 'Esfera sólida (Dalton) → pudín de ciruelas (Thomson) → nuclear (Rutherford) → sistema solar (Bohr). Cada cambio siguió a nueva evidencia.')
+    },
+    {
+      sec: 'B', kq: [10], type: 'numbers', max: 3,
+      prompt: E('Phosphorus, P, has atomic number 15 and a rounded atomic mass of 31. Fill in a neutral atom.', 'El fósforo, P, tiene número atómico 15 y una masa atómica redondeada de 31. Completa para un átomo neutro.'),
+      fields: [{ l: E('protons', 'protones'), a: 15 }, { l: E('electrons', 'electrones'), a: 15 }, { l: E('neutrons', 'neutrones'), a: 16 }],
+      explanation: E('Protons = atomic number; electrons = protons in a neutral atom; neutrons = 31 − 15 = 16.', 'Protones = número atómico; electrones = protones en un átomo neutro; neutrones = 31 − 15 = 16.')
+    },
+    {
+      sec: 'B', kq: [11], type: 'mc', max: 1,
+      prompt: E('Lithium chloride and lithium nitrate both burn with a crimson-red flame. An unknown salt also burns crimson red. What can you conclude?', 'El cloruro de litio y el nitrato de litio arden con una llama rojo carmesí. Una sal desconocida también arde rojo carmesí. ¿Qué puedes concluir?'),
+      choices: [E('It probably contains lithium, but the test cannot tell what the other part is', 'Probablemente contiene litio, pero la prueba no puede decir cuál es la otra parte'), E('It must contain chlorine', 'Debe contener cloro'), E('It must be lithium nitrate', 'Debe ser nitrato de litio'), E('It contains no metal at all', 'No contiene ningún metal')],
+      correct: 0,
+      explanation: E('The flame color comes from the metal atom only, so matching color points to lithium — but says nothing about the nonmetal part.', 'El color de la llama proviene solo del átomo del metal, así que un color igual apunta al litio — pero no dice nada de la parte no metálica.')
+    },
+    {
+      sec: 'B', kq: [12], type: 'numbers', max: 2,
+      prompt: E('Chlorine (atomic number 17) has the shell arrangement 2, 8, 7. How many valence and core electrons does it have?', 'El cloro (número atómico 17) tiene el arreglo de capas 2, 8, 7. ¿Cuántos electrones de valencia y del núcleo interno tiene?'),
+      fields: [{ l: E('valence', 'valencia'), a: 7 }, { l: E('core', 'núcleo interno'), a: 10 }],
+      explanation: E('Valence = outer shell (7). Core = everything else: 2 + 8 = 10.', 'Valencia = capa externa (7). Núcleo interno = todo lo demás: 2 + 8 = 10.')
+    },
+    {
+      sec: 'B', kq: [13], type: 'rows', max: 2,
+      prompt: E('Choose the ion each atom forms.', 'Elige el ion que forma cada átomo.'),
+      opts: [E('1+', '1+'), E('2+', '2+'), E('3+', '3+'), E('1−', '1−'), E('2−', '2−'), E('3−', '3−')],
+      rows: [{ l: 'Li', a: 0 }, { l: 'Ca', a: 1 }, { l: 'Al', a: 2 }, { l: 'N', a: 5 }, { l: 'F', a: 3 }],
+      explanation: E('Metals lose their valence electrons (+); nonmetals gain enough to reach eight (−): Li⁺, Ca²⁺, Al³⁺, N³⁻, F⁻.', 'Los metales pierden sus electrones de valencia (+); los no metales ganan los necesarios para llegar a ocho (−): Li⁺, Ca²⁺, Al³⁺, N³⁻, F⁻.')
+    },
+    {
+      sec: 'B', kq: [14], type: 'rows', max: 2,
+      prompt: E('Choose the correct formula for the compound each pair forms. (Charges must add to zero.)', 'Elige la fórmula correcta del compuesto que forma cada par. (Las cargas deben sumar cero.)'),
+      rows: [
+        { l: E('barium + iodine', 'bario + yodo'), a: 1, opts: ['Ba₂I', 'BaI₂', 'BaI', 'Ba₂I₂'] },
+        { l: E('potassium + phosphorus', 'potasio + fósforo'), a: 0, opts: ['K₃P', 'KP₃', 'KP', 'K₂P₃'] },
+        { l: E('aluminum + fluorine', 'aluminio + flúor'), a: 2, opts: ['AlF', 'Al₃F', 'AlF₃', 'Al₃F₃'] },
+        { l: E('lithium + sulfur', 'litio + azufre'), a: 1, opts: ['LiS', 'Li₂S', 'LiS₂', 'Li₂S₂'] }
+      ],
+      explanation: E('BaI₂ (Ba²⁺ + 2 I⁻) · K₃P (3 K⁺ + P³⁻) · AlF₃ (Al³⁺ + 3 F⁻) · Li₂S (2 Li⁺ + S²⁻).', 'BaI₂ (Ba²⁺ + 2 I⁻) · K₃P (3 K⁺ + P³⁻) · AlF₃ (Al³⁺ + 3 F⁻) · Li₂S (2 Li⁺ + S²⁻).')
+    },
+    {
+      sec: 'B', kq: [15], type: 'rows', max: 2,
+      prompt: E('Name each compound.', 'Nombra cada compuesto.'),
+      rows: [
+        { l: 'Rb2O', a: 0, opts: [E('rubidium oxide', 'óxido de rubidio'), E('rubidium dioxide', 'dióxido de rubidio'), E('dirubidium oxide', 'óxido de dirubidio'), E('rubidium oxygen', 'rubidio oxígeno')] },
+        { l: 'SrBr2', a: 2, opts: [E('strontium dibromide', 'dibromuro de estroncio'), E('strontium bromine', 'estroncio bromo'), E('strontium bromide', 'bromuro de estroncio'), E('bromine strontide', 'bromo estroncuro')] },
+        { l: 'AlP', a: 1, opts: [E('aluminum phosphate', 'fosfato de aluminio'), E('aluminum phosphide', 'fosfuro de aluminio'), E('aluminum phosphorus', 'aluminio fósforo'), E('monoaluminum phosphide', 'fosfuro de monoaluminio')] }
+      ],
+      explanation: E('Metal name + nonmetal root + -ide, with no prefixes: rubidium oxide, strontium bromide, aluminum phosphide.', 'Nombre del metal + raíz del no metal + -uro, sin prefijos: óxido de rubidio, bromuro de estroncio, fosfuro de aluminio.')
+    },
+    {
+      sec: 'B', kq: [16], type: 'rows', max: 2,
+      prompt: E('Choose the correct formula for each compound.', 'Elige la fórmula correcta de cada compuesto.'),
+      rows: [
+        { l: E('lithium carbonate', 'carbonato de litio'), a: 2, opts: ['LiCO₃', 'Li(CO₃)₂', 'Li₂CO₃', 'Li₃CO₂'] },
+        { l: E('ammonium sulfate', 'sulfato de amonio'), a: 1, opts: ['NH₄SO₄', '(NH₄)₂SO₄', 'NH₄(SO₄)₂', '(NH₄)₂(SO₄)₂'] },
+        { l: E('calcium phosphate', 'fosfato de calcio'), a: 0, opts: ['Ca₃(PO₄)₂', 'CaPO₄', 'Ca₂(PO₄)₃', 'Ca₃PO₄'] }
+      ],
+      explanation: E('Keep each polyatomic ion intact, and balance charges: 2 Li⁺ + CO₃²⁻ · 2 NH₄⁺ + SO₄²⁻ · 3 Ca²⁺ + 2 PO₄³⁻ (parentheses when you need more than one).', 'Mantén cada ion poliatómico intacto y equilibra las cargas: 2 Li⁺ + CO₃²⁻ · 2 NH₄⁺ + SO₄²⁻ · 3 Ca²⁺ + 2 PO₄³⁻ (paréntesis cuando necesitas más de uno).')
+    },
+    {
+      sec: 'B', kq: [18], type: 'mc', max: 1,
+      prompt: E('Which electron configuration belongs to nitrogen (atomic number 7)?', '¿Qué configuración electrónica pertenece al nitrógeno (número atómico 7)?'),
+      choices: ['1s² 2s² 2p³', '1s² 2s² 2p⁵', '1s² 2s³ 2p²', '1s² 2s² 2p⁶ 3s¹'],
+      correct: 0,
+      explanation: E('2 + 2 + 3 = 7 electrons. Nitrogen is in period 2, p-block, 3rd column → 2p³. (An s subshell holds only 2.)', '2 + 2 + 3 = 7 electrones. El nitrógeno está en el período 2, bloque p, 3.ª columna → 2p³. (Una subcapa s aguanta solo 2.)')
+    },
+    {
+      sec: 'B', kq: [19], type: 'rows', max: 2,
+      prompt: E('Use the data to name each sample’s category. Sample E: dissolves in water, does not conduct as a solid, conducts when dissolved. Sample F: does not dissolve, conducts as a solid. Sample G: dissolves, does not conduct either way. Sample H: does not dissolve, does not conduct.', 'Usa los datos para nombrar la categoría de cada muestra. Muestra E: se disuelve en agua, no conduce como sólido, conduce disuelta. Muestra F: no se disuelve, conduce como sólido. Muestra G: se disuelve, no conduce de ninguna forma. Muestra H: no se disuelve, no conduce.'),
+      opts: [E('salt (ionic)', 'sal (iónico)'), E('metal', 'metal'), E('sugar (molecular covalent)', 'azúcar (covalente molecular)'), E('sand (network covalent)', 'arena (covalente de red)')],
+      rows: [{ l: E('Sample G', 'Muestra G'), a: 2 }, { l: E('Sample E', 'Muestra E'), a: 0 }, { l: E('Sample H', 'Muestra H'), a: 3 }, { l: E('Sample F', 'Muestra F'), a: 1 }],
+      explanation: E('Conducting needs free charges: dissolved ions (salt) or free electrons (metal). Sugar dissolves but makes no ions; sand neither dissolves nor conducts.', 'Conducir necesita cargas libres: iones disueltos (sal) o electrones libres (metal). El azúcar se disuelve pero no forma iones; la arena ni se disuelve ni conduce.')
+    },
+    {
+      sec: 'B', kq: [20], type: 'rows', max: 2,
+      prompt: E('Name the bonding type of each substance from its formula.', 'Nombra el tipo de enlace de cada sustancia a partir de su fórmula.'),
+      opts: BOND_OPTS,
+      rows: [{ l: 'MgO', a: 0 }, { l: 'Br2', a: 2 }, { l: 'Ag', a: 1 }, { l: 'SiC', a: 3 }, { l: 'K2CO3', a: 0 }, { l: 'NH3', a: 2 }],
+      explanation: E('Metal + nonmetal (or a polyatomic ion) = ionic · one metal = metallic · only nonmetals = covalent (small molecules: Br₂, NH₃; a giant network: SiC).', 'Metal + no metal (o ion poliatómico) = iónico · un metal = metálico · solo no metales = covalente (moléculas pequeñas: Br₂, NH₃; una red gigante: SiC).')
+    },
+    // ---- C. Fix the Mistake ----
+    {
+      sec: 'C', kq: [4], type: 'mc', max: 1,
+      prompt: E('A student labels a bottle of cobalt metal “CO.” What is the mistake?', 'Un estudiante etiqueta un frasco de cobalto metálico como “CO.” ¿Cuál es el error?'),
+      choices: [E('There is no mistake — CO is cobalt', 'No hay error — CO es cobalto'), E('“CO” means carbon monoxide, a compound; cobalt is written Co (capital C, lowercase o)', '“CO” significa monóxido de carbono, un compuesto; el cobalto se escribe Co (C mayúscula, o minúscula)'), E('Cobalt’s symbol is Cb', 'El símbolo del cobalto es Cb'), E('Metals never have two-letter symbols', 'Los metales nunca tienen símbolos de dos letras')],
+      correct: 1,
+      explanation: E('Only the first letter of a symbol is capitalized — and capitalization changes the meaning: Co is an element, CO is a compound.', 'Solo la primera letra de un símbolo va en mayúscula — y la capitalización cambia el significado: Co es un elemento, CO es un compuesto.')
+    },
+    {
+      sec: 'C', kq: [14], type: 'mc', max: 1,
+      prompt: E('A student writes calcium oxide as Ca₂O₂ “because Ca is 2+ and O is 2−.” What is the mistake?', 'Un estudiante escribe el óxido de calcio como Ca₂O₂ “porque el Ca es 2+ y el O es 2−.” ¿Cuál es el error?'),
+      choices: [E('One Ca²⁺ already balances one O²⁻, so the formula should be CaO (the smallest whole-number ratio)', 'Un Ca²⁺ ya equilibra un O²⁻, así que la fórmula debe ser CaO (la proporción de números enteros más pequeña)'), E('The charges do not add to zero', 'Las cargas no suman cero'), E('Oxygen should come first', 'El oxígeno debe ir primero'), E('Calcium forms 1+ ions', 'El calcio forma iones 1+')],
+      correct: 0,
+      explanation: E('Ca₂O₂ does add to zero, but formulas use the smallest ratio that balances. +2 and −2 cancel at 1 : 1 → CaO.', 'Ca₂O₂ sí suma cero, pero las fórmulas usan la proporción más pequeña que equilibra. +2 y −2 se cancelan en 1 : 1 → CaO.')
+    },
+    {
+      sec: 'C', kq: [20], type: 'mc', max: 1,
+      prompt: E('A student says: “Diamond is very hard, so it must be an ionic compound.” What is the mistake?', 'Un estudiante dice: “El diamante es muy duro, así que debe ser un compuesto iónico.” ¿Cuál es el error?'),
+      choices: [E('Hardness proves ionic bonding', 'La dureza prueba el enlace iónico'), E('Diamond is only carbon (a nonmetal), so it has no ions — its atoms are covalently bonded in one giant network', 'El diamante es solo carbono (un no metal), así que no tiene iones — sus átomos están unidos covalentemente en una red gigante'), E('Diamond is a metal', 'El diamante es un metal'), E('Diamond is a molecular covalent solid', 'El diamante es un sólido covalente molecular')],
+      correct: 1,
+      explanation: E('Use the formula first: C alone is nonmetal-only, so covalent. Very hard + insoluble + non-conducting → network covalent.', 'Usa primero la fórmula: C solo es de un no metal, así que covalente. Muy duro + insoluble + no conductor → covalente de red.')
+    },
+    // ---- D. Explain It (choose the strongest claim–evidence–reasoning) ----
+    {
+      sec: 'D', kq: [6], type: 'mc', max: 1,
+      prompt: E('A candle burns on a balance in an open room and its mass drops. A student says matter was destroyed. Which response is the strongest?', 'Una vela se quema sobre una balanza en una habitación abierta y su masa baja. Un estudiante dice que se destruyó materia. ¿Qué respuesta es la más fuerte?'),
+      choices: [E('No. Burning makes carbon dioxide and water vapor, which float away, so they are no longer on the balance. The law of conservation of mass says atoms are rearranged, not destroyed.', 'No. Quemar produce dióxido de carbono y vapor de agua, que se van flotando, así que ya no están en la balanza. La ley de conservación de la masa dice que los átomos se reorganizan, no se destruyen.'), E('No. Matter can never be destroyed.', 'No. La materia nunca se puede destruir.'), E('Yes. The balance shows less mass, so mass was lost.', 'Sí. La balanza muestra menos masa, así que se perdió masa.'), E('No. Candles are made of wax.', 'No. Las velas están hechas de cera.')],
+      correct: 0,
+      explanation: E('The strongest answer has a claim, specific evidence (the gases that left), and the reasoning (conservation of mass).', 'La respuesta más fuerte tiene una afirmación, evidencia específica (los gases que salieron) y el razonamiento (conservación de la masa).')
+    },
+    {
+      sec: 'D', kq: [13], type: 'mc', max: 1,
+      prompt: E('Why does a fluorine atom form F⁻, but a neon atom forms no ion at all? Which response is the strongest?', '¿Por qué un átomo de flúor forma F⁻, pero un átomo de neón no forma ningún ion? ¿Qué respuesta es la más fuerte?'),
+      choices: [E('Neon is a gas.', 'El neón es un gas.'), E('Fluorine has 7 valence electrons and gains 1 to reach 8; neon already has 8. Atoms gain or lose electrons to reach a stable noble-gas arrangement, so neon has no reason to change.', 'El flúor tiene 7 electrones de valencia y gana 1 para llegar a 8; el neón ya tiene 8. Los átomos ganan o pierden electrones para llegar a un arreglo estable de gas noble, así que el neón no tiene razón para cambiar.'), E('Fluorine is more reactive than neon.', 'El flúor es más reactivo que el neón.'), E('Fluorine has more protons.', 'El flúor tiene más protones.')],
+      correct: 1,
+      explanation: E('It names the evidence (7 vs. 8 valence electrons) and the rule (stability = noble-gas arrangement).', 'Nombra la evidencia (7 vs. 8 electrones de valencia) y la regla (estabilidad = arreglo de gas noble).')
+    },
+    {
+      sec: 'D', kq: [20], type: 'mc', max: 1,
+      prompt: E('A gray solid is shiny, bends without breaking, and conducts electricity as a solid. Which response best supports a claim about its bonding?', 'Un sólido gris es brillante, se dobla sin romperse y conduce electricidad como sólido. ¿Qué respuesta respalda mejor una afirmación sobre su enlace?'),
+      choices: [E('It is metallic. It is shiny, bendable, and conducts as a solid; metals have free-moving electrons, which carry charge even in the solid.', 'Es metálico. Es brillante, maleable y conduce como sólido; los metales tienen electrones libres que transportan carga incluso en el sólido.'), E('It is ionic, because it is a solid.', 'Es iónico, porque es un sólido.'), E('It is covalent, because it is gray.', 'Es covalente, porque es gris.'), E('It is metallic, because I think so.', 'Es metálico, porque eso creo.')],
+      correct: 0,
+      explanation: E('The strongest answer links properties (evidence) to free-moving electrons (reasoning) for a metallic claim.', 'La respuesta más fuerte vincula las propiedades (evidencia) con los electrones libres (razonamiento) para una afirmación metálica.')
+    }
+  ];
+  QUESTIONS.forEach((q, i) => { q.id = 'q' + (i + 1); });
+  const TOTAL_POINTS = QUESTIONS.reduce((s, q) => s + (q.max || 1), 0);
+
+  // Which guided part to revisit for each Key Question.
+  const KQ_PART = { 1: 1, 2: 1, 3: 1, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4, 10: 4, 11: 5, 12: 5, 13: 6, 14: 6, 15: 7, 16: 7, 18: 8, 19: 9, 20: 9 };
+
+  // Teacher preview: open with ?preview=1 to click through the graded check with
+// Back / Skip / jump controls. Nothing is graded or saved in preview.
+const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
+  STRINGS.previewBar = { en: 'PREVIEW — nothing is graded or saved', es: 'VISTA PREVIA — nada se califica ni se guarda' };
+  STRINGS.previewBack = { en: '← Back', es: '← Atrás' };
+  STRINGS.previewSkip = { en: 'Skip →', es: 'Saltar →' };
+  STRINGS.previewJump = { en: 'Jump to', es: 'Ir a' };
+  STRINGS.previewDone = { en: 'That was the last question. Nothing was saved.', es: 'Esa fue la última pregunta. No se guardó nada.' };
+  STRINGS.previewRestart = { en: 'Start over', es: 'Empezar de nuevo' };
+  STRINGS.answerAll = { en: 'Answer every item first.', es: 'Responde todos los elementos primero.' };
+  STRINGS.pickAny = { en: 'Pick at least one.', es: 'Elige al menos uno.' };
+  STRINGS.yourAnswersKey = { en: 'Correct answers:', es: 'Respuestas correctas:' };
+  STRINGS.selectAll = { en: 'Select all that apply, then check.', es: 'Selecciona todas las que apliquen y luego revisa.' };
+  STRINGS.paceHead = { en: ['Part', 'What you do', 'Minutes', 'Done by'], es: ['Parte', 'Qué haces', 'Minutos', 'Termina en'] };
+
+  // ---- Layout of a guided part ----
+  function sectionBody(sec, lang, idx) {
+    if (sec.customBody) return tr(sec.customBody, lang);
+    const kqLabel = sec.kq.indexOf('–') >= 0 || sec.kq.indexOf('-') >= 0 ? t('keyQuestions', lang) : (lang === 'es' ? 'Pregunta Clave' : 'Key Question');
+    const badges = `<div class="u1r-badges"><span class="u1r-badge">${escapeHtml(kqLabel)} ${escapeHtml(sec.kq)}</span><span class="u1r-badge alt">${escapeHtml(t('targets', lang))} ${escapeHtml(sec.targets)}</span></div>`;
+    const words = `<div class="u1r-words"><span class="u1r-words-label">${escapeHtml(t('wordWall', lang))}</span>${tr(sec.words, lang).map(x => `<span class="u1r-word">${escapeHtml(x)}</span>`).join('')}</div>`;
+    const know = `<h3>${escapeHtml(t('mustKnow', lang))}</h3><ul>${sec.know.map(k => `<li>${tr(k, lang)}</li>`).join('')}</ul>`;
+    const extra = sec.extra ? tr(sec.extra, lang) : '';
+    const tools = (sec.tools || []).map(tool => `<div class="u1r-h-tool">${escapeHtml(t('tryIt', lang))}</div><p>${tr(tool.intro, lang)}</p><div class="u1r-tool" data-widget="${tool.name}" data-opts='${escapeHtml(JSON.stringify(tool.opts || {}))}'></div>`).join('');
+    const practice = `<div class="u1r-h-tool">${escapeHtml(t('practice', lang))}</div>` + sec.practice.map((p, i) => practiceProblem(lang, sec.id + '-' + i, tr(p.q, lang), p.d, tr(p.h, lang), tr(p.a, lang))).join('');
+    const revisit = `<div class="u1r-revisit"><strong>${escapeHtml(t('revisit', lang))}</strong> ${escapeHtml(tr(sec.revisit, lang))}</div>`;
+    return badges + words + know + extra + tools + practice + revisit;
+  }
+
+  function paceTable(lang) {
+    const head = t('paceHead', lang);
+    let cum = 0;
+    const rows = SECTIONS.concat([{ title: STRINGS.checkForUnderstanding }]).map((s, i) => {
+      cum += PACE[i];
+      return `<tr><td>${i === 0 ? '★' : (i === PACE.length - 1 ? '✓' : i)}</td><td>${escapeHtml(tr(s.title, lang))}</td><td>${PACE[i]}</td><td>${cum} min</td></tr>`;
+    }).join('');
+    return `<div class="u1r-pace"><table><thead><tr>${head.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  // ---- 100-minute clock ----
+  function readStart() {
+    try {
+      const v = Number(localStorage.getItem(TIMER_KEY));
+      if (v && Date.now() - v < 5 * 3600 * 1000) return v;
+    } catch (e) { /* ignore */ }
+    return writeStart();
+  }
+  function writeStart() {
+    const now = Date.now();
+    try { localStorage.setItem(TIMER_KEY, String(now)); } catch (e) { /* ignore */ }
+    return now;
+  }
+
+  function render(host, ctx) {
+    ensureStylesInjected();
+    const lang = getLang();
+    if (window.__u1rTimer) { clearInterval(window.__u1rTimer); window.__u1rTimer = null; }
+
+    const sectionsHtml = SECTIONS.map((sec, i) => `
+      <div class="section-card" id="cl-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
+          <span class="section-title">${escapeHtml(tr(sec.title, lang))}</span>
+          <span class="section-time">${PACE[i]} min</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          ${sectionBody(sec, lang, i)}
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">${escapeHtml(t('markSectionComplete', lang))}</button>
+        </div>
+      </div>`).join('');
+
+    host.innerHTML = `
+      <div class="u1r-lesson">
+        <div class="cl-header">
+          <div class="cl-lang-toggle" role="group" aria-label="${escapeHtml(t('langToggleAria', lang))}">
+            <button type="button" class="cl-lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="cl-lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="cl-header-label">${escapeHtml(t('headerLabel', lang))}</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="cl-header-meta">${escapeHtml(t('headerMeta', lang))}</div>
+        </div>
+        <div class="cl-progress-wrap">
+          <span class="cl-progress-label">${escapeHtml(t('progress', lang))}</span>
+          <div class="cl-progress-track"><div class="cl-progress-fill" id="cl-progress-fill"></div></div>
+          <span class="cl-progress-count" id="cl-progress-count">${escapeHtml(t('sectionCount', lang, 0, SECTION_COUNT))}</span>
+          <span class="cl-timer" id="cl-timer"></span>
+          <button type="button" class="cl-timer-reset" id="cl-timer-reset">${escapeHtml(t('timerReset', lang))}</button>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="cl-sec-${QUIZ_SECTION}" data-section="${QUIZ_SECTION}">
+            <div class="section-header" data-toggle="${QUIZ_SECTION}">
+              <span class="section-num">✓</span>
+              <span class="section-title">${escapeHtml(t('checkForUnderstanding', lang))}</span>
+              <span class="section-time">${escapeHtml(t('quizTimeGraded', lang))}</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">${t('quizNote', lang)}</div>
+              <div id="cl-quiz-mount"></div>
+            </div>
+          </div>
+        </main>
+      </div>`;
+
+    const root = host.querySelector('.u1r-lesson');
+    const completed = new Array(SECTION_COUNT).fill(false);
+
+    const paceMount = root.querySelector('[data-pace]');
+    if (paceMount) paceMount.innerHTML = paceTable(lang);
+    root.querySelectorAll('[data-widget]').forEach(el => {
+      const fn = WIDGETS[el.getAttribute('data-widget')];
+      if (fn) { let opts = {}; try { opts = JSON.parse(el.getAttribute('data-opts') || '{}'); } catch (e) { /* ignore */ } fn(el, lang, opts); }
+    });
+
+    function updateProgress() {
+      const done = completed.filter(Boolean).length;
+      root.querySelector('#cl-progress-fill').style.width = Math.round((done / SECTION_COUNT) * 100) + '%';
+      root.querySelector('#cl-progress-count').textContent = t('sectionCount', lang, done, SECTION_COUNT);
+    }
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#cl-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function toggleSection(i) {
+      const card = root.querySelector(`#cl-sec-${i}`);
+      const open = !card.querySelector('.section-body').classList.contains('open');
+      card.querySelector('.section-body').classList.toggle('open', open);
+      card.querySelector('.section-header').classList.toggle('open', open);
+    }
+
+    root.querySelectorAll('[data-toggle]').forEach(el => el.addEventListener('click', () => toggleSection(Number(el.getAttribute('data-toggle')))));
+    root.querySelectorAll('[data-mark-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-mark-done'));
+        if (completed[i]) return;
+        completed[i] = true;
+        root.querySelector(`#cl-sec-${i}`).classList.add('done');
+        btn.textContent = t('sectionComplete', lang);
+        btn.disabled = true;
+        updateProgress();
+        setTimeout(() => openSection(i + 1, true), 250);
+      });
+    });
+    root.querySelectorAll('[data-hint-target]').forEach(btn => btn.addEventListener('click', () => {
+      const open = root.querySelector('#' + btn.getAttribute('data-hint-target')).classList.toggle('open');
+      btn.textContent = open ? t('hintHide', lang) : t('hintShow', lang);
+    }));
+    root.querySelectorAll('[data-answer-target]').forEach(btn => btn.addEventListener('click', () => {
+      const open = root.querySelector('#' + btn.getAttribute('data-answer-target')).classList.toggle('open');
+      btn.textContent = open ? t('hideAnswer', lang) : t('revealAnswer', lang);
+    }));
+    root.querySelectorAll('[data-lang]').forEach(btn => btn.addEventListener('click', () => {
+      const newLang = btn.getAttribute('data-lang');
+      if (newLang === lang) return;
+      setLang(newLang);
+      render(host, ctx);
+    }));
+
+    // 100-minute clock
+    let start = readStart();
+    const timerEl = root.querySelector('#cl-timer');
+    function tick() {
+      if (!root.isConnected) { clearInterval(window.__u1rTimer); window.__u1rTimer = null; return; }
+      const m = Math.floor((Date.now() - start) / 60000);
+      timerEl.textContent = t('timerLabel', lang, m);
+      timerEl.classList.toggle('late', m >= CLASS_MINUTES - 10);
+    }
+    tick();
+    window.__u1rTimer = setInterval(tick, 15000);
+    root.querySelector('#cl-timer-reset').addEventListener('click', () => { start = writeStart(); tick(); });
+
+    renderQuiz(root.querySelector('#cl-quiz-mount'), ctx);
+
+    const progress = ctx.getProgress();
+    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
+      if (progress.status === 'completed') completed[QUIZ_SECTION] = true;
+      openSection(QUIZ_SECTION, false);
+    } else {
+      openSection(0, false);
+    }
+    updateProgress();
+  }
+
+  // ---- Graded check engine ----
+  function renderQuiz(mount, ctx) {
+    if (PREVIEW) { renderQuizQuestion(mount, ctx, [], 0); return; }
+    const progress = ctx.getProgress();
+    if (progress && progress.status === 'completed') { renderQuizSummary(mount, ctx); return; }
+    const answers = (progress && progress.answers) || [];
+    if (answers.length >= QUESTIONS.length) { finishQuiz(mount, ctx, answers); return; }
+    renderQuizQuestion(mount, ctx, answers, answers.length);
+  }
+
+  function rowLabelHtml(l, lang) {
+    return typeof l === 'string' ? `<span class="u1r-row-label mono">${fmt(l)}</span>` : `<span class="u1r-row-label">${escapeHtml(tr(l, lang))}</span>`;
+  }
+  function optText(o, lang) { return typeof o === 'string' ? o : tr(o, lang); }
+
+  function gradeQuestion(q, response) {
+    if (q.type === 'mc') { const ok = response === q.correct; return { points: ok ? (q.max || 1) : 0, correct: ok }; }
+    if (q.type === 'multi') {
+      const want = q.correct; const miss = want.filter(i => response.indexOf(i) < 0).length; const extra = response.filter(i => want.indexOf(i) < 0).length;
+      const points = Math.max(0, q.max - miss - extra);
+      return { points, correct: miss + extra === 0 };
+    }
+    const items = q.type === 'rows' ? q.rows : q.fields;
+    const right = items.filter((it, i) => response[i] === it.a).length;
+    return { points: Math.floor(q.max * right / items.length), correct: right === items.length, right, total: items.length };
+  }
+
+  function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const lang = getLang();
+    const q = QUESTIONS[index];
+    const pct = Math.round((index / QUESTIONS.length) * 100);
+    const secName = { A: lang === 'es' ? 'A · Palabras que Debes Saber' : 'A · Words to Know', B: lang === 'es' ? 'B · Muestra la Destreza' : 'B · Show the Skill', C: lang === 'es' ? 'C · Corrige el Error' : 'C · Fix the Mistake', D: lang === 'es' ? 'D · Explícalo' : 'D · Explain It' }[q.sec];
+    const previewBar = PREVIEW ? `<div class="u1r-preview"><strong>${escapeHtml(t('previewBar', lang))}</strong>
+        <button type="button" class="u1r-btn secondary" data-pv="back"${index === 0 ? ' disabled' : ''}>${escapeHtml(t('previewBack', lang))}</button>
+        <button type="button" class="u1r-btn secondary" data-pv="skip">${escapeHtml(t('previewSkip', lang))}</button>
+        <label>${escapeHtml(t('previewJump', lang))} <select class="u1r-sel" data-pv="jump">${QUESTIONS.map((x, i) => `<option value="${i}"${i === index ? ' selected' : ''}>${i + 1}</option>`).join('')}</select></label></div>` : '';
+    mount.innerHTML = previewBar + `
+      <div class="quiz-question-count">${escapeHtml(t('questionCount', lang, index + 1, QUESTIONS.length, q.max || 1))} · ${escapeHtml(secName)}</div>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <p class="quiz-prompt">${escapeHtml(tr(q.prompt, lang))}</p>
+      ${q.type === 'multi' ? `<p class="u1r-qhint">${escapeHtml(t('selectAll', lang))}</p>` : ''}
+      <div id="cl-answer-area"></div>
+      <div id="cl-feedback-area"></div>
+      <button type="button" class="cl-next-btn" id="cl-next-btn" style="display:none;">${escapeHtml(t('nextQuestion', lang))}</button>`;
+
+    const area = mount.querySelector('#cl-answer-area');
+    const fbArea = mount.querySelector('#cl-feedback-area');
+    const nextBtn = mount.querySelector('#cl-next-btn');
+    let submitted = false;
+    const checkBtnHtml = `<button type="button" class="cl-next-btn" id="u1r-check">${escapeHtml(t('checkAnswer', lang))}</button><div class="u1r-fb bad" id="u1r-warn"></div>`;
+
+    if (q.type === 'mc' || q.type === 'multi') {
+      area.innerHTML = q.choices.map((c, i) => `<button type="button" class="cl-choice" data-choice="${i}">${escapeHtml(optText(c, lang))}</button>`).join('') + (q.type === 'multi' ? checkBtnHtml : '');
+    } else if (q.type === 'rows') {
+      area.innerHTML = `<div class="u1r-rows">${q.rows.map((r, i) => `<div class="u1r-row" data-i="${i}">${rowLabelHtml(r.l, lang)}<select class="u1r-sel"><option value="">${escapeHtml(t('choose', lang))}</option>${(r.opts || q.opts).map((o, k) => `<option value="${k}">${escapeHtml(optText(o, lang))}</option>`).join('')}</select></div>`).join('')}</div>${checkBtnHtml}`;
+    } else {
+      area.innerHTML = `<div class="u1r-fields">${q.fields.map((f, i) => `<label class="u1r-field" data-i="${i}">${typeof f.l === 'string' ? escapeHtml(f.l) : escapeHtml(tr(f.l, lang))}<input type="number" min="0" class="u1r-num" inputmode="numeric"></label>`).join('')}</div>${checkBtnHtml}`;
+    }
+
+    function finish(response, g) {
+      submitted = true;
+      const answers = answersSoFar.concat([{ questionId: q.id, response, correct: g.correct, points: g.points }]);
+      let keyHtml = '';
+      if (q.type === 'rows') {
+        const wrong = q.rows.map((r, i) => response[i] === r.a ? '' : `${typeof r.l === 'string' ? r.l : tr(r.l, lang)} → ${optText((r.opts || q.opts)[r.a], lang)}`).filter(Boolean);
+        if (wrong.length) keyHtml = `<br><span style="font-weight:400">${escapeHtml(t('yourAnswersKey', lang))} ${escapeHtml(wrong.join(' · '))}</span>`;
+      } else if (q.type === 'numbers') {
+        const wrong = q.fields.map((f, i) => response[i] === f.a ? '' : `${typeof f.l === 'string' ? f.l : tr(f.l, lang)} = ${f.a}`).filter(Boolean);
+        if (wrong.length) keyHtml = `<br><span style="font-weight:400">${escapeHtml(t('yourAnswersKey', lang))} ${escapeHtml(wrong.join(' · '))}</span>`;
+      }
+      const cls = g.correct ? 'correct' : (g.points > 0 ? 'partial' : 'incorrect');
+      const prefix = g.correct ? t('correctPrefix', lang) : (g.points > 0 ? t('partialPrefix', lang) : t('incorrectPrefix', lang));
+      fbArea.innerHTML = `<div class="cl-feedback ${cls}">${escapeHtml(prefix)} ${escapeHtml(tr(q.explanation, lang))}${keyHtml}</div>`;
+      nextBtn.style.display = 'inline-block';
+      if (!PREVIEW) ctx.saveProgress({ status: 'in_progress', score: answers.reduce((s, a) => s + a.points, 0), totalQuestions: TOTAL_POINTS, answers });
+    }
+
+    if (q.type === 'mc') {
+      area.querySelectorAll('.cl-choice').forEach(btn => btn.addEventListener('click', () => {
+        if (submitted) return;
+        const val = Number(btn.getAttribute('data-choice'));
+        area.querySelectorAll('.cl-choice').forEach(el => {
+          el.disabled = true;
+          const v = Number(el.getAttribute('data-choice'));
+          if (v === q.correct) el.classList.add('selected-correct'); else if (el === btn) el.classList.add('selected-incorrect');
+        });
+        finish(val, gradeQuestion(q, val));
+      }));
+    } else if (q.type === 'multi') {
+      area.querySelectorAll('.cl-choice').forEach(btn => btn.addEventListener('click', () => { if (!submitted) btn.classList.toggle('picked'); }));
+      area.querySelector('#u1r-check').addEventListener('click', () => {
+        if (submitted) return;
+        const picked = [...area.querySelectorAll('.cl-choice.picked')].map(b => Number(b.getAttribute('data-choice')));
+        if (!picked.length) { area.querySelector('#u1r-warn').textContent = t('pickAny', lang); return; }
+        area.querySelectorAll('.cl-choice').forEach(el => {
+          el.disabled = true; const v = Number(el.getAttribute('data-choice'));
+          if (q.correct.indexOf(v) >= 0) el.classList.add('selected-correct'); else if (picked.indexOf(v) >= 0) el.classList.add('selected-incorrect');
+        });
+        area.querySelector('#u1r-check').style.display = 'none';
+        finish(picked, gradeQuestion(q, picked));
+      });
+    } else {
+      area.querySelector('#u1r-check').addEventListener('click', () => {
+        if (submitted) return;
+        let response;
+        if (q.type === 'rows') {
+          response = [...area.querySelectorAll('.u1r-row select')].map(s => s.value === '' ? null : Number(s.value));
+        } else {
+          response = [...area.querySelectorAll('.u1r-field input')].map(inp => inp.value === '' ? null : Number(inp.value));
+        }
+        if (response.some(v => v === null)) { area.querySelector('#u1r-warn').textContent = t('answerAll', lang); return; }
+        const g = gradeQuestion(q, response);
+        const items = q.type === 'rows' ? q.rows : q.fields;
+        const nodes = q.type === 'rows' ? area.querySelectorAll('.u1r-row') : area.querySelectorAll('.u1r-field');
+        nodes.forEach((node, i) => {
+          const ok = response[i] === items[i].a; node.classList.toggle('good', ok); node.classList.toggle('bad', !ok);
+          node.querySelectorAll('select, input').forEach(el => { el.disabled = true; });
+        });
+        area.querySelector('#u1r-check').style.display = 'none';
+        area.querySelector('#u1r-warn').textContent = '';
+        finish(response, g);
+      });
+    }
+
+    function goTo(i) {
+      if (i < 0) i = 0;
+      if (i >= QUESTIONS.length) {
+        mount.innerHTML = `<div class="cl-summary"><p>${escapeHtml(t('previewDone', lang))}</p><button type="button" class="cl-retake-btn" id="u1r-pv-restart">${escapeHtml(t('previewRestart', lang))}</button></div>`;
+        mount.querySelector('#u1r-pv-restart').addEventListener('click', () => renderQuizQuestion(mount, ctx, [], 0));
+        return;
+      }
+      renderQuizQuestion(mount, ctx, [], i);
+    }
+    if (PREVIEW) {
+      mount.querySelector('[data-pv="back"]').addEventListener('click', () => goTo(index - 1));
+      mount.querySelector('[data-pv="skip"]').addEventListener('click', () => goTo(index + 1));
+      mount.querySelector('[data-pv="jump"]').addEventListener('change', e => goTo(Number(e.target.value)));
+      nextBtn.addEventListener('click', () => goTo(index + 1));
+    } else {
+      nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
+    }
+  }
+
+  function sumPoints(answers) { return answers.reduce((s, a) => s + (a.points || 0), 0); }
+
+  async function finishQuiz(mount, ctx, answers) {
+    await ctx.saveProgress({ status: 'completed', score: sumPoints(answers), totalQuestions: TOTAL_POINTS, answers });
+    renderQuizSummary(mount, ctx);
+  }
+
+  function renderQuizSummary(mount, ctx) {
+    const lang = getLang();
+    const progress = ctx.getProgress();
+    const score = progress ? progress.score : 0;
+    const code = progress && progress.code ? progress.code : '';
+
+    const missedKq = [];
+    ((progress && progress.answers) || []).forEach(a => {
+      const q = QUESTIONS.find(x => x.id === a.questionId);
+      if (q && !a.correct) q.kq.forEach(k => { if (missedKq.indexOf(k) < 0) missedKq.push(k); });
+    });
+    missedKq.sort((a, b) => a - b);
+    const weak = missedKq.length
+      ? `<div class="u1r-weak"><strong>${escapeHtml(t('weakSpots', lang))}</strong><ul>${missedKq.map(k => `<li>${lang === 'es' ? 'Pregunta Clave' : 'Key Question'} ${k} → ${lang === 'es' ? 'Parte' : 'Part'} ${KQ_PART[k]}: ${escapeHtml(tr(SECTIONS[KQ_PART[k]].title, lang))}</li>`).join('')}</ul></div>`
+      : `<p>${escapeHtml(t('noWeakSpots', lang))}</p>`;
+
+    mount.innerHTML = `
+      <div class="cl-summary">
+        <div class="cl-score">${score} / ${TOTAL_POINTS}</div>
+        ${code
+          ? `<p class="u1r-code-label">${escapeHtml(t('completionCode', lang))}</p><div class="u1r-code">${escapeHtml(code)}</div>`
+          : `<p><button type="button" class="cl-retake-btn" id="u1r-show-code">${escapeHtml(t('showMyCode', lang))}</button></p>`}
+        ${weak}
+        <p>${escapeHtml(t('summaryText', lang))}</p>
+        <button type="button" class="cl-retake-btn" id="cl-retake-btn">${escapeHtml(t('retakeQuiz', lang))}</button>
+      </div>`;
+
+    // A completed record saved without a code (e.g. before codes existed) gets one when re-saved.
+    const showBtn = mount.querySelector('#u1r-show-code');
+    if (showBtn) showBtn.addEventListener('click', async () => {
+      await ctx.saveProgress(Object.assign({}, progress));
+      renderQuizSummary(mount, ctx);
+    });
+    mount.querySelector('#cl-retake-btn').addEventListener('click', async () => {
+      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: TOTAL_POINTS, answers: [] });
+      renderQuiz(mount, ctx);
+    });
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['unit1-review'] = { render };
+})();

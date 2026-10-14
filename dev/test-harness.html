@@ -35,7 +35,11 @@
 <script src="../js/activities/moving-electrons-review.js"></script>
 <script src="../js/activities/conductivity-lab.js"></script>
 <script src="../js/activities/electron-glue.js"></script>
-<script src="../js/activities/unit1-review.js"></script>
+<script>
+  // Unit 1 Review: ?a=unit1-review is the student build (what ships); add &preview=1 to load the
+  // teacher copy with the click-through controls (dev/teacher-preview/, never deployed).
+  document.write('<script src="../' + (/[?&]preview=1(&|$)/.test(location.search) ? 'dev/teacher-preview/unit1-review.teacher.js' : 'js/activities/unit1-review.js') + '"><\/script>');
+</script>
 <script>
   const ACTIVITY_ID = new URLSearchParams(location.search).get('a') || 'elements-review'; // or ?a=matter-review / ?a=atomic-models / ?a=particles-review / ?a=moving-electrons-review / ?a=conductivity-lab / ?a=electron-glue / ?a=unit1-review
 
