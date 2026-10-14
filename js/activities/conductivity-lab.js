@@ -660,9 +660,20 @@
       setBusy(false);
     });
 
+    let resetArmed = false, resetTimer = null;
+    const resetLabel = btn('reset').textContent;
     btn('reset').addEventListener('click', () => {
       if (busy) return;
-      if (!window.confirm(_('Reset this station? Both beakers go back to fresh and dry, and you will need to repeat the steps for this substance.', '¿Reiniciar esta estación? Ambos vasos vuelven a estar nuevos y secos, y tendrás que repetir los pasos para esta sustancia.'))) return;
+      const rb = btn('reset');
+      if (!resetArmed) { // two-step confirm that works everywhere (no browser dialog)
+        resetArmed = true;
+        rb.textContent = _('Click again to reset', 'Clic otra vez para reiniciar');
+        rb.classList.remove('pulse'); void rb.offsetWidth; rb.classList.add('pulse');
+        say(_('This puts both beakers back to fresh and dry, and you will repeat the steps for this substance. Click Reset again to confirm.', 'Esto devuelve ambos vasos a nuevos y secos, y repetirás los pasos para esta sustancia. Haz clic en Reiniciar otra vez para confirmar.'), true);
+        resetTimer = setTimeout(() => { resetArmed = false; rb.textContent = resetLabel; rb.classList.remove('pulse'); }, 5000);
+        return;
+      }
+      clearTimeout(resetTimer); resetArmed = false; rb.textContent = resetLabel; rb.classList.remove('pulse');
       st.a = 0; st.w = 0; st.b = 0;
       ctl.setLit(false);
       ctl.setBeaker(0, sub, 'dry'); ctl.setBeaker(1, sub, 'dry');
