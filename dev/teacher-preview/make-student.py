@@ -28,7 +28,8 @@ cut(r"\n/\* ---- teacher preview \(\?preview=1\) ---- \*/\n.*?\.u1r-lesson \.u1r
 cut(r"  // Teacher preview: open with \?preview=1.*?STRINGS\.previewRestart = [^\n]*\n", "")
 cut(r"    if \(PREVIEW\) \{ renderQuizQuestion\(mount, ctx, \[\], 0\); return; \}\n", "")
 cut(r"    const previewBar = PREVIEW \? `.*?` : '';\n    mount\.innerHTML = previewBar \+ `", "    mount.innerHTML = `")
-cut(r"if \(!PREVIEW\) ctx\.saveProgress\(", "ctx.saveProgress(")
+cut(r"if \(!PREVIEW\) \{ (session\.answers = answers; session\.status = 'in_progress'; persist\(\);) \}", r"\1")
+cut(r"if \(!PREVIEW\) \{ (if \(!session\.status\) session\.status = 'in_progress'; persist\(\);) \}", r"\1")
 cut(r"    function goTo\(i\) \{.*?    \} else \{\n      nextBtn\.addEventListener\('click', \(\) => renderQuiz\(mount, ctx\)\);\n    \}\n",
     "    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));\n")
 if re.search(r'(?i)preview', src):

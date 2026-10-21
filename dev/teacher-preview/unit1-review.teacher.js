@@ -8,8 +8,10 @@
 // It" studio -> a graded check that mirrors the Chapter Check item types (Words
 // to Know, Show the Skill, Fix the Mistake, Explain It).
 //
-// Only the graded check's score is saved via ctx.saveProgress, and its
-// completion code is shown on the summary screen (see CLAUDE.md).
+// ctx.saveProgress stores the graded check (score, answers, completion code) AND which
+// guided parts the student has finished, so a reload, a language switch, or a different
+// computer picks up where they left off. The completion code is shown on the summary
+// screen (see CLAUDE.md).
 //
 // Every scenario/element here is deliberately different from the real exam
 // forms and the chapter checks -- same skills, fresh specifics.
@@ -1576,6 +1578,7 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
   STRINGS.previewJump = { en: 'Jump to', es: 'Ir a' };
   STRINGS.previewDone = { en: 'That was the last question. Nothing was saved.', es: 'Esa fue la última pregunta. No se guardó nada.' };
   STRINGS.previewRestart = { en: 'Start over', es: 'Empezar de nuevo' };
+  STRINGS.savingScore = { en: 'Saving your score…', es: 'Guardando tu puntaje…' };
   STRINGS.answerAll = { en: 'Answer every item first.', es: 'Responde todos los elementos primero.' };
   STRINGS.pickAny = { en: 'Pick at least one.', es: 'Elige al menos uno.' };
   STRINGS.yourAnswersKey = { en: 'Correct answers:', es: 'Respuestas correctas:' };
@@ -1675,7 +1678,8 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
       </div>`;
 
     const root = host.querySelector('.u1r-lesson');
-    const completed = new Array(SECTION_COUNT).fill(false);
+    if (!session || session.ctx !== ctx) loadSession(ctx);
+    const completed = session.done;
 
     const paceMount = root.querySelector('[data-pace]');
     if (paceMount) paceMount.innerHTML = paceTable(lang);
@@ -1713,6 +1717,7 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
         btn.textContent = t('sectionComplete', lang);
         btn.disabled = true;
         updateProgress();
+        if (!PREVIEW) { if (!session.status) session.status = 'in_progress'; persist(); }
         setTimeout(() => openSection(i + 1, true), 250);
       });
     });
@@ -1746,22 +1751,66 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
 
     renderQuiz(root.querySelector('#cl-quiz-mount'), ctx);
 
-    const progress = ctx.getProgress();
-    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
-      if (progress.status === 'completed') completed[QUIZ_SECTION] = true;
-      openSection(QUIZ_SECTION, false);
-    } else {
-      openSection(0, false);
-    }
+    // Restore what this student already did: finished parts, then open the right place.
+    if (session.status === 'completed') completed[QUIZ_SECTION] = true;
+    completed.forEach((isDone, i) => {
+      if (!isDone || i >= QUIZ_SECTION) return;
+      root.querySelector(`#cl-sec-${i}`).classList.add('done');
+      const b = root.querySelector(`[data-mark-done="${i}"]`);
+      b.textContent = t('sectionComplete', lang); b.disabled = true;
+    });
+    const nextPart = completed.slice(0, QUIZ_SECTION).findIndex(d => !d);
+    if (session.status === 'completed' || session.answers.length > 0 || nextPart === -1) openSection(QUIZ_SECTION, false);
+    else openSection(nextPart, false);
     updateProgress();
+  }
+
+  // ---- Saved progress ----
+  // The saved record's `answers` holds the graded-check answers plus ONE metadata entry,
+  // { questionId: '_parts', done: [indexes of finished parts] } (same style as the labs' '_lab'
+  // entry), so the guided parts survive a reload, a language switch, or another computer.
+  // `session` is the single in-memory source of truth for this student's record.
+  const META_ID = '_parts';
+  let session = null;      // { ctx, done: [bool x SECTION_COUNT], answers: [quiz answers], status }
+  let saveChain = Promise.resolve();
+  let saveTicket = 0;
+
+  function loadSession(ctx) {
+    const p = ctx.getProgress();
+    const all = (p && p.answers) || [];
+    const meta = all.find(a => a && a.questionId === META_ID);
+    const done = new Array(SECTION_COUNT).fill(false);
+    ((meta && meta.done) || []).forEach(i => { if (i >= 0 && i < SECTION_COUNT) done[i] = true; });
+    session = { ctx, done, answers: all.filter(a => a && a.questionId !== META_ID), status: p ? p.status : null };
+  }
+
+  // Saves run one at a time, in order, each built from the latest session when it runs, so a slow
+  // earlier save can never land after (and overwrite) a newer one -- including the final
+  // 'completed' save and its completion code. A burst of calls while one save is in flight
+  // collapses into a single trailing save (only the newest call's turn actually saves).
+  function persist() {
+    const mine = ++saveTicket;
+    const go = () => {
+      if (mine !== saveTicket) return;
+      const rec = {
+        status: session.status || 'in_progress',
+        score: sumPoints(session.answers),
+        totalQuestions: TOTAL_POINTS,
+        answers: [{ questionId: META_ID, done: session.done.map((d, i) => d ? i : -1).filter(i => i >= 0) }].concat(session.answers)
+      };
+      if (rec.status === 'completed') { const p = session.ctx.getProgress(); if (p && p.code) rec.code = p.code; }
+      return session.ctx.saveProgress(rec);
+    };
+    saveChain = saveChain.then(go, go);
+    return saveChain;
   }
 
   // ---- Graded check engine ----
   function renderQuiz(mount, ctx) {
     if (PREVIEW) { renderQuizQuestion(mount, ctx, [], 0); return; }
-    const progress = ctx.getProgress();
-    if (progress && progress.status === 'completed') { renderQuizSummary(mount, ctx); return; }
-    const answers = (progress && progress.answers) || [];
+    if (!session || session.ctx !== ctx) loadSession(ctx);
+    if (session.status === 'completed') { renderQuizSummary(mount, ctx); return; }
+    const answers = session.answers;
     if (answers.length >= QUESTIONS.length) { finishQuiz(mount, ctx, answers); return; }
     renderQuizQuestion(mount, ctx, answers, answers.length);
   }
@@ -1830,7 +1879,7 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
       const prefix = g.correct ? t('correctPrefix', lang) : (g.points > 0 ? t('partialPrefix', lang) : t('incorrectPrefix', lang));
       fbArea.innerHTML = `<div class="cl-feedback ${cls}">${escapeHtml(prefix)} ${escapeHtml(tr(q.explanation, lang))}${keyHtml}</div>`;
       nextBtn.style.display = 'inline-block';
-      if (!PREVIEW) ctx.saveProgress({ status: 'in_progress', score: answers.reduce((s, a) => s + a.points, 0), totalQuestions: TOTAL_POINTS, answers });
+      if (!PREVIEW) { session.answers = answers; session.status = 'in_progress'; persist(); }
     }
 
     if (q.type === 'mc') {
@@ -1902,7 +1951,9 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
   function sumPoints(answers) { return answers.reduce((s, a) => s + (a.points || 0), 0); }
 
   async function finishQuiz(mount, ctx, answers) {
-    await ctx.saveProgress({ status: 'completed', score: sumPoints(answers), totalQuestions: TOTAL_POINTS, answers });
+    session.answers = answers; session.status = 'completed';
+    mount.innerHTML = `<div class="cl-summary"><p>${escapeHtml(t('savingScore', getLang()))}</p></div>`;
+    await persist();
     renderQuizSummary(mount, ctx);
   }
 
@@ -1936,11 +1987,12 @@ const PREVIEW = /[?&]preview=1(&|$)/.test(location.search);
     // A completed record saved without a code (e.g. before codes existed) gets one when re-saved.
     const showBtn = mount.querySelector('#u1r-show-code');
     if (showBtn) showBtn.addEventListener('click', async () => {
-      await ctx.saveProgress(Object.assign({}, progress));
+      await persist();
       renderQuizSummary(mount, ctx);
     });
     mount.querySelector('#cl-retake-btn').addEventListener('click', async () => {
-      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: TOTAL_POINTS, answers: [] });
+      session.answers = []; session.status = 'in_progress';
+      await persist();
       renderQuiz(mount, ctx);
     });
   }
