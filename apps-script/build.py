@@ -44,6 +44,7 @@ JS_FILES = [
     ('ElectronGlueJs.html', 'js/activities/electron-glue.js'),
     ('Unit1ReviewJs.html', 'js/activities/unit1-review.js'),
     ('CrossMultiplyDensityJs.html', 'js/activities/cross-multiply-density.js'),
+    ('MiniMathReviewJs.html', 'js/activities/mini-math-review.js'),
     ('AppJs.html', 'js/app.js'),
 ]
 
@@ -85,6 +86,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <?!= include('ElectronGlueJs'); ?>
   <?!= include('Unit1ReviewJs'); ?>
   <?!= include('CrossMultiplyDensityJs'); ?>
+  <?!= include('MiniMathReviewJs'); ?>
   <?!= include('AppJs'); ?>
 </body>
 </html>

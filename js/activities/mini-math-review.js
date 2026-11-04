@@ -1,0 +1,1450 @@
+// "Mini Math Review: Metric Units, Density & Conversions" (registered as CONTENT activity id
+// 'mini-math-review'). A cumulative review of the whole Mini Math Unit, built from the unit
+// packet/slides in Drive ("Mini Math Unit Metric Units, Density, and Conversions") and the
+// algebra skills in js/activities/cross-multiply-density.js. Cross-reference
+// (unit lesson -> review part):
+//   M1  Metric Units (ladder, prefixes, conversion factors) ........ Part 1
+//   L4  Mass Communication (mass, volume, water displacement) ...... Part 2
+//   L5  All That Glitters (D = m/V, identify a metal, intensive) ... Part 3
+//   M2  Cross Multiply and Divide (proportions, density as a ratio)  Part 4 (+ the practice activity)
+//   M3  1-2 Step Unit Conversions (dimensional analysis) ........... Part 5
+//   M4  2-3 Step Unit Conversions (unit path, density as a bridge) . Part 6
+//   Review page: "Which tool?", fix the mistake, Explain It ....... Part 7
+//
+// Shape: Start Here -> seven guided parts (each: a quick refresher, interactive mini-tools,
+// two or three practice problems) -> a graded check that mirrors the Mini Math Check
+// (Words to Know, Show the Skill, Fix the Mistake, Explain It). Only the graded check is saved
+// via ctx.saveProgress. The summary shows the completion code (see CLAUDE.md) and which parts
+// to revisit. Every scenario/number here is deliberately different from the packet's Review
+// page and Mini Math Check -- same skills, fresh specifics.
+(function () {
+  const STYLE_ID = 'mmr-lesson-styles';
+  const FONT_LINK_ID = 'el-lesson-fonts'; // shared Google Fonts <link>, same family as every other review
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function roundNice(n) { return Math.round(n * 100) / 100; }
+  function formatNum(n) {
+    if (typeof n !== 'number') return String(n);
+    return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(3)));
+  }
+
+  // ---- Visual equation building blocks (same look as the practice activity) ----
+  function eqvFrac(num, den, hlNum, hlDen) {
+    return `<span class="eqv-frac"><span class="eqv-num${hlNum ? ' eqv-hl' : ''}">${num}</span><span class="eqv-bar"></span><span class="eqv-den${hlDen ? ' eqv-hl' : ''}">${den}</span></span>`;
+  }
+  function eqvArrow(label) {
+    return `<div class="eqv-arrow"><span class="eqv-arrow-glyph">↓</span><span class="eqv-arrow-label">${escapeHtml(label)}</span></div>`;
+  }
+  function hl(text) { return `<span class="eqv-hl">${escapeHtml(text)}</span>`; }
+  const EQ = '<span class="eqv-eq">=</span>';
+  const TIMES = '<span class="eqv-op">×</span>';
+  const DIVIDE = '<span class="eqv-op">÷</span>';
+  function eqRow(...parts) { return `<div class="eqv-row">${parts.join(' ')}</div>`; }
+
+  // ---- Proportion math: a/b = c/d, cross multiplying gives a*d = b*c ----
+  function solveProp(p) {
+    let coef, product;
+    if (p.key === 'a') { coef = p.d; product = p.b * p.c; }
+    else if (p.key === 'd') { coef = p.a; product = p.b * p.c; }
+    else if (p.key === 'b') { coef = p.c; product = p.a * p.d; }
+    else { coef = p.b; product = p.a * p.d; }
+    return { coef, product, answer: roundNice(product / coef) };
+  }
+
+  // =====================================================================
+  // Data
+  // =====================================================================
+  const PARTS = [
+    { title: 'Part 1: Metric Units & the Ladder', time: '5 min' },
+    { title: 'Part 2: Mass & Volume', time: '4 min' },
+    { title: 'Part 3: Density', time: '5 min' },
+    { title: 'Part 4: Cross Multiply & Divide', time: '8 min' },
+    { title: 'Part 5: 1–2 Step Unit Conversions', time: '6 min' },
+    { title: 'Part 6: Longer Chains & Density as a Bridge', time: '5 min' },
+    { title: 'Part 7: Choose the Tool & Fix It', time: '6 min' }
+  ];
+  const SECTION_COUNT = PARTS.length + 2; // Start Here + 7 parts + graded check
+  const QUIZ_INDEX = SECTION_COUNT - 1;
+
+  const DENSITIES = [['zinc', 7.1], ['gold', 19.3], ['paper', 0.9], ['brass', 8.4], ['water', 1.0], ['copper', 9.0], ['aluminum', 2.7], ['lead', 11.4]];
+
+  const COVERAGE = [
+    ['M1.1–M1.3', 'Name metric base units and prefixes; write an equality as two conversion factors', 'Part 1'],
+    ['4.1–4.2', 'Measure mass with a balance; find volume, including by water displacement', 'Part 2'],
+    ['5.1–5.3', 'Define density, solve with D = m ÷ V, identify a substance, intensive vs. extensive', 'Part 3'],
+    ['M2.1–M2.3', 'Set up a proportion, cross multiply and divide, use density as a ratio', 'Part 4 (+ the Density & Cross-Multiplying Practice)'],
+    ['M3.1–M3.3', 'Choose the factor that cancels; solve one- and two-step conversions', 'Part 5'],
+    ['M4.1–M4.3', 'Plan a unit path; solve 2–3 step conversions; use density as a conversion factor; check it is reasonable', 'Part 6'],
+    ['Review page', 'Pick the right tool, find and fix mistakes, explain with claim–evidence–reasoning', 'Part 7']
+  ];
+
+  // ---- Part 1: metric ladder ----
+  const LADDER = [['kilo-', 'k'], ['hecto-', 'h'], ['deka-', 'da'], ['BASE', ''], ['deci-', 'd'], ['centi-', 'c'], ['milli-', 'm']];
+  const LADDER_ITEMS = [
+    { v: 3.4, from: 'k', to: '', base: 'g', ans: 3400 },
+    { v: 620, from: 'm', to: '', base: 'L', ans: 0.62 },
+    { v: 8.5, from: 'c', to: '', base: 'm', ans: 0.085 },
+    { v: 0.045, from: '', to: 'm', base: 'L', ans: 45 }
+  ];
+
+  // ---- Part 2: mass & volume ----
+  const MEASURE_ITEMS = [
+    { kind: 'mc', prompt: 'Which tool do you use to measure the mass of a rock?', choices: ['Graduated cylinder', 'Balance', 'Ruler'], correct: 1, why: 'A balance measures mass. A graduated cylinder measures the volume of a liquid.' },
+    { kind: 'num', prompt: 'A balance reads 7.346 g. Record the mass to the nearest tenth of a gram.', prefix: 'Mass =', answer: 7.3, unitText: 'g' },
+    { kind: 'disp', before: 25.0, after: 31.8 },
+    { kind: 'mc', prompt: 'A 1 kg bag of rice and a 1 kg bag of marshmallows. Which has more mass?', choices: ['The rice', 'The marshmallows', 'They have the same mass'], correct: 2, why: 'Both are 1 kg. The marshmallows take up more space (volume), but the mass is the same.' },
+    { kind: 'disp', before: 18.5, after: 24.3 },
+    { kind: 'mc', prompt: 'Two blocks have the same volume. One has a mass of 12.0 g and the other 36.0 g. What can you conclude?', choices: ['They are the same substance', 'They are probably different substances', 'The heavier one has less matter'], correct: 1, why: 'Same space, different mass: the 36.0 g block packs three times as much matter into the same volume, so they are probably different substances.' }
+  ];
+
+  // ---- Part 3: density ----
+  const TAG_PROBLEMS = [
+    { parts: ['A liquid has a density of ', { n: '1.2 g/mL', role: 'D' }, '. What volume does ', { n: '90 g', role: 'M' }, ' of it fill?'], solve: 'V' },
+    { parts: ['Zinc has a density of ', { n: '7.1 g/mL', role: 'D' }, '. A zinc bar has a volume of ', { n: '15 mL', role: 'V' }, '. What is its mass?'], solve: 'M' },
+    { parts: ['A rock found ', { n: '5 m', role: 'X' }, ' underground has a mass of ', { n: '54 g', role: 'M' }, ' and a volume of ', { n: '20 mL', role: 'V' }, '. What is its density?'], solve: 'D' }
+  ];
+  const METAL_ITEMS = [
+    { text: 'A metal sample has a mass of 54.0 g and a volume of 20.0 mL.', m: 54.0, V: 20.0, D: 2.7, metal: 'aluminum' },
+    { text: 'A metal sample has a mass of 84.0 g and a volume of 10.0 mL.', m: 84.0, V: 10.0, D: 8.4, metal: 'brass' },
+    { text: 'A metal sample has a mass of 57.0 g and a volume of 5.0 mL.', m: 57.0, V: 5.0, D: 11.4, metal: 'lead' },
+    { text: 'A sample has a mass of 4.5 g and a volume of 5.0 mL.', m: 4.5, V: 5.0, D: 0.9, metal: 'paper' },
+    { text: 'A metal sample has a mass of 96.5 g and a volume of 5.0 mL.', m: 96.5, V: 5.0, D: 19.3, metal: 'gold' }
+  ];
+  const DENSITY_CONCEPT_ITEMS = [
+    { kind: 'mc', prompt: 'A 5 g piece and a 50 g piece are both pure copper. Which property is the same for both?', choices: ['Mass', 'Volume', 'Density'], correct: 2, why: 'Density is an intensive property: it does not depend on how much you have, so both pieces are 9.0 g/mL.' },
+    { kind: 'mc', prompt: 'Which of these is an extensive property?', choices: ['Density', 'Mass', 'Both'], correct: 1, why: 'Mass depends on the amount of matter, so it is extensive. Density stays the same, so it is intensive.' }
+  ];
+
+  // ---- Part 4: cross multiply & divide ----
+  const PROPORTIONS = [
+    { a: 4, b: 9, c: null, d: 27, key: 'c', v: 'x' },
+    { a: 8, b: 12, c: 20, d: null, key: 'd', v: 'y' },
+    { a: null, b: 6, c: 15, d: 18, key: 'a', v: 'n' },
+    { a: 5, b: null, c: 15, d: 21, key: 'b', v: 'k' }
+  ];
+  // Density is a ratio over 1 mL: grams on top on both sides; x on top for mass, x on the bottom for volume.
+  const DENSITY_PROP_ITEMS = [
+    {
+      word: 'Aluminum has a density of 2.7 g/mL. What is the mass of 8.0 mL of aluminum?',
+      p: { a: 2.7, b: 1, c: null, d: 8.0, key: 'c', v: 'x' }, unit: 'g',
+      options: [
+        { n1: '2.7 g', d1: '1 mL', n2: '8.0 mL', d2: 'x g', why: 'Grams are on top on the left but volume is on top on the right. Keep grams on top on both sides.' },
+        { n1: '2.7 g', d1: '1 mL', n2: 'x g', d2: '8.0 mL', ok: true },
+        { n1: '2.7 g', d1: '1 mL', n2: 'x mL', d2: '8.0 g', why: '8.0 is a volume (mL), not grams. Keep each number with its own unit.' }
+      ]
+    },
+    {
+      word: 'Brass has a density of 8.4 g/mL. What volume does 42 g of brass take up?',
+      p: { a: 8.4, b: 1, c: 42, d: null, key: 'd', v: 'x' }, unit: 'mL',
+      options: [
+        { n1: '8.4 g', d1: '1 mL', n2: 'x g', d2: '42 mL', why: 'x is a volume (mL), but it is on top with the grams. To find volume, x goes on the bottom.' },
+        { n1: '1 g', d1: '8.4 mL', n2: '42 g', d2: 'x mL', why: 'Density is 8.4 g for every 1 mL — grams on top, mL on the bottom — not 1 g for 8.4 mL.' },
+        { n1: '8.4 g', d1: '1 mL', n2: '42 g', d2: 'x mL', ok: true }
+      ]
+    },
+    {
+      word: 'Zinc has a density of 7.1 g/mL. What volume does 14.2 g of zinc take up?',
+      p: { a: 7.1, b: 1, c: 14.2, d: null, key: 'd', v: 'x' }, unit: 'mL',
+      options: [
+        { n1: '7.1 g', d1: '1 mL', n2: '14.2 g', d2: 'x mL', ok: true },
+        { n1: '7.1 g', d1: '1 mL', n2: 'x g', d2: '14.2 mL', why: '14.2 is the mass in grams, not mL. The unknown volume goes on the bottom with mL.' },
+        { n1: '7.1 g', d1: '14.2 mL', n2: '1 g', d2: 'x mL', why: 'This pairs 7.1 g with 14.2 mL, but those numbers do not belong together — the 14.2 is grams.' }
+      ]
+    }
+  ];
+  // Challenge: why it works (rearrange D = M/V by undoing operations on both sides).
+  const START_ROW = eqRow('D', EQ, eqvFrac('M', 'V'));
+  const STEP_TARGETS = [
+    {
+      solve: 'D', word: 'A 25 mL sample of a mineral has a mass of 70 g. Find its density.', steps: [],
+      noneRow: eqRow('D', EQ, 'M', DIVIDE, 'V'), noneLabel: 'already alone — just divide',
+      noneHint: 'Look at D = M/V: D is already by itself on one side, so there is nothing to undo.',
+      calc: { text: 'D = 70 ÷ 25', answer: 2.8, unit: 'g/mL' }
+    },
+    {
+      solve: 'V', word: 'A liquid has a density of 1.2 g/mL. What volume does 90 g of it fill?',
+      steps: [
+        { op: '× V', row: eqRow('D', TIMES, hl('V'), EQ, 'M'), hint: 'V is stuck under M as a ÷ V. What operation cancels a ÷ V?' },
+        { op: '÷ D', row: eqRow('V', EQ, eqvFrac('M', 'D', false, true)), hint: 'Now D is multiplying V. To get V alone, undo that × D.' }
+      ],
+      noneHint: 'Not yet — V is still stuck in the denominator.',
+      calc: { text: 'V = 90 ÷ 1.2', answer: 75, unit: 'mL' }
+    },
+    {
+      solve: 'M', word: 'Brass has a density of 8.4 g/mL. A brass bar has a volume of 20 mL. What is its mass?',
+      steps: [{ op: '× V', row: eqRow('D', TIMES, hl('V'), EQ, 'M'), hint: 'M is being divided by V. What cancels a ÷ V?' }],
+      noneHint: 'Not yet — M is still being divided by V.',
+      calc: { text: 'M = 8.4 × 20', answer: 168, unit: 'g' }
+    }
+  ];
+  const STEP_OPS = ['× V', '÷ V', '× D', '÷ D', '× M', '÷ M'];
+  const UNIT_OPTIONS = ['g', 'mL', 'cm³', 'g/mL', 'g/cm³'];
+
+  // ---- Parts 5-6: conversion-factor builder ----
+  // mk(from, to, a, b): a and b are [value, unit] and a = b is the equality. The right factor
+  // puts the unit you want to cancel (from) on the bottom.
+  function mk(from, to, a, b, magWhy) {
+    const fromSide = a[1] === from ? a : b, toSide = a[1] === from ? b : a;
+    const ok = { nv: toSide[0], nu: toSide[1], dv: fromSide[0], du: fromSide[1], ok: true };
+    const flipped = { nv: fromSide[0], nu: fromSide[1], dv: toSide[0], du: toSide[1], why: `That puts ${from} on top, so it cannot cancel. Put the unit you want to get rid of (${from}) on the bottom.` };
+    const scale = v => v === 1000 ? 100 : v === 100 ? 1000 : v === 60 ? 100 : v * 10;
+    const mag = Object.assign({}, ok, { ok: false, why: magWhy || `The units cancel, but check the equality: ${formatNum(a[0])} ${a[1]} = ${formatNum(b[0])} ${b[1]}.` });
+    if (toSide[0] !== 1) mag.nv = scale(toSide[0]);
+    else if (fromSide[0] !== 1) mag.dv = scale(fromSide[0]);
+    else mag.nv = 10;
+    return { from, to, options: [ok, flipped, mag] };
+  }
+  const CONVERT_ITEMS = [
+    { prompt: 'Convert 650 mL to L.', given: [650, 'mL'], want: 'L', steps: [mk('mL', 'L', [1, 'L'], [1000, 'mL'])], ans: 0.65 },
+    { prompt: 'Convert 3.2 kg to g.', given: [3.2, 'kg'], want: 'g', steps: [mk('kg', 'g', [1, 'kg'], [1000, 'g'])], ans: 3200 },
+    { prompt: 'Convert 3.6 km to cm (two steps).', given: [3.6, 'km'], want: 'cm', steps: [mk('km', 'm', [1, 'km'], [1000, 'm']), mk('m', 'cm', [1, 'm'], [100, 'cm'])], ans: 360000 },
+    { prompt: 'Convert 0.25 L to cm³ (two steps).', given: [0.25, 'L'], want: 'cm³', steps: [mk('L', 'mL', [1, 'L'], [1000, 'mL']), mk('mL', 'cm³', [1, 'mL'], [1, 'cm³'])], ans: 250 },
+    { prompt: 'Convert 1.5 h to s (two steps).', given: [1.5, 'h'], want: 's', steps: [mk('h', 'min', [1, 'h'], [60, 'min']), mk('min', 's', [1, 'min'], [60, 's'])], ans: 5400 }
+  ];
+  const CHAIN_ITEMS = [
+    {
+      prompt: 'How many kg is 400 mL of aluminum? (Aluminum is 2.7 g/mL.)', given: [400, 'mL'], want: 'kg',
+      paths: ['mL → g → kg', 'mL → kg', 'mL → L → kg'], pathOk: 0,
+      pathWhy: 'Density takes you from volume (mL) to mass (g). Then a metric factor takes g to kg.',
+      steps: [mk('mL', 'g', [1, 'mL'], [2.7, 'g'], 'Check the density table: aluminum is 2.7 g for every 1 mL.'), mk('g', 'kg', [1, 'kg'], [1000, 'g'])],
+      ans: 1.08
+    },
+    {
+      prompt: 'What volume (mL) does 54 g of aluminum take up? (Aluminum is 2.7 g/mL.)', given: [54, 'g'], want: 'mL',
+      paths: ['g → kg → mL', 'g → L', 'g → mL'], pathOk: 2,
+      pathWhy: 'Density is the bridge between mass and volume. Flip it to go from grams to mL.',
+      steps: [mk('g', 'mL', [1, 'mL'], [2.7, 'g'], 'Check the density table: aluminum is 2.7 g for every 1 mL.')],
+      ans: 20
+    },
+    {
+      prompt: 'How many kg is 0.60 L of brass? (Brass is 8.4 g/mL.)', given: [0.60, 'L'], want: 'kg',
+      paths: ['L → g → kg', 'L → kg', 'L → mL → g → kg'], pathOk: 2,
+      pathWhy: 'Density uses mL, so change L to mL first, then use density to get g, then change g to kg.',
+      steps: [mk('L', 'mL', [1, 'L'], [1000, 'mL']), mk('mL', 'g', [1, 'mL'], [8.4, 'g'], 'Check the density table: brass is 8.4 g for every 1 mL.'), mk('g', 'kg', [1, 'kg'], [1000, 'g'])],
+      ans: 5.04
+    }
+  ];
+
+  // ---- Part 7: choose the tool, fix the mistake, explain it ----
+  const TOOLS = ['D = m ÷ V', 'Cross multiply and divide', 'Dimensional analysis (conversion factors)', 'Dimensional analysis with density as a factor'];
+  const TOOL_ITEMS = [
+    { kind: 'mc', prompt: 'A sample has a mass of 36 g and a volume of 8.0 mL. Find its density.', choices: TOOLS, correct: 0, why: 'You are given mass and volume and want density: D = m ÷ V.' },
+    { kind: 'mc', prompt: 'Aluminum’s density is 2.7 g/mL. Find the mass of 15 mL of aluminum.', choices: TOOLS, correct: 1, why: 'Given a density and asked for mass: write the density over 1 mL, cross multiply and divide.' },
+    { kind: 'mc', prompt: 'Change 4,500 mg to g.', choices: TOOLS, correct: 2, why: 'You are only changing units, so use conversion factors (dimensional analysis).' },
+    { kind: 'mc', prompt: 'Find the mass, in kg, of 0.20 L of lead.', choices: TOOLS, correct: 3, why: 'You are changing units AND using density: L → mL → g → kg, with density as one factor.' },
+    { kind: 'mc', prompt: 'If 3 notebooks cost $4.50, what do 7 notebooks cost?', choices: TOOLS, correct: 1, why: 'Two equal ratios with one missing number: cross multiply and divide.' }
+  ];
+  const ERROR_ITEMS = [
+    {
+      title: 'Converting 3.2 kg to grams',
+      lines: ['Start with 3.2 kg / 1', 'Multiply by 1 kg / 1000 g', 'Answer: 0.0032 g'], wrong: 1,
+      fixes: ['Multiply by 1000 g / 1 kg', 'Multiply by 1 g / 1000 kg', 'Multiply by 100 g / 1 kg'], fix: 0,
+      why: 'The unit you want to cancel (kg) goes on the bottom: 3.2 × 1000 = 3,200 g.'
+    },
+    {
+      title: 'Finding density',
+      lines: ['A sample has m = 54 g and V = 20 mL', 'D = V ÷ m = 20 ÷ 54', 'D ≈ 0.37 g/mL'], wrong: 1,
+      fixes: ['D = m ÷ V = 54 ÷ 20', 'D = m × V = 54 × 20', 'D = m − V = 54 − 20'], fix: 0,
+      why: 'Density is mass per unit volume: D = m ÷ V = 54 ÷ 20 = 2.7 g/mL.'
+    },
+    {
+      title: 'Solving the proportion 8/12 = x/30',
+      lines: ['8/12 = x/30', 'Cross multiply: 8 × x = 12 × 30', 'x = 360 ÷ 8 = 45'], wrong: 1,
+      fixes: ['Cross multiply: 8 × 30 = 12 × x', 'Cross multiply: 8 × 12 = x × 30', 'Cross multiply: 8 + 30 = 12 + x'], fix: 0,
+      why: 'The cross goes corner to opposite corner: 8 with 30, and 12 with x. (Then x = 240 ÷ 12 = 20.)'
+    },
+    {
+      title: 'Finding a volume',
+      lines: ['D = 1.2 g/mL, M = 90 g', 'V = M ÷ D = 90 ÷ 1.2', 'V = 75 g'], wrong: 2,
+      fixes: ['V = 75 mL', 'V = 75 g/mL', 'V = 75 cm²'], fix: 0,
+      why: 'Grams ÷ (grams per mL) leaves mL. A volume is never measured in grams.'
+    },
+    {
+      title: 'Solving D = M/V for M',
+      lines: ['D = M/V', 'Divide both sides by V: D ÷ V = M', 'So M = D ÷ V'], wrong: 1,
+      fixes: ['Multiply both sides by V: D × V = M', 'Add V to both sides: D + V = M', 'Subtract V from both sides: D − V = M'], fix: 0,
+      why: 'M is being divided by V, so the operation that cancels it is multiplying both sides by V.'
+    },
+    {
+      title: 'Converting 450 mL to L',
+      lines: ['450 mL/1 × (1000 mL / 1 L)', 'The units do not cancel: mL × mL', '= 450,000 mL²/L'], wrong: 0,
+      fixes: ['450 mL/1 × (1 L / 1000 mL)', '450 mL/1 × (1000 L / 1 mL)', '450 mL/1 × (1 mL / 1000 L)'], fix: 0,
+      why: 'Flip the factor so mL is on the bottom and cancels: 450 × 1 ÷ 1000 = 0.45 L.'
+    }
+  ];
+  const CER_ITEM = {
+    scenario: 'A seller says a bar is solid aluminum. You measure its mass as 0.84 kg and its volume as 100 mL. Is the seller right? Build your answer one piece at a time.',
+    stages: [
+      { label: 'Claim', prompt: 'Which claim does your data support?', choices: ['It is aluminum', 'It is not aluminum', 'You cannot tell from mass and volume'], correct: 1, why: 'The density will not match aluminum — see the evidence next.' },
+      { label: 'Evidence', prompt: 'Which evidence is correct?', choices: [
+        'D = 0.84 ÷ 100 = 0.0084 g/mL',
+        '0.84 kg/1 × (1000 g / 1 kg) = 840 g; D = 840 g ÷ 100 mL = 8.4 g/mL; aluminum is 2.7 g/mL',
+        'D = 100 mL ÷ 840 g = 0.12 g/mL'], correct: 1, why: 'Convert kg to g first, then D = m ÷ V. 8.4 g/mL is not 2.7 g/mL.' },
+      { label: 'Reasoning', prompt: 'Which reasoning connects the evidence to the claim?', choices: [
+        'A bigger bar is always denser, so this bar must be something else',
+        'Density is an intensive property, so a bar of any size that is aluminum would be 2.7 g/mL; 8.4 g/mL matches brass',
+        'Mass is extensive, so it identifies the substance'], correct: 1, why: 'Intensive properties like density do not depend on the amount, so they identify the substance.' }
+    ]
+  };
+
+  // =====================================================================
+  // Graded check (mirrors the Mini Math Check: words, skills, fix, explain)
+  // =====================================================================
+  const QUESTIONS = [
+    { id: 'q1', part: 2, type: 'mc', prompt: 'Words to know — mass:',
+      choices: ['the amount of space a sample of matter takes up', 'the amount of matter in an object', 'mass per unit volume', 'an equation that says two ratios are equal'], correct: 1,
+      explanation: 'Mass is the amount of matter in an object.' },
+    { id: 'q2', part: 2, type: 'mc', prompt: 'Words to know — volume:',
+      choices: ['the amount of matter in an object', 'an equality written as a fraction', 'the amount of space a sample of matter takes up', 'the temperature at which a solid melts'], correct: 2,
+      explanation: 'Volume is the amount of space a sample of matter takes up.' },
+    { id: 'q3', part: 3, type: 'mc', prompt: 'Words to know — density:',
+      choices: ['mass per unit volume', 'the amount of matter in an object', 'an equality written as a fraction', 'the amount of space a sample takes up'], correct: 0,
+      explanation: 'Density is mass per unit volume: D = m ÷ V.' },
+    { id: 'q4', part: 5, type: 'mc', prompt: 'Words to know — conversion factor:',
+      choices: ['an equation that says two ratios are equal', 'mass per unit volume', 'an equality written as a fraction, like 1000 g / 1 kg', 'the amount of space a sample takes up'], correct: 2,
+      explanation: 'A conversion factor is an equality written as a fraction. It equals one.' },
+    { id: 'q5', part: 4, type: 'mc', prompt: 'Words to know — proportion:',
+      choices: ['an equation that says two ratios are equal', 'an equality written as a fraction', 'mass per unit volume', 'the amount of matter in an object'], correct: 0,
+      explanation: 'A proportion is an equation that says two ratios are equal.' },
+    { id: 'q6', part: 4, type: 'num', prompt: 'Solve for x: 5/x = 15/24', correct: 8,
+      explanation: 'Cross multiply: 5 × 24 = x × 15 → 120 = 15x → x = 8.' },
+    { id: 'q7', part: 4, type: 'num', prompt: 'Solve for x: x/6 = 14/21', correct: 4,
+      explanation: 'Cross multiply: x × 21 = 6 × 14 → 21x = 84 → x = 4.' },
+    { id: 'q8', part: 3, type: 'num', prompt: 'A metal sample has a mass of 67.5 g and a volume of 25.0 mL. What is its density (g/mL)?', correct: 2.7,
+      explanation: 'D = m ÷ V = 67.5 ÷ 25.0 = 2.7 g/mL.' },
+    { id: 'q9', part: 3, type: 'mc', prompt: 'Use the density table. Which metal has a density of 2.7 g/mL?',
+      choices: ['zinc', 'gold', 'aluminum', 'brass'], correct: 2,
+      explanation: 'Aluminum is 2.7 g/mL. Density is intensive, so it identifies the substance.' },
+    { id: 'q10', part: 4, type: 'num', prompt: 'Lead is 11.4 g/mL. What is the mass (g) of 6.0 mL of lead?', correct: 68.4,
+      explanation: '11.4 g / 1 mL = x g / 6.0 mL → x = 11.4 × 6.0 ÷ 1 = 68.4 g.' },
+    { id: 'q11', part: 4, type: 'num', prompt: 'Brass is 8.4 g/mL. What volume (mL) does 63 g of brass take up?', correct: 7.5,
+      explanation: '8.4 g / 1 mL = 63 g / x mL → x = 63 × 1 ÷ 8.4 = 7.5 mL.' },
+    { id: 'q12', part: 1, type: 'num', prompt: 'Use dimensional analysis: 0.62 L = ? mL', correct: 620,
+      explanation: '0.62 L/1 × (1000 mL / 1 L) = 620 mL.' },
+    { id: 'q13', part: 5, type: 'num', prompt: 'Use dimensional analysis: 135 min = ? h', correct: 2.25,
+      explanation: '135 min/1 × (1 h / 60 min) = 2.25 h.' },
+    { id: 'q14', part: 5, type: 'num', prompt: 'Use dimensional analysis (two steps): 5.2 km = ? cm', correct: 520000,
+      explanation: '5.2 km/1 × (1000 m / 1 km) × (100 cm / 1 m) = 520,000 cm.' },
+    { id: 'q15', part: 6, type: 'num', prompt: 'Plan the path, then solve: how many kg is 0.30 L of lead? (Lead is 11.4 g/mL.)', correct: 3.42,
+      explanation: 'L → mL → g → kg: 0.30 L/1 × (1000 mL / 1 L) × (11.4 g / 1 mL) × (1 kg / 1000 g) = 3.42 kg.' },
+    { id: 'q16', part: 2, type: 'num', prompt: 'A cylinder holds 30.0 mL of water. After a rock is added, the level is 37.6 mL. What is the volume of the rock (mL)?', correct: 7.6,
+      explanation: 'Volume of object = with − without = 37.6 − 30.0 = 7.6 mL.' },
+    { id: 'q17', part: 7, type: 'mc', prompt: 'Fix the mistake: a student writes 3.2 kg/1 × (1 kg / 1000 g) = 0.0032 g. What went wrong?',
+      choices: ['The conversion factor is upside down, so kg does not cancel', 'They should have added 1000', 'Nothing — that is correct', 'They should have used density'], correct: 0,
+      explanation: 'kg has to be on the bottom to cancel: 3.2 kg/1 × (1000 g / 1 kg) = 3,200 g.' },
+    { id: 'q18', part: 7, type: 'mc', prompt: 'Which tool finds the mass of 25 mL of copper when you are given copper’s density?',
+      choices: ['D = m ÷ V', 'Cross multiply and divide (density over 1 mL)', 'Water displacement', 'Only a balance'], correct: 1,
+      explanation: 'Given a density and asked for mass: set up density over 1 mL, then cross multiply and divide.' },
+    { id: 'q19', part: 7, type: 'mc', prompt: 'Explain it: a seller says a bar is aluminum, but its mass is 0.84 kg and its volume is 100 mL. Which response is best?',
+      choices: ['Yes — it is heavy, so it is aluminum', 'No — D = 840 g ÷ 100 mL = 8.4 g/mL, which matches brass, not aluminum (2.7 g/mL)', 'No — its density is 0.0084 g/mL', 'You cannot tell without knowing the temperature'], correct: 1,
+      explanation: 'Convert 0.84 kg to 840 g, then D = m ÷ V = 8.4 g/mL. Density is intensive, so it identifies the substance.' },
+    { id: 'q20', part: 3, type: 'mc', prompt: 'A 5 g piece and a 50 g piece are both pure zinc. Which property is the same for both?',
+      choices: ['Mass', 'Volume', 'Density', 'None of them'], correct: 2,
+      explanation: 'Density is intensive: both pieces are 7.1 g/mL, no matter the size.' }
+  ];
+
+  // =====================================================================
+  // Styles
+  // =====================================================================
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.mmr-lesson {
+  --navy: #0d1b2a; --navy-mid: #1b2d42; --navy-light: #253a52;
+  --teal: #2ec4b6; --teal-dim: #1a8c83; --amber: #f4a261;
+  --cream: #f7f3ec; --cream-dark: #ede8df;
+  --text: #1a1a2e; --text-muted: #5a6475;
+  --note-bg: #fff8e7; --note-border: #f4a261;
+  --correct-bg: #e8f8f5; --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text); font-size: 17px; line-height: 1.7;
+  background: var(--cream); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.mmr-lesson * { box-sizing: border-box; }
+.mmr-lesson .mmr-header { background: var(--navy); color: var(--cream); padding: 2rem 1.75rem 1.6rem; position: relative; overflow: hidden; }
+.mmr-lesson .mmr-header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; border: 32px solid rgba(46,196,182,0.12); }
+.mmr-lesson .mmr-header-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem; position: relative; }
+.mmr-lesson .mmr-header h1 { font-family: 'Playfair Display', serif; font-size: 1.9rem; font-weight: 700; line-height: 1.2; margin: 0 0 0.4rem; position: relative; }
+.mmr-lesson .mmr-header-meta { font-size: 0.82rem; color: rgba(247,243,236,0.65); font-family: 'JetBrains Mono', monospace; position: relative; }
+.mmr-lesson .mmr-progress-wrap { background: var(--navy-mid); padding: 0.7rem 1.75rem; display: flex; align-items: center; gap: 0.9rem; position: sticky; top: 0; z-index: 10; }
+.mmr-lesson .mmr-progress-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+.mmr-lesson .mmr-progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; }
+.mmr-lesson .mmr-progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber)); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+.mmr-lesson .mmr-progress-count { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(247,243,236,0.55); white-space: nowrap; }
+.mmr-lesson main { padding: 1.5rem 1.25rem 2.5rem; }
+.mmr-lesson .section-card { background: white; border-radius: 12px; margin-bottom: 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+.mmr-lesson .section-header { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.2rem; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; }
+.mmr-lesson .section-header:hover { background: #fafafa; }
+.mmr-lesson .section-header.open { border-bottom-color: var(--cream-dark); }
+.mmr-lesson .section-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; color: white; background: var(--navy); border-radius: 6px; padding: 0.22rem 0.5rem; flex-shrink: 0; }
+.mmr-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.mmr-lesson .section-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; flex: 1; }
+.mmr-lesson .section-time { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); }
+.mmr-lesson .section-arrow { font-size: 0.9rem; color: var(--text-muted); transition: transform 0.25s; flex-shrink: 0; }
+.mmr-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.mmr-lesson .section-body { display: none; padding: 1.3rem; }
+.mmr-lesson .section-body.open { display: block; animation: mmrFadeIn 0.25s ease; }
+@keyframes mmrFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.mmr-lesson h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--navy); margin: 0 0 0.6rem; }
+.mmr-lesson h3 { font-size: 0.95rem; font-weight: 600; color: var(--navy-mid); margin: 1.1rem 0 0.5rem; }
+.mmr-lesson p { margin: 0 0 0.85rem; }
+.mmr-lesson p:last-child { margin-bottom: 0; }
+.mmr-lesson .note-box { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin: 1.1rem 0; display: flex; gap: 0.7rem; font-size: 0.9rem; }
+.mmr-lesson .note-box .note-icon { font-size: 1.15rem; flex-shrink: 0; }
+.mmr-lesson .concept-box { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%); color: var(--cream); border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.1rem 0; }
+.mmr-lesson .concept-box .concept-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--teal); margin-bottom: 0.4rem; }
+.mmr-lesson .concept-box p { color: rgba(247,243,236,0.92); margin-bottom: 0; }
+.mmr-lesson .worked-example { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 0.9rem 1.1rem; margin: 1.1rem 0; font-size: 0.9rem; font-family: 'JetBrains Mono', monospace; }
+.mmr-lesson .worked-example .we-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.14em; color: #0369a1; margin-bottom: 0.5rem; font-family: 'Source Serif 4', serif; }
+.mmr-lesson .worked-example .we-line { margin: 0.3rem 0; }
+.mmr-lesson .worked-example .we-context { font-family: 'Source Serif 4', serif; font-size: 0.9rem; color: var(--text); margin-bottom: 0.8rem; }
+.mmr-lesson .eqv-flow { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; margin: 0.3rem 0; }
+.mmr-lesson .eqv-row { display: flex; align-items: center; justify-content: center; gap: 0.4em; font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; font-weight: 700; color: var(--navy); flex-wrap: wrap; text-align: center; }
+.mmr-lesson .eqv-eq, .mmr-lesson .eqv-op { color: var(--text-muted); font-weight: 700; }
+.mmr-lesson .eqv-frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; line-height: 1.3; }
+.mmr-lesson .eqv-frac .eqv-num, .mmr-lesson .eqv-frac .eqv-den { padding: 0 0.25em; }
+.mmr-lesson .eqv-frac .eqv-bar { width: 100%; height: 2px; background: var(--navy); margin: 1px 0; }
+.mmr-lesson .eqv-hl { background: #fef3c7; border: 1.5px solid var(--amber); border-radius: 6px; padding: 0.02em 0.32em; color: #92400e; }
+.mmr-lesson .eqv-arrow { display: flex; flex-direction: column; align-items: center; color: var(--teal-dim); margin: 0.2rem 0; }
+.mmr-lesson .eqv-arrow-glyph { font-size: 1.1rem; line-height: 1; }
+.mmr-lesson .eqv-arrow-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; background: var(--cream-dark); color: var(--navy-mid); padding: 0.15em 0.55em; border-radius: 999px; margin-top: 0.1rem; white-space: nowrap; }
+.mmr-lesson .objectives-list { list-style: none; padding: 0; margin: 0.4rem 0; }
+.mmr-lesson .objectives-list li { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.4rem 0; font-size: 0.92rem; border-bottom: 1px solid var(--cream-dark); }
+.mmr-lesson .objectives-list li:last-child { border-bottom: none; }
+.mmr-lesson .obj-check { color: var(--teal); flex-shrink: 0; }
+.mmr-lesson table { width: 100%; border-collapse: collapse; margin: 0.9rem 0; font-size: 0.85rem; }
+.mmr-lesson th { background: var(--navy); color: var(--cream); font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; text-align: left; }
+.mmr-lesson td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cream-dark); }
+.mmr-lesson tr:nth-child(even) td { background: #fafafa; }
+.mmr-lesson .practice-problem { border: 1.5px solid var(--cream-dark); border-radius: 10px; margin-bottom: 1.1rem; overflow: hidden; }
+.mmr-lesson .pp-header { display: flex; align-items: center; gap: 0.65rem; padding: 0.85rem 1.1rem; background: #fafafa; border-bottom: 1px solid var(--cream-dark); }
+.mmr-lesson .pp-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700; color: white; background: var(--amber); border-radius: 6px; padding: 0.18rem 0.45rem; flex-shrink: 0; }
+.mmr-lesson .pp-body { padding: 0.95rem 1.1rem; }
+.mmr-lesson .pp-body p { font-size: 0.92rem; }
+.mmr-lesson .hint-btn, .mmr-lesson .reveal-btn, .mmr-lesson .mark-done-btn, .mmr-lesson .mmr-choice, .mmr-lesson .mmr-next-btn, .mmr-lesson .mmr-retake-btn, .mmr-lesson .check-btn {
+  font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none;
+}
+.mmr-lesson .hint-btn, .mmr-lesson .reveal-btn { border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.mmr-lesson .hint-btn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; margin-right: 0.5rem; }
+.mmr-lesson .hint-btn:hover { background: #fde68a; }
+.mmr-lesson .reveal-btn { background: var(--navy); color: white; }
+.mmr-lesson .reveal-btn:hover { background: var(--navy-light); }
+.mmr-lesson .hint-box, .mmr-lesson .answer-box { border-radius: 7px; padding: 0.75rem 0.95rem; margin-top: 0.7rem; font-size: 0.87rem; display: none; }
+.mmr-lesson .hint-box.open, .mmr-lesson .answer-box.open { display: block; animation: mmrFadeIn 0.2s ease; }
+.mmr-lesson .hint-box { background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; }
+.mmr-lesson .answer-box { background: var(--correct-bg); border: 1px solid var(--correct-border); color: #065f46; }
+.mmr-lesson .answer-box .answer-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim); margin-bottom: 0.35rem; font-weight: 700; }
+.mmr-lesson .mark-done-btn { display: block; width: 100%; margin-top: 1.2rem; background: var(--navy); color: var(--cream); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; transition: background 0.2s; }
+.mmr-lesson .mark-done-btn:hover:not(:disabled) { background: var(--teal-dim); }
+.mmr-lesson .mark-done-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.mmr-lesson .quiz-note { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin-bottom: 1.1rem; font-size: 0.88rem; }
+.mmr-lesson .quiz-progress-bar { height: 6px; background: var(--cream-dark); border-radius: 999px; overflow: hidden; margin: 0.6rem 0 0.9rem; }
+.mmr-lesson .quiz-progress-fill { height: 100%; background: linear-gradient(90deg, var(--navy), var(--teal)); transition: width 0.2s ease; }
+.mmr-lesson .quiz-question-count { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+.mmr-lesson .quiz-prompt { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--navy); margin: 0.5rem 0 1rem; }
+.mmr-lesson .mmr-choice { display: block; width: 100%; text-align: left; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem; font-size: 0.93rem; color: var(--text); font-family: 'Source Serif 4', serif; transition: border-color 0.15s, background 0.15s; }
+.mmr-lesson .mmr-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.mmr-lesson .mmr-choice:disabled { cursor: default; }
+.mmr-lesson .mmr-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.mmr-lesson .mmr-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.mmr-lesson .num-input { display: block; width: 160px; margin: 0.4rem 0 0.8rem; padding: 0.55rem 0.7rem; border: 1.5px solid var(--cream-dark); border-radius: 8px; font-size: 0.95rem; font-family: 'JetBrains Mono', monospace; }
+.mmr-lesson .num-input:focus { outline: none; border-color: var(--teal); }
+.mmr-lesson .mmr-feedback { border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600; }
+.mmr-lesson .mmr-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.mmr-lesson .mmr-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.mmr-lesson .mmr-next-btn, .mmr-lesson .mmr-retake-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem; }
+.mmr-lesson .mmr-next-btn:hover, .mmr-lesson .mmr-retake-btn:hover { background: var(--navy-light); }
+.mmr-lesson .mmr-summary { text-align: center; padding: 1rem 0.5rem; }
+.mmr-lesson .mmr-score { font-family: 'JetBrains Mono', monospace; font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0; }
+.mmr-lesson .step-note { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 0.6rem 0.85rem; margin: 0 0 0.9rem; font-size: 0.85rem; }
+.mmr-lesson .step-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--navy-mid); margin-bottom: 0.7rem; font-weight: 700; }
+.mmr-lesson .check-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.6rem 1.1rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.mmr-lesson .check-btn:hover:not(:disabled) { background: var(--navy-light); }
+.mmr-lesson .check-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: default; }
+.mmr-lesson .step-feedback { margin-top: 0.7rem; font-size: 0.85rem; font-weight: 600; min-height: 1.2em; }
+.mmr-lesson .step-feedback.ok { color: var(--teal-dim); }
+.mmr-lesson .step-feedback.bad { color: #b91c1c; }
+
+/* ---- Mini-Math Review additions ---- */
+.mmr-lesson .mmr-xref { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-muted); background: var(--cream); border-radius: 6px; padding: 0.35rem 0.6rem; margin: 0 0 1rem; display: inline-block; }
+.mmr-lesson .mmr-tool { border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 1rem 1.1rem; margin: 1.1rem 0; background: #fcfcfd; }
+.mmr-lesson .mmr-tool-title { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--navy-mid); font-weight: 700; margin-bottom: 0.6rem; }
+.mmr-lesson .mmr-tool-count { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+.mmr-lesson .mmr-tool-done { background: var(--correct-bg); border-left: 4px solid var(--correct-border); border-radius: 0 8px 8px 0; padding: 0.8rem 1rem; font-weight: 600; color: var(--teal-dim); }
+.mmr-lesson .mmr-sentence { font-size: 0.98rem; margin-bottom: 0.8rem; }
+.mmr-lesson .mmr-chip { display: inline-block; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.85rem; background: #fef3c7; border: 1.5px solid var(--amber); color: #92400e; border-radius: 6px; padding: 0 0.4rem; }
+.mmr-lesson .mmr-tag-row { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 8px; border: 1.5px solid transparent; }
+.mmr-lesson .mmr-tag-row.ok { background: var(--correct-bg); border-color: var(--correct-border); }
+.mmr-lesson .mmr-tag-row.bad { background: #fef2f2; border-color: #dc2626; }
+.mmr-lesson .mmr-solve-label { font-size: 0.9rem; font-weight: 600; }
+.mmr-lesson .mmr-select { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; padding: 0.4rem 0.5rem; border: 1.5px solid var(--cream-dark); border-radius: 8px; background: white; color: var(--text); }
+.mmr-lesson .mmr-mark { font-weight: 700; }
+.mmr-lesson .mmr-ops { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.6rem 0; justify-content: center; }
+.mmr-lesson .mmr-op-btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.8rem; background: white; border: 1.5px solid var(--navy-mid); color: var(--navy); border-radius: 8px; padding: 0.45rem 0.8rem; cursor: pointer; }
+.mmr-lesson .mmr-op-btn:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.mmr-lesson .mmr-op-btn:disabled { opacity: 0.4; cursor: default; }
+.mmr-lesson .mmr-op-btn.bad { border-color: #dc2626; background: #fef2f2; animation: mmrShake 0.3s; }
+@keyframes mmrShake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);} }
+.mmr-lesson .mmr-calc { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed var(--cream-dark); text-align: center; }
+.mmr-lesson .mmr-calc .num-input { display: inline-block; margin: 0.3rem 0.3rem 0.3rem 0; }
+.mmr-lesson .mmr-xlab { position: relative; display: flex; justify-content: center; padding: 0.8rem 0; }
+.mmr-lesson .mmr-xlab .eqv-row { gap: 2.6rem; }
+.mmr-lesson .mmr-xsvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.mmr-lesson .mmr-cell { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.05rem; min-width: 3rem; background: white; border: 2px solid var(--navy-mid); color: var(--navy); border-radius: 8px; padding: 0.3rem 0.6rem; cursor: pointer; margin: 0.15rem 0; position: relative; z-index: 1; }
+.mmr-lesson .mmr-cell.unknown { border-color: var(--amber); background: #fff3e6; color: #b45309; }
+.mmr-lesson .mmr-cell.sel { box-shadow: 0 0 0 3px rgba(46,196,182,0.35); border-color: var(--teal); }
+.mmr-lesson .mmr-cell.pair0 { background: #fef3c7; border-color: var(--amber); }
+.mmr-lesson .mmr-cell.pair1 { background: var(--correct-bg); border-color: var(--teal); }
+.mmr-lesson .mmr-cell:disabled { cursor: default; }
+.mmr-lesson .mmr-option { display: block; width: 100%; text-align: center; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.5rem; margin-bottom: 0.6rem; cursor: pointer; font-family: 'Source Serif 4', serif; font-size: 0.93rem; color: var(--text); }
+.mmr-lesson .mmr-option:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.mmr-lesson .mmr-option.bad { border-color: #dc2626; background: #fef2f2; }
+.mmr-lesson .mmr-option.ok { border-color: var(--correct-border); background: var(--correct-bg); }
+.mmr-lesson .mmr-option:disabled { cursor: default; }
+.mmr-lesson .mmr-line { display: block; width: 100%; text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.55rem 0.8rem; margin-bottom: 0.45rem; cursor: pointer; color: var(--text); }
+.mmr-lesson .mmr-line:hover:not(:disabled) { border-color: var(--teal); }
+.mmr-lesson .mmr-line.flag { border-color: #dc2626; background: #fef2f2; }
+.mmr-lesson .mmr-line.fixed { border-color: var(--correct-border); background: var(--correct-bg); }
+.mmr-lesson .mmr-line:disabled { cursor: default; }
+.mmr-lesson .mmr-ladder { display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: center; margin: 0.5rem 0 0.9rem; }
+.mmr-lesson .mmr-rung { display: flex; flex-direction: column; align-items: center; min-width: 4.2rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700; background: white; border: 2px solid var(--navy-mid); color: var(--navy); border-radius: 8px; padding: 0.4rem 0.3rem; cursor: pointer; }
+.mmr-lesson .mmr-rung small { font-weight: 500; color: var(--text-muted); font-size: 0.68rem; }
+.mmr-lesson .mmr-rung.start { background: #fef3c7; border-color: var(--amber); }
+.mmr-lesson .mmr-rung.target { background: var(--correct-bg); border-color: var(--teal); }
+.mmr-lesson .mmr-rung:disabled { cursor: default; }
+.mmr-lesson .mmr-cyls { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin: 0.3rem 0 0.8rem; text-align: center; }
+.mmr-lesson .mmr-cyl-label { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+.mmr-lesson s { text-decoration-thickness: 2px; text-decoration-color: #dc2626; color: var(--text-muted); }
+.mmr-lesson .mmr-ref { display: flex; flex-wrap: wrap; gap: 1rem; }
+.mmr-lesson .mmr-ref table { flex: 1; min-width: 220px; margin: 0.5rem 0; }
+.mmr-lesson details.mmr-details { background: var(--cream); border-radius: 8px; padding: 0.6rem 0.9rem; margin: 0.6rem 0; font-size: 0.88rem; }
+.mmr-lesson details.mmr-details summary { cursor: pointer; font-weight: 600; }
+.mmr-lesson .mmr-summary .mmr-code-label { margin: 0.6rem 0 0.2rem; font-weight: 600; }
+.mmr-lesson .mmr-summary .mmr-code { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--navy); border: 2px dashed var(--navy); border-radius: 10px; padding: 0.3rem 1rem; margin-bottom: 0.8rem; user-select: all; }
+.mmr-lesson .mmr-revisit { text-align: left; background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.8rem 1rem; margin: 0.8rem 0; font-size: 0.9rem; }
+.mmr-lesson .mmr-revisit ul { margin: 0.3rem 0 0; }
+`;
+    document.head.appendChild(style);
+  }
+
+  // =====================================================================
+  // Generic helpers
+  // =====================================================================
+  function practiceProblem(idSuffix, prompt, hint, answer) {
+    return `
+      <div class="practice-problem">
+        <div class="pp-header"><span class="pp-num">Q</span></div>
+        <div class="pp-body">
+          <p><strong>${escapeHtml(prompt)}</strong></p>
+          <button type="button" class="hint-btn" data-hint-target="mmrhint-${idSuffix}">💡 Hint</button>
+          <button type="button" class="reveal-btn" data-answer-target="mmrans-${idSuffix}">Reveal Answer</button>
+          <div class="hint-box" id="mmrhint-${idSuffix}">${escapeHtml(hint)}</div>
+          <div class="answer-box" id="mmrans-${idSuffix}">
+            <div class="answer-label">✓ Answer</div>
+            ${escapeHtml(answer)}
+          </div>
+        </div>
+      </div>`;
+  }
+  function toolBox(id, title) {
+    return `<div class="mmr-tool"><div class="mmr-tool-title">Mini-tool · ${escapeHtml(title)}</div><div id="${id}"></div></div>`;
+  }
+
+  // Runs a list of items one at a time. renderItem(item, bodyEl, markSolved, index).
+  function runSequence(mount, items, label, renderItem) {
+    function show(i) {
+      if (i >= items.length) {
+        mount.innerHTML = `<div class="mmr-tool-done">✓ ${escapeHtml(label)} complete — nice work.</div><p><button type="button" class="hint-btn" id="mmr-again">↺ Do it again</button></p>`;
+        mount.querySelector('#mmr-again').addEventListener('click', () => show(0));
+        return;
+      }
+      mount.innerHTML = `
+        <div class="mmr-tool-count">${escapeHtml(label)} · ${i + 1} of ${items.length}</div>
+        <div class="mmr-tool-body"></div>
+        <button type="button" class="mmr-next-btn" style="display:none;">${i + 1 < items.length ? 'Next problem' : 'Finish'}</button>`;
+      const nextBtn = mount.querySelector('.mmr-next-btn');
+      nextBtn.addEventListener('click', () => show(i + 1));
+      renderItem(items[i], mount.querySelector('.mmr-tool-body'), () => { nextBtn.style.display = 'inline-block'; }, i);
+    }
+    show(0);
+  }
+
+  function setFeedback(root, msg, ok) {
+    const fb = root.querySelector('.step-feedback');
+    if (!fb) return;
+    fb.textContent = msg;
+    fb.className = 'step-feedback ' + (ok ? 'ok' : 'bad');
+  }
+
+  function unitSelectHtml() {
+    return `<select class="mmr-select mmr-unit"><option value="">unit…</option>${UNIT_OPTIONS.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('')}</select>`;
+  }
+
+  // Number box + (optional) unit picker + Check. onCorrect fires once.
+  function appendAnswerBox(container, { prefix, answer, unit, unitText, onCorrect }) {
+    const box = document.createElement('div');
+    box.className = 'mmr-calc';
+    box.innerHTML = `
+      <div>${escapeHtml(prefix)} <input type="number" step="any" class="num-input mmr-ans" placeholder="?"> ${unit ? unitSelectHtml() : `<span>${escapeHtml(unitText || '')}</span>`}</div>
+      <button type="button" class="check-btn">Check</button>
+      <div class="step-feedback"></div>`;
+    container.appendChild(box);
+    const input = box.querySelector('.mmr-ans');
+    const checkBtn = box.querySelector('.check-btn');
+    let finished = false;
+    function check() {
+      if (finished || input.value === '') return;
+      const tol = Math.max(0.0005, Math.min(0.011, Math.abs(answer) * 0.004));
+      const numOk = Math.abs(Number(input.value) - answer) < tol;
+      const unitSel = box.querySelector('.mmr-unit');
+      const unitOk = !unit || (unitSel && unitSel.value === unit);
+      if (numOk && unitOk) {
+        finished = true;
+        input.disabled = true; checkBtn.disabled = true;
+        if (unitSel) unitSel.disabled = true;
+        setFeedback(box, `✓ Correct! ${prefix} ${formatNum(answer)}${unit ? ' ' + unit : (unitText ? ' ' + unitText : '')}`, true);
+        onCorrect();
+      } else if (numOk) {
+        setFeedback(box, 'Right number — now check the unit. Grams measure mass, mL/cm³ measure volume, g/mL or g/cm³ measure density.', false);
+      } else {
+        setFeedback(box, 'Not quite — redo the arithmetic and try again.', false);
+      }
+    }
+    checkBtn.addEventListener('click', check);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); check(); } });
+  }
+
+  // Single multiple-choice item. item: { prompt, choices, correct, why }
+  function renderMcItem(item, body, done) {
+    body.innerHTML = `
+      <p class="mmr-sentence">${escapeHtml(item.prompt)}</p>
+      <div class="mmr-options">${item.choices.map((c, i) => `<button type="button" class="mmr-option" data-i="${i}">${escapeHtml(c)}</button>`).join('')}</div>
+      <div class="step-feedback"></div>`;
+    let solved = false;
+    body.querySelectorAll('.mmr-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (solved) return;
+        if (Number(btn.getAttribute('data-i')) === item.correct) {
+          solved = true;
+          btn.classList.add('ok');
+          body.querySelectorAll('.mmr-option').forEach(b => { b.disabled = true; });
+          setFeedback(body, '✓ ' + item.why, true);
+          done();
+        } else {
+          btn.classList.add('bad');
+          setFeedback(body, 'Not quite — try another choice.', false);
+        }
+      });
+    });
+  }
+
+  function renderNumItem(item, body, done) {
+    body.innerHTML = `<p class="mmr-sentence">${escapeHtml(item.prompt)}</p><div class="mmr-solve-slot"></div>`;
+    appendAnswerBox(body.querySelector('.mmr-solve-slot'), { prefix: item.prefix, answer: item.answer, unit: null, unitText: item.unitText, onCorrect: done });
+  }
+
+  // =====================================================================
+  // Part 1 tool — walk the metric ladder
+  // =====================================================================
+  function renderLadderItem(item, body, done) {
+    const fromIdx = LADDER.findIndex(r => r[1] === item.from);
+    const toIdx = LADDER.findIndex(r => r[1] === item.to);
+    const steps = Math.abs(toIdx - fromIdx);
+    const dir = toIdx > fromIdx ? 'right' : 'left';
+    const fromU = item.from + item.base, toU = item.to + item.base;
+    body.innerHTML = `
+      <p class="mmr-sentence">Convert <strong>${formatNum(item.v)} ${fromU}</strong> to <strong>${toU}</strong>.</p>
+      <div class="mmr-ladder">${LADDER.map((r, i) => `<button type="button" class="mmr-rung${i === fromIdx ? ' start' : ''}" data-i="${i}"><span>${r[0]}</span><small>${i === 3 ? item.base : r[1] + item.base}</small></button>`).join('')}</div>
+      <p class="mmr-sentence"><strong>Step 1.</strong> Tap the rung you are converting <em>to</em>.</p>
+      <div class="step-feedback"></div>
+      <div class="mmr-solve-slot"></div>`;
+    const slot = body.querySelector('.mmr-solve-slot');
+    const rungs = [...body.querySelectorAll('.mmr-rung')];
+    rungs.forEach(r => {
+      r.addEventListener('click', () => {
+        if (r.disabled) return;
+        if (Number(r.getAttribute('data-i')) !== toIdx) {
+          setFeedback(body, `That is not ${toU}. Find the rung for ${toU}.`, false);
+          return;
+        }
+        rungs.forEach(x => { x.disabled = true; });
+        r.classList.add('target');
+        setFeedback(body, '✓ Now count how far you moved.', true);
+        slot.innerHTML = `
+          <p class="mmr-sentence"><strong>Step 2.</strong> The decimal moves
+            <select class="mmr-select" data-k="n"><option value="">?</option>${[1, 2, 3, 4].map(n => `<option value="${n}">${n}</option>`).join('')}</select>
+            place(s) to the
+            <select class="mmr-select" data-k="dir"><option value="">?</option><option value="left">left</option><option value="right">right</option></select>.</p>
+          <button type="button" class="check-btn">Check</button>
+          <div class="step-feedback mmr-fb2"></div>
+          <div class="mmr-step3"></div>`;
+        const fb2 = slot.querySelector('.mmr-fb2');
+        const btn = slot.querySelector('.check-btn');
+        btn.addEventListener('click', () => {
+          const n = slot.querySelector('[data-k="n"]').value, d = slot.querySelector('[data-k="dir"]').value;
+          if (Number(n) === steps && d === dir) {
+            btn.disabled = true;
+            slot.querySelectorAll('select').forEach(s => { s.disabled = true; });
+            fb2.textContent = `✓ ${steps} step${steps > 1 ? 's' : ''} ${dir === 'right' ? 'down the ladder (big → small): the number gets bigger' : 'up the ladder (small → big): the number gets smaller'}.`;
+            fb2.className = 'step-feedback mmr-fb2 ok';
+            appendAnswerBox(slot.querySelector('.mmr-step3'), { prefix: `${formatNum(item.v)} ${fromU} =`, answer: item.ans, unit: null, unitText: toU, onCorrect: done });
+          } else {
+            fb2.textContent = 'Count the rungs between the two units. Big unit → small unit moves the decimal right (bigger number).';
+            fb2.className = 'step-feedback mmr-fb2 bad';
+          }
+        });
+      });
+    });
+  }
+
+  // =====================================================================
+  // Part 2 tool — water displacement with graduated cylinders
+  // =====================================================================
+  function cylinderSvg(ml, withObj) {
+    const top = 20, h = 160, max = 50, y = top + h - (ml / max) * h;
+    let ticks = '';
+    for (let t = 0; t <= max; t += 10) {
+      const yy = top + h - (t / max) * h;
+      ticks += `<line x1="35" y1="${yy}" x2="45" y2="${yy}" stroke="#253a52" stroke-width="1.5"/><text x="30" y="${yy + 4}" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="#5a6475">${t}</text>`;
+    }
+    return `<svg viewBox="0 0 130 200" width="130" height="200" role="img" aria-label="Graduated cylinder reading ${ml} mL">
+      <rect x="36" y="${y}" width="48" height="${top + h - y}" fill="#bae6fd"/>
+      <rect x="35" y="20" width="50" height="160" fill="none" stroke="#253a52" stroke-width="2"/>
+      ${ticks}
+      ${withObj ? '<circle cx="60" cy="167" r="10" fill="#f4a261" stroke="#92400e" stroke-width="2"/>' : ''}
+      <text x="60" y="196" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="#1a1a2e">${ml.toFixed(1)} mL</text>
+    </svg>`;
+  }
+  function renderMeasureItem(item, body, done) {
+    if (item.kind === 'mc') return renderMcItem(item, body, done);
+    if (item.kind === 'num') return renderNumItem(item, body, done);
+    body.innerHTML = `
+      <p class="mmr-sentence">An object is lowered into a graduated cylinder. <strong>What is the volume of the object?</strong> (Volume of object = with − without.)</p>
+      <div class="mmr-cyls">
+        <div><div class="mmr-cyl-label">Without the object</div>${cylinderSvg(item.before, false)}</div>
+        <div><div class="mmr-cyl-label">With the object</div>${cylinderSvg(item.after, true)}</div>
+      </div>
+      <div class="mmr-solve-slot"></div>`;
+    appendAnswerBox(body.querySelector('.mmr-solve-slot'), { prefix: `${item.after.toFixed(1)} − ${item.before.toFixed(1)} =`, answer: roundNice(item.after - item.before), unit: null, unitText: 'mL', onCorrect: done });
+  }
+
+  // =====================================================================
+  // Part 3 tools — label the numbers, then identify the metal
+  // =====================================================================
+  function renderTagItem(prob, body, done) {
+    const nums = prob.parts.filter(p => typeof p !== 'string');
+    const sentence = prob.parts.map(p => typeof p === 'string' ? escapeHtml(p) : `<span class="mmr-chip">${escapeHtml(p.n)}</span>`).join('');
+    const roleOpts = `<option value="">Choose…</option><option value="D">D — density</option><option value="M">M — mass</option><option value="V">V — volume</option><option value="X">Not used in D = M/V</option>`;
+    body.innerHTML = `
+      <p class="mmr-sentence">${sentence}</p>
+      ${nums.map((p, i) => `<div class="mmr-tag-row" data-row="${i}"><span class="mmr-chip">${escapeHtml(p.n)}</span><select class="mmr-select" data-row="${i}">${roleOpts}</select><span class="mmr-mark"></span></div>`).join('')}
+      <div class="mmr-tag-row" data-row="solve"><span class="mmr-solve-label">We are solving for…</span><select class="mmr-select" data-row="solve"><option value="">Choose…</option><option value="D">D — density</option><option value="M">M — mass</option><option value="V">V — volume</option></select><span class="mmr-mark"></span></div>
+      <button type="button" class="check-btn">Check</button>
+      <div class="step-feedback"></div>`;
+    const checkBtn = body.querySelector('.check-btn');
+    checkBtn.addEventListener('click', () => {
+      let allOk = true;
+      body.querySelectorAll('.mmr-tag-row').forEach(row => {
+        const key = row.getAttribute('data-row');
+        const want = key === 'solve' ? prob.solve : nums[Number(key)].role;
+        const ok = row.querySelector('select').value === want;
+        if (!ok) allOk = false;
+        row.classList.toggle('ok', ok);
+        row.classList.toggle('bad', !ok);
+        row.querySelector('.mmr-mark').textContent = ok ? '✓' : '✗';
+      });
+      if (allOk) {
+        body.querySelectorAll('select').forEach(s => { s.disabled = true; });
+        checkBtn.disabled = true;
+        setFeedback(body, '✓ Every number is labeled and you know what to solve for.', true);
+        done();
+      } else {
+        setFeedback(body, 'Not quite. Units are clues: g = mass · mL or cm³ = volume · g/mL or g/cm³ = density. The unknown is the thing the question asks for.', false);
+      }
+    });
+  }
+
+  function renderMetalItem(item, body, done) {
+    body.innerHTML = `
+      <p class="mmr-sentence">${escapeHtml(item.text)}</p>
+      <div class="mmr-solve-slot"></div>
+      <div class="mmr-pick-slot"></div>`;
+    const pick = body.querySelector('.mmr-pick-slot');
+    appendAnswerBox(body.querySelector('.mmr-solve-slot'), {
+      prefix: `D = m ÷ V = ${item.m.toFixed(1)} ÷ ${item.V.toFixed(1)} =`, answer: item.D, unit: null, unitText: 'g/mL',
+      onCorrect: () => {
+        pick.innerHTML = `
+          <p class="mmr-sentence"><strong>Which substance is it?</strong> Compare your density to the table.</p>
+          <div class="mmr-options">${DENSITIES.map(d => `<button type="button" class="mmr-option" data-n="${d[0]}">${d[0]} · ${d[1]} g/mL</button>`).join('')}</div>
+          <div class="step-feedback"></div>`;
+        let solved = false;
+        pick.querySelectorAll('.mmr-option').forEach(btn => {
+          btn.addEventListener('click', () => {
+            if (solved) return;
+            const name = btn.getAttribute('data-n');
+            if (name === item.metal) {
+              solved = true;
+              btn.classList.add('ok');
+              pick.querySelectorAll('.mmr-option').forEach(b => { b.disabled = true; });
+              setFeedback(pick, `✓ ${item.D} g/mL matches ${item.metal}. Density is intensive, so it identifies the substance.`, true);
+              done();
+            } else {
+              btn.classList.add('bad');
+              const d = DENSITIES.find(x => x[0] === name)[1];
+              setFeedback(pick, `${name} is ${d} g/mL — that does not match ${item.D} g/mL.`, false);
+            }
+          });
+        });
+      }
+    });
+  }
+
+  // =====================================================================
+  // Part 4 tools — draw the X, density as a proportion, "why it works"
+  // =====================================================================
+  function appendSolveBlock(container, p, unitText, onCorrect) {
+    const lab = k => k === p.key ? p.v : formatNum(p[k]);
+    const { coef, product, answer } = solveProp(p);
+    const wrap = document.createElement('div');
+    wrap.className = 'eqv-flow';
+    wrap.innerHTML = `
+      ${eqvArrow('multiply the diagonal without ' + p.v)}
+      ${eqRow(lab('a'), TIMES, lab('d'), EQ, lab('b'), TIMES, lab('c'))}
+      ${eqvArrow('simplify')}
+      ${eqRow(formatNum(coef), TIMES, escapeHtml(p.v), EQ, formatNum(product))}
+      ${eqvArrow('divide by the number left (' + formatNum(coef) + ')')}`;
+    container.appendChild(wrap);
+    appendAnswerBox(container, { prefix: p.v + ' =', answer, unit: null, unitText, onCorrect });
+  }
+
+  const DIAGONAL = { a: 'd', d: 'a', b: 'c', c: 'b' };
+  function renderCrossItem(p, body, done) {
+    const cell = k => `<button type="button" class="mmr-cell${k === p.key ? ' unknown' : ''}" data-key="${k}">${escapeHtml(k === p.key ? p.v : formatNum(p[k]))}</button>`;
+    body.innerHTML = `
+      <p class="mmr-sentence"><strong>Step 1.</strong> Tap two numbers that sit corner to opposite corner. Then tap the other two corners.</p>
+      <div class="mmr-xlab">
+        <svg class="mmr-xsvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        ${eqRow(eqvFrac(cell('a'), cell('b')), EQ, eqvFrac(cell('c'), cell('d')))}
+      </div>
+      <div class="step-feedback"></div>
+      <div class="mmr-solve-slot"></div>`;
+    const lab = body.querySelector('.mmr-xlab');
+    const svg = body.querySelector('.mmr-xsvg');
+    const slot = body.querySelector('.mmr-solve-slot');
+    const cells = {};
+    body.querySelectorAll('.mmr-cell').forEach(c => { cells[c.getAttribute('data-key')] = c; });
+    let pending = null;
+    const pairs = [];
+    function center(el) {
+      const r = lab.getBoundingClientRect(), c = el.getBoundingClientRect();
+      return { x: c.left - r.left + c.width / 2, y: c.top - r.top + c.height / 2 };
+    }
+    function drawLine(k1, k2, color) {
+      const a = center(cells[k1]), b = center(cells[k2]);
+      svg.insertAdjacentHTML('beforeend', `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${color}" stroke-width="3" stroke-linecap="round" opacity="0.8"/>`);
+    }
+    Object.keys(cells).forEach(k => {
+      cells[k].addEventListener('click', () => {
+        if (pairs.length >= 2 || pairs.some(pr => pr.includes(k))) return;
+        if (pending === null) {
+          pending = k; cells[k].classList.add('sel');
+          setFeedback(body, 'Now tap the number in the opposite corner.', true);
+        } else if (pending === k) {
+          cells[k].classList.remove('sel'); pending = null;
+        } else if (DIAGONAL[pending] === k) {
+          const idx = pairs.length;
+          pairs.push([pending, k]);
+          [pending, k].forEach(x => { cells[x].classList.remove('sel'); cells[x].classList.add('pair' + idx); });
+          drawLine(pending, k, idx === 0 ? '#f4a261' : '#2ec4b6');
+          pending = null;
+          if (pairs.length === 2) {
+            Object.values(cells).forEach(c => { c.disabled = true; });
+            setFeedback(body, '✓ That’s the X. Each pair multiplies together.', true);
+            appendSolveBlock(slot, p, '', done);
+          } else {
+            setFeedback(body, '✓ One diagonal down. Tap the other two corners.', true);
+          }
+        } else {
+          cells[pending].classList.remove('sel'); pending = null;
+          setFeedback(body, 'Those two are in the same row or column. The cross goes corner to opposite corner — try again.', false);
+        }
+      });
+    });
+  }
+
+  function renderScaleItem(item, body, done) {
+    body.innerHTML = `
+      <p class="mmr-sentence">${escapeHtml(item.word)}</p>
+      <p class="mmr-sentence"><strong>Which proportion matches?</strong> Density is a ratio over 1 mL. Grams on top on both sides — for a mass, x goes on top; for a volume, x goes on the bottom.</p>
+      <div class="mmr-options"></div>
+      <div class="step-feedback"></div>
+      <div class="mmr-solve-slot"></div>`;
+    const optsEl = body.querySelector('.mmr-options');
+    const slot = body.querySelector('.mmr-solve-slot');
+    item.options.forEach((o, i) => {
+      optsEl.insertAdjacentHTML('beforeend', `<button type="button" class="mmr-option" data-i="${i}">${eqRow(eqvFrac(escapeHtml(o.n1), escapeHtml(o.d1)), EQ, eqvFrac(escapeHtml(o.n2), escapeHtml(o.d2)))}</button>`);
+    });
+    let solved = false;
+    optsEl.querySelectorAll('.mmr-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (solved) return;
+        const o = item.options[Number(btn.getAttribute('data-i'))];
+        if (o.ok) {
+          solved = true; btn.classList.add('ok');
+          optsEl.querySelectorAll('.mmr-option').forEach(b => { b.disabled = true; });
+          setFeedback(body, '✓ Yes — grams on top on both sides, mL on the bottom, each pair from the same sample.', true);
+          appendSolveBlock(slot, item.p, item.unit, done);
+        } else {
+          btn.classList.add('bad');
+          setFeedback(body, o.why, false);
+        }
+      });
+    });
+  }
+
+  function renderStepItem(target, body, done) {
+    body.innerHTML = `
+      <p class="mmr-sentence"><strong>Solve for ${target.solve}.</strong> ${escapeHtml(target.word)}</p>
+      <div class="eqv-flow mmr-flow">${START_ROW}</div>
+      <div class="mmr-ops"></div>
+      <div class="step-feedback"></div>
+      <div class="mmr-calc-slot"></div>`;
+    const flow = body.querySelector('.mmr-flow');
+    const opsEl = body.querySelector('.mmr-ops');
+    const slot = body.querySelector('.mmr-calc-slot');
+    let stepIdx = 0;
+    const choices = STEP_OPS.map(op => ({ op, label: op + ' both sides' })).concat([{ op: 'none', label: 'Nothing — it’s already alone' }]);
+    opsEl.innerHTML = choices.map(c => `<button type="button" class="mmr-op-btn" data-op="${escapeHtml(c.op)}">${escapeHtml(c.label)}</button>`).join('');
+
+    function finishAlgebra() {
+      opsEl.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      setFeedback(body, `✓ ${target.solve} is alone. Now do the math with the numbers from the problem.`, true);
+      appendAnswerBox(slot, { prefix: target.calc.text + ' =', answer: target.calc.answer, unit: target.calc.unit, onCorrect: done });
+    }
+    opsEl.querySelectorAll('.mmr-op-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const op = btn.getAttribute('data-op');
+        const expected = target.steps.length === 0 ? 'none' : target.steps[stepIdx].op;
+        if (op === expected) {
+          if (op === 'none') {
+            flow.insertAdjacentHTML('beforeend', eqvArrow(target.noneLabel) + target.noneRow);
+            finishAlgebra();
+          } else {
+            const step = target.steps[stepIdx];
+            flow.insertAdjacentHTML('beforeend', eqvArrow(step.op + ' on both sides') + step.row);
+            stepIdx++;
+            setFeedback(body, '✓ Good move. What’s next?', true);
+            if (stepIdx >= target.steps.length) finishAlgebra();
+          }
+        } else {
+          btn.classList.add('bad');
+          setTimeout(() => btn.classList.remove('bad'), 400);
+          const hint = (op === 'none' || target.steps.length === 0) ? target.noneHint : target.steps[stepIdx].hint;
+          setFeedback(body, 'Not that one. ' + hint, false);
+        }
+      });
+    });
+  }
+
+  // =====================================================================
+  // Parts 5-6 tool — build the conversion-factor chain (units cancel as you go)
+  // =====================================================================
+  function renderChainItem(item, body, done, idx) {
+    body.innerHTML = `
+      <p class="mmr-sentence">${escapeHtml(item.prompt)}</p>
+      <div class="mmr-path-slot"></div>
+      <div class="mmr-expr"></div>
+      <div class="mmr-options"></div>
+      <div class="step-feedback"></div>
+      <div class="mmr-solve-slot"></div>`;
+    const pathSlot = body.querySelector('.mmr-path-slot');
+    const exprEl = body.querySelector('.mmr-expr');
+    const optsEl = body.querySelector('.mmr-options');
+    const solveSlot = body.querySelector('.mmr-solve-slot');
+    const unitHtml = u => u.struck ? `<s>${escapeHtml(u.u)}</s>` : escapeHtml(u.u);
+    const terms = [{ num: { v: item.given[0], u: item.given[1], struck: false }, den: null }];
+    let stepIdx = 0;
+
+    function drawExpr() {
+      exprEl.innerHTML = eqRow(terms.map((t, i) => i === 0
+        ? eqvFrac(`${formatNum(t.num.v)} ${unitHtml(t.num)}`, '1')
+        : `${TIMES} ${eqvFrac(`${formatNum(t.num.v)} ${unitHtml(t.num)}`, `${formatNum(t.den.v)} ${unitHtml(t.den)}`)}`).join(' '));
+    }
+    function showStep() {
+      drawExpr();
+      if (stepIdx >= item.steps.length) {
+        optsEl.innerHTML = '';
+        setFeedback(body, `✓ Every unit cancels except ${item.want}. Multiply the tops, divide by the bottoms.`, true);
+        appendAnswerBox(solveSlot, { prefix: 'Answer =', answer: item.ans, unit: null, unitText: item.want, onCorrect: done });
+        return;
+      }
+      const step = item.steps[stepIdx];
+      const rot = (idx + stepIdx) % 3;
+      const order = step.options.map((_, i) => step.options[(i + rot) % 3]);
+      optsEl.innerHTML = `<p class="mmr-sentence"><strong>Pick the factor that cancels ${escapeHtml(step.from)}</strong> (to get ${escapeHtml(step.to)}):</p>` +
+        order.map((o, i) => `<button type="button" class="mmr-option" data-i="${i}">${eqRow(eqvFrac(`${formatNum(o.nv)} ${escapeHtml(o.nu)}`, `${formatNum(o.dv)} ${escapeHtml(o.du)}`))}</button>`).join('');
+      optsEl.querySelectorAll('.mmr-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const o = order[Number(btn.getAttribute('data-i'))];
+          if (o.ok) {
+            terms[terms.length - 1].num.struck = true;
+            terms.push({ num: { v: o.nv, u: o.nu, struck: false }, den: { v: o.dv, u: o.du, struck: true } });
+            stepIdx++;
+            setFeedback(body, `✓ ${step.from} cancels.`, true);
+            showStep();
+          } else {
+            btn.classList.add('bad');
+            setFeedback(body, o.why, false);
+          }
+        });
+      });
+    }
+    function startSteps() { setFeedback(body, '', true); showStep(); }
+
+    if (item.paths) {
+      pathSlot.innerHTML = `<p class="mmr-sentence"><strong>Plan the path first.</strong> Which path of units do you pass through?</p>
+        <div class="mmr-options">${item.paths.map((p, i) => `<button type="button" class="mmr-option" data-i="${i}">${escapeHtml(p)}</button>`).join('')}</div>`;
+      let picked = false;
+      pathSlot.querySelectorAll('.mmr-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (picked) return;
+          if (Number(btn.getAttribute('data-i')) === item.pathOk) {
+            picked = true; btn.classList.add('ok');
+            pathSlot.querySelectorAll('.mmr-option').forEach(b => { b.disabled = true; });
+            setFeedback(body, '✓ ' + item.pathWhy, true);
+            showStep();
+          } else {
+            btn.classList.add('bad');
+            setFeedback(body, 'Not that path. Each arrow is one conversion factor, and you cannot skip from volume to mass without density.', false);
+          }
+        });
+      });
+    } else {
+      startSteps();
+    }
+  }
+
+  // =====================================================================
+  // Part 7 tools — find the wrong line, explain it (claim–evidence–reasoning)
+  // =====================================================================
+  function renderErrorItem(item, body, done) {
+    body.innerHTML = `
+      <p class="mmr-sentence"><strong>${escapeHtml(item.title)}</strong> — one line has a mistake. Tap it.</p>
+      <div class="mmr-lines">${item.lines.map((l, i) => `<button type="button" class="mmr-line" data-i="${i}">${escapeHtml(l)}</button>`).join('')}</div>
+      <div class="mmr-fix-slot"></div>
+      <div class="step-feedback"></div>`;
+    const linesEl = body.querySelector('.mmr-lines');
+    const fixSlot = body.querySelector('.mmr-fix-slot');
+    let flagged = false;
+    linesEl.querySelectorAll('.mmr-line').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (flagged) return;
+        if (Number(btn.getAttribute('data-i')) !== item.wrong) {
+          setFeedback(body, 'That line is fine. Check the other steps again.', false);
+          return;
+        }
+        flagged = true;
+        btn.classList.add('flag');
+        setFeedback(body, 'Yes, that line is wrong. What should it say?', true);
+        fixSlot.innerHTML = `<div class="mmr-fixes">${item.fixes.map((f, j) => `<button type="button" class="mmr-option" data-j="${j}">${escapeHtml(f)}</button>`).join('')}</div>`;
+        fixSlot.querySelectorAll('.mmr-option').forEach(fb => {
+          fb.addEventListener('click', () => {
+            if (Number(fb.getAttribute('data-j')) === item.fix) {
+              fixSlot.querySelectorAll('.mmr-option').forEach(b => { b.disabled = true; });
+              fb.classList.add('ok');
+              btn.classList.remove('flag'); btn.classList.add('fixed');
+              btn.textContent = item.fixes[item.fix];
+              linesEl.querySelectorAll('.mmr-line').forEach(b => { b.disabled = true; });
+              setFeedback(body, '✓ Fixed. ' + item.why, true);
+              done();
+            } else {
+              fb.classList.add('bad');
+              setFeedback(body, 'Not quite — try another fix.', false);
+            }
+          });
+        });
+      });
+    });
+  }
+
+  function renderCerItem(item, body, done) {
+    body.innerHTML = `<p class="mmr-sentence">${escapeHtml(item.scenario)}</p><div class="mmr-stages"></div>`;
+    const stages = body.querySelector('.mmr-stages');
+    function runStage(i) {
+      if (i >= item.stages.length) { done(); return; }
+      const st = item.stages[i];
+      const box = document.createElement('div');
+      box.className = 'mmr-stage';
+      stages.appendChild(box);
+      renderMcItem({ prompt: st.label + ' — ' + st.prompt, choices: st.choices, correct: st.correct, why: st.why }, box, () => runStage(i + 1));
+    }
+    runStage(0);
+  }
+
+  // =====================================================================
+  // Section content
+  // =====================================================================
+  function referenceBoxHtml() {
+    return `
+      <div class="mmr-ref">
+        <table>
+          <thead><tr><th colspan="2">Conversion toolbox</th></tr></thead>
+          <tbody>
+            <tr><td>1 km = 1000 m</td><td>1 kg = 1000 g</td></tr>
+            <tr><td>1 m = 100 cm</td><td>1 g = 1000 mg</td></tr>
+            <tr><td>1 m = 1000 mm</td><td>1 L = 1000 mL</td></tr>
+            <tr><td>1 cm = 10 mm</td><td>1 mL = 1 cm³</td></tr>
+            <tr><td>1 min = 60 s</td><td>1 h = 60 min</td></tr>
+            <tr><td>1 day = 24 h</td><td>1 week = 7 days</td></tr>
+          </tbody>
+        </table>
+        <table>
+          <thead><tr><th>Substance</th><th>Density (g/mL)</th></tr></thead>
+          <tbody>${DENSITIES.map(d => `<tr><td>${d[0]}</td><td>${d[1]}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+  }
+
+  function startHereHtml() {
+    return `
+      <p>This review covers the <strong>entire Mini Math Unit</strong>: metric units, mass and volume, density, cross multiply and divide, and unit conversions (dimensional analysis). Each part has a quick refresher, interactive mini-tools, and practice problems. The last section is a <strong>graded check</strong> in the same style as your Mini Math Check — it saves your score and gives you a completion code.</p>
+      <p><strong>How the review lines up with the unit:</strong></p>
+      <table>
+        <thead><tr><th>Targets</th><th>Skill</th><th>Review part</th></tr></thead>
+        <tbody>${COVERAGE.map(r => `<tr><td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1])}</td><td>${escapeHtml(r[2])}</td></tr>`).join('')}</tbody>
+      </table>
+      <p><strong>Your reference box</strong> (the same equalities and densities you can use on the Mini Math Check — keep it handy):</p>
+      ${referenceBoxHtml()}
+      <div class="concept-box"><div class="concept-label">Which tool?</div><p>Mass + volume → density: <strong>D = m ÷ V</strong>. Density given, mass or volume wanted: <strong>cross multiply and divide</strong>. Changing units: <strong>dimensional analysis</strong>. Changing units <em>and</em> using density: <strong>dimensional analysis with density as a factor</strong>.</p></div>`;
+  }
+
+  function partHtml(i) {
+    const xref = t => `<div class="mmr-xref">📎 Mini Math Unit: ${escapeHtml(t)}</div>`;
+    if (i === 1) return `
+      ${xref('Lesson M1 · Metric Units (targets M1.1–M1.3)')}
+      <div class="concept-box"><div class="concept-label">Remember</div><p>The metric system is built on powers of ten. Base units: <strong>gram</strong> (mass), <strong>liter</strong> (volume), <strong>meter</strong> (length). Prefixes: <strong>kilo-</strong> = 1000, <strong>centi-</strong> = 1/100, <strong>milli-</strong> = 1/1000. Going from a big unit to a small unit makes the number <strong>bigger</strong>.</p></div>
+      ${eqRow(eqvFrac('1000 g', '1 kg'), '<span class="eqv-op">and</span>', eqvFrac('1 kg', '1000 g'))}
+      <p class="mmr-sentence">A conversion factor is an equality written as a fraction, so it equals one.</p>
+      ${toolBox('mmr-tool-1', 'Walk the metric ladder')}
+      <h3>Practice</h3>
+      ${practiceProblem('1a', 'Write 1 km = 1000 m as two conversion factors.', 'An equality can be written two ways as a fraction — flip it.', '1 km / 1000 m  and  1000 m / 1 km.')}
+      ${practiceProblem('1b', 'Which is longer, 62 cm or 0.7 m? Explain.', 'Change both to the same unit first.', '0.7 m = 70 cm, and 70 cm > 62 cm, so 0.7 m is longer.')}`;
+    if (i === 2) return `
+      ${xref('Lesson 4 · Mass Communication (targets 4.1–4.2)')}
+      <div class="concept-box"><div class="concept-label">Remember</div><p><strong>Mass</strong> is the amount of matter in an object (balance, in g or kg). <strong>Volume</strong> is the amount of space it takes up (graduated cylinder, in mL; 1 mL = 1 cm³). Read the bottom of the curve (meniscus) at eye level, record mass to 0.1 g and volume to 0.1 mL. For an irregular object: <strong>volume = with − without</strong> (water displacement).</p></div>
+      ${toolBox('mmr-tool-2', 'Measure it')}
+      <h3>Practice</h3>
+      ${practiceProblem('2a', 'A cylinder reads 22.0 mL. After a metal bolt is added it reads 27.4 mL. What is the volume of the bolt?', 'Volume of object = with − without.', '27.4 − 22.0 = 5.4 mL.')}
+      ${practiceProblem('2b', 'What is the difference between mass and volume?', 'One is about matter, one is about space.', 'Mass is the amount of matter in an object; volume is the amount of space it takes up.')}`;
+    if (i === 3) return `
+      ${xref('Lesson 5 · All That Glitters (targets 5.1–5.3)')}
+      <div class="concept-box"><div class="concept-label">Remember</div><p><strong>Density</strong> is mass per unit volume: <strong>D = m ÷ V</strong>, in g/mL. Density is an <strong>intensive</strong> property — it does not depend on the amount — so it can identify a substance. Mass and volume are <strong>extensive</strong>. Round to the tenths place.</p></div>
+      ${eqRow('D', EQ, eqvFrac('m', 'V'))}
+      <div class="mmr-ref">
+        <table>
+          <thead><tr><th>Substance</th><th>Density (g/mL)</th></tr></thead>
+          <tbody>${DENSITIES.map(d => `<tr><td>${d[0]}</td><td>${d[1]}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+      ${toolBox('mmr-tool-3a', 'Label every number')}
+      ${toolBox('mmr-tool-3b', 'Metal detective')}
+      ${toolBox('mmr-tool-3c', 'Intensive or extensive?')}
+      <h3>Practice</h3>
+      ${practiceProblem('3a', 'A 3.0 mL sample has a mass of 8.1 g. What is its density, and what is it?', 'D = m ÷ V, then compare to the table.', 'D = 8.1 ÷ 3.0 = 2.7 g/mL → aluminum.')}
+      ${practiceProblem('3b', 'True or false: a bigger piece of copper has a bigger density than a smaller piece of copper.', 'Is density intensive or extensive?', 'False. Density is intensive — both pieces are 9.0 g/mL.')}`;
+    if (i === 4) return `
+      ${xref('Lesson M2 · Cross Multiply and Divide (targets M2.1–M2.3) · also the Density & Cross-Multiplying Practice')}
+      <div class="concept-box"><div class="concept-label">Rule</div><p>A <strong>proportion</strong> says two ratios are equal. Keep the same unit in the same position on both sides. To solve: <strong>multiply the diagonal without x, then divide by the number left</strong> (across from x). Density is a ratio too: 2.7 g/mL means <strong>2.7 g over 1 mL</strong>. To find a mass, put x on top; to find a volume, put x on the bottom.</p></div>
+      <div class="worked-example"><div class="we-label">Example — aluminum is 2.7 g/mL; mass of 4.0 mL?</div>
+        <div class="eqv-flow">
+          ${eqRow(eqvFrac('2.7 g', '1 mL'), EQ, eqvFrac('x g', '4.0 mL'))}
+          ${eqvArrow('2.7 × 4.0 ÷ 1')}
+          ${eqRow('x', EQ, '10.8 g')}
+        </div></div>
+      ${toolBox('mmr-tool-4a', 'Draw the X, then solve')}
+      ${toolBox('mmr-tool-4b', 'Density as a proportion')}
+      <h3>Challenge: why does it work?</h3>
+      <p>Cross multiplying is the same thing as undoing operations on both sides. Rearrange D = M/V yourself:</p>
+      ${toolBox('mmr-tool-4c', 'Pick each algebra move')}
+      <h3>Practice</h3>
+      ${practiceProblem('4a', 'Solve 4/x = 10/15.', 'Multiply the diagonal without x: 4 × 15.', '4 × 15 = 10 × x → 60 = 10x → x = 6.')}
+      ${practiceProblem('4b', 'Brass is 8.4 g/mL. What is the mass of 5.0 mL of brass?', 'Write 8.4 g over 1 mL, with x grams over 5.0 mL.', '8.4 g/1 mL = x g/5.0 mL → x = 8.4 × 5.0 ÷ 1 = 42 g.')}
+      ${practiceProblem('4c', 'Lead is 11.4 g/mL. What volume does 57 g of lead take up?', 'For a volume, x goes on the bottom.', '11.4 g/1 mL = 57 g/x mL → x = 57 × 1 ÷ 11.4 = 5.0 mL.')}`;
+    if (i === 5) return `
+      ${xref('Lesson M3 · 1–2 Step Unit Conversions (targets M3.1–M3.3)')}
+      <div class="concept-box"><div class="concept-label">Steps</div><p>1) Write the given number and unit <strong>over 1</strong>. 2) Multiply by a conversion factor with the <strong>unwanted unit on the bottom</strong>. 3) Cancel the units, then multiply the tops and divide by the bottoms. 4) Units do not cancel? <strong>Flip the factor.</strong> For two steps, keep adding factors until only the wanted unit is left.</p></div>
+      <div class="worked-example"><div class="we-label">Example — two steps</div>
+        <div class="eqv-flow">${eqRow(eqvFrac('3.0 <s>h</s>', '1'), TIMES, eqvFrac('60 min', '1 <s>h</s>'), TIMES, eqvFrac('60 s', '1 min'), EQ, '10,800 s')}</div></div>
+      ${toolBox('mmr-tool-5', 'Build the conversion')}
+      <h3>Practice</h3>
+      ${practiceProblem('5a', 'Convert 7.5 L to mL.', 'Put the unit you want to cancel (L) on the bottom.', '7.5 L/1 × (1000 mL / 1 L) = 7,500 mL.')}
+      ${practiceProblem('5b', 'Convert 250 g to kg.', 'Which factor has g on the bottom?', '250 g/1 × (1 kg / 1000 g) = 0.25 kg.')}
+      ${practiceProblem('5c', 'Convert 0.8 km to mm (two steps).', 'km → m → mm.', '0.8 km/1 × (1000 m / 1 km) × (1000 mm / 1 m) = 800,000 mm.')}`;
+    if (i === 6) return `
+      ${xref('Lesson M4 · 2–3 Step Unit Conversions (targets M4.1–M4.3)')}
+      <div class="concept-box"><div class="concept-label">Remember</div><p><strong>Plan a path of units</strong> before you start — every arrow is one conversion factor. <strong>Density is a conversion factor too:</strong> it bridges volume (mL) and mass (g). Flip it to go from mass to volume. Then ask: <strong>is my answer reasonable?</strong> (Big unit → small unit should give a bigger number.)</p></div>
+      <div class="worked-example"><div class="we-label">Example — mL → g → kg</div>
+        <div class="eqv-flow">${eqRow(eqvFrac('300 <s>mL</s>', '1'), TIMES, eqvFrac('2.7 g', '1 <s>mL</s>'), TIMES, eqvFrac('1 kg', '1000 g'), EQ, '0.81 kg of aluminum')}</div></div>
+      ${toolBox('mmr-tool-6', 'Plan the path, then build it')}
+      <h3>Practice</h3>
+      ${practiceProblem('6a', 'How many minutes are in 2.0 days? Write the path first.', 'days → h → min.', 'days → h → min: 2.0 days/1 × (24 h / 1 day) × (60 min / 1 h) = 2,880 min.')}
+      ${practiceProblem('6b', 'How many grams are in 0.50 L of water? (Water is 1.0 g/mL.)', 'L → mL → g.', '0.50 L/1 × (1000 mL / 1 L) × (1.0 g / 1 mL) = 500 g.')}
+      ${practiceProblem('6c', 'Is it reasonable that 3.0 kg = 0.003 g?', 'Big unit → small unit should make the number bigger.', 'No. kg is bigger than g, so the number should get bigger: 3.0 kg = 3,000 g.')}`;
+    return `
+      ${xref('Mini Math Review page — “Which tool?”, fix the mistake, Explain It')}
+      <div class="concept-box"><div class="concept-label">Check your work</div><p>Before you move on, ask: Did I pick the right tool? Did I put the unwanted unit on the bottom so it cancels? Did I cross multiply corner to opposite corner? Does my unit match what I was solving for? Is the answer reasonable?</p></div>
+      ${toolBox('mmr-tool-7a', 'Which tool do I use?')}
+      ${toolBox('mmr-tool-7b', 'Find the mistake')}
+      ${toolBox('mmr-tool-7c', 'Explain it (claim · evidence · reasoning)')}
+      <h3>Practice</h3>
+      ${practiceProblem('7a', 'Which tool: “Find the volume, in L, of 2.7 kg of aluminum (2.7 g/mL).”', 'You are changing units and using density.', 'Dimensional analysis with density as a factor: 2.7 kg/1 × (1000 g / 1 kg) × (1 mL / 2.7 g) × (1 L / 1000 mL) = 1.0 L.')}
+      ${practiceProblem('7b', 'In your own words: when do you use cross multiply and divide, and when do you use dimensional analysis?', 'Think about what is given and what is changing.', 'Cross multiply and divide when two ratios are equal and one number is missing (like density, recipes, prices). Dimensional analysis when changing units, especially in more than one step.')}`;
+  }
+
+  // =====================================================================
+  // Graded check
+  // =====================================================================
+  function renderQuiz(mount, ctx) {
+    const progress = ctx.getProgress();
+    if (progress && progress.status === 'completed') { renderQuizSummary(mount, ctx); return; }
+    const answers = (progress && progress.answers) || [];
+    if (answers.length >= QUESTIONS.length) { finishQuiz(mount, ctx, answers); return; }
+    renderQuizQuestion(mount, ctx, answers, answers.length);
+  }
+
+  function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const q = QUESTIONS[index];
+    const pct = Math.round((index / QUESTIONS.length) * 100);
+    mount.innerHTML = `
+      <div class="quiz-question-count">Question ${index + 1} of ${QUESTIONS.length}</div>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <p class="quiz-prompt">${escapeHtml(q.prompt)}</p>
+      <div id="mmr-answer-area"></div>
+      <div id="mmr-feedback-area"></div>
+      <button type="button" class="mmr-next-btn" id="mmr-next-btn" style="display:none;">${index + 1 < QUESTIONS.length ? 'Next Question' : 'See my score'}</button>`;
+    const answerArea = mount.querySelector('#mmr-answer-area');
+    const feedbackArea = mount.querySelector('#mmr-feedback-area');
+    const nextBtn = mount.querySelector('#mmr-next-btn');
+    let submitted = false;
+
+    if (q.type === 'mc') {
+      answerArea.innerHTML = q.choices.map((c, i) => `<button type="button" class="mmr-choice" data-choice="${i}">${escapeHtml(c)}</button>`).join('');
+    } else {
+      answerArea.innerHTML = `<input type="number" step="any" id="mmr-num-answer" class="num-input" placeholder="Your answer"><button type="button" class="reveal-btn" id="mmr-submit-num">Submit Answer</button>`;
+    }
+
+    function submit(response, btnEl) {
+      if (submitted || response === null || Number.isNaN(response)) return;
+      submitted = true;
+      const correct = q.type === 'mc' ? response === q.correct : Math.abs(response - q.correct) < Math.max(0.0005, Math.min(0.011, Math.abs(q.correct) * 0.004));
+      if (q.type === 'mc') {
+        answerArea.querySelectorAll('.mmr-choice').forEach(el => {
+          el.disabled = true;
+          if (Number(el.getAttribute('data-choice')) === q.correct) el.classList.add('selected-correct');
+          else if (el === btnEl) el.classList.add('selected-incorrect');
+        });
+      } else {
+        answerArea.querySelectorAll('input, button').forEach(el => { el.disabled = true; });
+      }
+      feedbackArea.innerHTML = `<div class="mmr-feedback ${correct ? 'correct' : 'incorrect'}">${correct ? '✓ Correct!' : '✗ Not quite.'} ${escapeHtml(q.explanation)}</div>`;
+      nextBtn.style.display = 'inline-block';
+      const answers = answersSoFar.concat([{ questionId: q.id, response, correct }]);
+      ctx.saveProgress({ status: 'in_progress', score: answers.filter(a => a.correct).length, totalQuestions: QUESTIONS.length, answers });
+    }
+
+    if (q.type === 'mc') {
+      answerArea.querySelectorAll('.mmr-choice').forEach(btn => btn.addEventListener('click', () => submit(Number(btn.getAttribute('data-choice')), btn)));
+    } else {
+      const input = answerArea.querySelector('#mmr-num-answer');
+      const go = () => submit(input.value === '' ? null : Number(input.value));
+      answerArea.querySelector('#mmr-submit-num').addEventListener('click', go);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    }
+    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
+  }
+
+  async function finishQuiz(mount, ctx, answers) {
+    await ctx.saveProgress({ status: 'completed', score: answers.filter(a => a.correct).length, totalQuestions: QUESTIONS.length, answers });
+    renderQuizSummary(mount, ctx);
+  }
+
+  function renderQuizSummary(mount, ctx) {
+    const progress = ctx.getProgress();
+    const score = progress ? progress.score : 0;
+    const code = progress && progress.code ? progress.code : '';
+    const total = QUESTIONS.length;
+    const missedParts = [];
+    ((progress && progress.answers) || []).forEach(a => {
+      const q = QUESTIONS.find(x => x.id === a.questionId);
+      if (q && !a.correct && !missedParts.includes(q.part)) missedParts.push(q.part);
+    });
+    missedParts.sort((a, b) => a - b);
+    mount.innerHTML = `
+      <div class="mmr-summary">
+        <div class="mmr-score">${score} / ${total}</div>
+        ${code
+          ? `<p class="mmr-code-label">Your completion code</p><div class="mmr-code">${escapeHtml(code)}</div>`
+          : `<p><button type="button" class="mmr-retake-btn" id="mmr-show-code-btn">Show my code</button></p>`}
+        ${missedParts.length ? `<div class="mmr-revisit"><strong>Worth another look:</strong><ul>${missedParts.map(n => `<li>${escapeHtml(PARTS[n - 1].title)}</li>`).join('')}</ul></div>` : ''}
+        <p>Nice work! You can retake this any time — your most recent attempt is what’s saved and sent to your teacher.</p>
+        <button type="button" class="mmr-retake-btn" id="mmr-retake-btn">Retake Quiz</button>
+      </div>`;
+    const showCodeBtn = mount.querySelector('#mmr-show-code-btn');
+    if (showCodeBtn) {
+      showCodeBtn.addEventListener('click', async () => {
+        showCodeBtn.disabled = true;
+        await ctx.saveProgress(Object.assign({}, progress));
+        renderQuizSummary(mount, ctx);
+      });
+    }
+    mount.querySelector('#mmr-retake-btn').addEventListener('click', async () => {
+      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: total, answers: [] });
+      renderQuiz(mount, ctx);
+    });
+  }
+
+  // =====================================================================
+  // Top-level render (accordion shell, same pattern as the other reviews)
+  // =====================================================================
+  function render(host, ctx) {
+    ensureStylesInjected();
+    const sections = [{ title: 'Start Here', time: '3 min', body: startHereHtml() }]
+      .concat(PARTS.map((p, i) => ({ title: p.title, time: p.time, body: partHtml(i + 1) })));
+
+    const sectionsHtml = sections.map((sec, i) => `
+      <div class="section-card" id="mmr-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
+          <span class="section-title">${escapeHtml(sec.title)}</span>
+          <span class="section-time">${escapeHtml(sec.time)}</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          ${sec.body}
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">✓ Mark Section Complete</button>
+        </div>
+      </div>`).join('');
+
+    host.innerHTML = `
+      <div class="mmr-lesson">
+        <div class="mmr-header">
+          <div class="mmr-header-label">Mini Math Unit · Cumulative Review</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="mmr-header-meta">Self-Paced Review · ~55 Minutes · Interactive mini-tools + graded check</div>
+        </div>
+        <div class="mmr-progress-wrap">
+          <span class="mmr-progress-label">Progress</span>
+          <div class="mmr-progress-track"><div class="mmr-progress-fill" id="mmr-progress-fill"></div></div>
+          <span class="mmr-progress-count" id="mmr-progress-count">0 / ${SECTION_COUNT} sections</span>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="mmr-sec-${QUIZ_INDEX}" data-section="${QUIZ_INDEX}">
+            <div class="section-header" data-toggle="${QUIZ_INDEX}">
+              <span class="section-num">✓</span>
+              <span class="section-title">Check for Understanding</span>
+              <span class="section-time">14 min · graded</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">Like the Mini Math Check, this has Words to Know, Show the Skill, Fix the Mistake, and Explain It questions. It <strong>saves your score</strong> and reports it to your teacher, and when you finish you’ll get a <strong>completion code</strong> — write it down. You can retake it any time; your most recent attempt is what’s saved.
+                <details class="mmr-details"><summary>Reference box (equalities and densities)</summary>${referenceBoxHtml()}</details></div>
+              <div id="mmr-quiz-mount"></div>
+            </div>
+          </div>
+        </main>
+      </div>`;
+
+    const root = host.querySelector('.mmr-lesson');
+    const completed = new Array(SECTION_COUNT).fill(false);
+
+    function updateProgress() {
+      const done = completed.filter(Boolean).length;
+      root.querySelector('#mmr-progress-fill').style.width = Math.round((done / SECTION_COUNT) * 100) + '%';
+      root.querySelector('#mmr-progress-count').textContent = `${done} / ${SECTION_COUNT} sections`;
+    }
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#mmr-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function toggleSection(i) {
+      const card = root.querySelector(`#mmr-sec-${i}`);
+      const body = card.querySelector('.section-body');
+      const header = card.querySelector('.section-header');
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      header.classList.toggle('open', !isOpen);
+    }
+
+    root.querySelectorAll('[data-toggle]').forEach(el => el.addEventListener('click', () => toggleSection(Number(el.getAttribute('data-toggle')))));
+    root.querySelectorAll('[data-mark-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-mark-done'));
+        if (completed[i]) return;
+        completed[i] = true;
+        root.querySelector(`#mmr-sec-${i}`).classList.add('done');
+        btn.textContent = '✓ Section Complete';
+        btn.disabled = true;
+        updateProgress();
+        setTimeout(() => openSection(i + 1, true), 250);
+      });
+    });
+    root.querySelectorAll('[data-hint-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const open = root.querySelector('#' + btn.getAttribute('data-hint-target')).classList.toggle('open');
+        btn.textContent = open ? '▲ Hide Hint' : '💡 Hint';
+      });
+    });
+    root.querySelectorAll('[data-answer-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const open = root.querySelector('#' + btn.getAttribute('data-answer-target')).classList.toggle('open');
+        btn.textContent = open ? 'Hide Answer' : 'Reveal Answer';
+      });
+    });
+
+    // Mini-tools (ungraded, session-only state).
+    const tool = id => root.querySelector('#' + id);
+    runSequence(tool('mmr-tool-1'), LADDER_ITEMS, 'Metric ladder', renderLadderItem);
+    runSequence(tool('mmr-tool-2'), MEASURE_ITEMS, 'Measure it', renderMeasureItem);
+    runSequence(tool('mmr-tool-3a'), TAG_PROBLEMS, 'Label the numbers', renderTagItem);
+    runSequence(tool('mmr-tool-3b'), METAL_ITEMS, 'Metal detective', renderMetalItem);
+    runSequence(tool('mmr-tool-3c'), DENSITY_CONCEPT_ITEMS, 'Intensive or extensive', renderMcItem);
+    runSequence(tool('mmr-tool-4a'), PROPORTIONS, 'Cross-multiply', renderCrossItem);
+    runSequence(tool('mmr-tool-4b'), DENSITY_PROP_ITEMS, 'Density as a proportion', renderScaleItem);
+    runSequence(tool('mmr-tool-4c'), STEP_TARGETS, 'Rearrange D = M/V', renderStepItem);
+    runSequence(tool('mmr-tool-5'), CONVERT_ITEMS, 'Conversions', renderChainItem);
+    runSequence(tool('mmr-tool-6'), CHAIN_ITEMS, 'Unit paths', renderChainItem);
+    runSequence(tool('mmr-tool-7a'), TOOL_ITEMS, 'Which tool', renderMcItem);
+    runSequence(tool('mmr-tool-7b'), ERROR_ITEMS, 'Find the mistake', renderErrorItem);
+    runSequence(tool('mmr-tool-7c'), [CER_ITEM], 'Explain it', renderCerItem);
+
+    renderQuiz(root.querySelector('#mmr-quiz-mount'), ctx);
+
+    const progress = ctx.getProgress();
+    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
+      if (progress.status === 'completed') completed[QUIZ_INDEX] = true;
+      openSection(QUIZ_INDEX, false);
+    } else {
+      openSection(0, false);
+    }
+    updateProgress();
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['mini-math-review'] = { render };
+})();

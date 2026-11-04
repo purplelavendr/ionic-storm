@@ -35,8 +35,10 @@
 <script src="../js/activities/moving-electrons-review.js"></script>
 <script src="../js/activities/conductivity-lab.js"></script>
 <script src="../js/activities/electron-glue.js"></script>
+<script src="../js/activities/cross-multiply-density.js"></script>
+<script src="../js/activities/mini-math-review.js"></script>
 <script>
-  // Unit 1 Review: ?a=unit1-review is the student build (what ships); add &preview=1 to load the
+  // Unit 1 Review: ?a=unit1-review / ?a=cross-multiply-density / ?a=mini-math-review is the student build (what ships); add &preview=1 to load the
   // teacher copy with the click-through controls (dev/teacher-preview/, never deployed).
   document.write('<script src="../' + (/[?&]preview=1(&|$)/.test(location.search) ? 'dev/teacher-preview/unit1-review.teacher.js' : 'js/activities/unit1-review.js') + '"><\/script>');
 </script>
@@ -51,7 +53,9 @@
     'moving-electrons-review': { title: 'Chapter 4 Review: Moving Electrons', unitId: 'unit1-alchemy' },
     'conductivity-lab': { title: 'Lesson 25: You Light Up My Life (Virtual Lab)', unitId: 'unit1-alchemy' },
     'electron-glue': { title: 'Lesson 26: Electron Glue (Bonding)', unitId: 'unit1-alchemy' },
-    'unit1-review': { title: 'Unit 1 Review: Alchemy', unitId: 'unit1-alchemy' }
+    'unit1-review': { title: 'Unit 1 Review: Alchemy', unitId: 'unit1-alchemy' },
+    'cross-multiply-density': { title: 'Density & Cross-Multiplying Practice', unitId: 'mini-math-unit' },
+    'mini-math-review': { title: 'Mini Math Review: Metric Units, Density & Conversions', unitId: 'mini-math-unit' }
   };
 
   let progress = null; // in-memory, mimics one activity's saved record
