@@ -17,9 +17,21 @@
 // via ctx.saveProgress. The summary shows the completion code (see CLAUDE.md) and which parts
 // to revisit. Every scenario/number here is deliberately different from the packet's Review
 // page and Mini Math Check -- same skills, fresh specifics.
+//
+// Supports an EN/ES language toggle (see LANG_KEY below). All display text goes through
+// L(en, es), and the data tables are rebuilt in initData() each time render() runs, so a
+// language switch is just a full re-render. Grading never depends on the displayed text:
+// it is always by the answer's positional index (QUESTIONS[i].correct) or the typed number,
+// so translation can never affect correctness.
 (function () {
   const STYLE_ID = 'mmr-lesson-styles';
   const FONT_LINK_ID = 'el-lesson-fonts'; // shared Google Fonts <link>, same family as every other review
+  const LANG_KEY = 'ionicstorm_lang_v1';  // shared literal: keeps language in sync across all activities
+
+  let LANG = 'en';
+  function getLang() { return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'; }
+  function setLang(lang) { localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en'); }
+  function L(en, es) { return LANG === 'es' ? es : en; }
 
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,296 +66,336 @@
   }
 
   // =====================================================================
-  // Data
+  // Language-neutral data
   // =====================================================================
-  const PARTS = [
-    { title: 'Part 1: Metric Units & the Ladder', time: '5 min' },
-    { title: 'Part 2: Mass & Volume', time: '4 min' },
-    { title: 'Part 3: Density', time: '5 min' },
-    { title: 'Part 4: Cross Multiply & Divide', time: '8 min' },
-    { title: 'Part 5: 1–2 Step Unit Conversions', time: '6 min' },
-    { title: 'Part 6: Longer Chains & Density as a Bridge', time: '5 min' },
-    { title: 'Part 7: Choose the Tool & Fix It', time: '6 min' }
-  ];
-  const SECTION_COUNT = PARTS.length + 2; // Start Here + 7 parts + graded check
+  const SECTION_COUNT = 9; // Start Here + 7 parts + graded check
   const QUIZ_INDEX = SECTION_COUNT - 1;
-
+  // English keys are what the code compares against; SUBST_ES is only the displayed name.
   const DENSITIES = [['zinc', 7.1], ['gold', 19.3], ['paper', 0.9], ['brass', 8.4], ['water', 1.0], ['copper', 9.0], ['aluminum', 2.7], ['lead', 11.4]];
+  const SUBST_ES = { zinc: 'zinc', gold: 'oro', paper: 'papel', brass: 'latón', water: 'agua', copper: 'cobre', aluminum: 'aluminio', lead: 'plomo' };
+  function substName(en) { return LANG === 'es' ? SUBST_ES[en] : en; }
 
-  const COVERAGE = [
-    ['M1.1–M1.3', 'Name metric base units and prefixes; write an equality as two conversion factors', 'Part 1'],
-    ['4.1–4.2', 'Measure mass with a balance; find volume, including by water displacement', 'Part 2'],
-    ['5.1–5.3', 'Define density, solve with D = m ÷ V, identify a substance, intensive vs. extensive', 'Part 3'],
-    ['M2.1–M2.3', 'Set up a proportion, cross multiply and divide, use density as a ratio', 'Part 4 (+ the Density & Cross-Multiplying Practice)'],
-    ['M3.1–M3.3', 'Choose the factor that cancels; solve one- and two-step conversions', 'Part 5'],
-    ['M4.1–M4.3', 'Plan a unit path; solve 2–3 step conversions; use density as a conversion factor; check it is reasonable', 'Part 6'],
-    ['Review page', 'Pick the right tool, find and fix mistakes, explain with claim–evidence–reasoning', 'Part 7']
-  ];
-
-  // ---- Part 1: metric ladder ----
-  const LADDER = [['kilo-', 'k'], ['hecto-', 'h'], ['deka-', 'da'], ['BASE', ''], ['deci-', 'd'], ['centi-', 'c'], ['milli-', 'm']];
+  const LADDER_SYMBOLS = ['k', 'h', 'da', '', 'd', 'c', 'm'];
   const LADDER_ITEMS = [
     { v: 3.4, from: 'k', to: '', base: 'g', ans: 3400 },
     { v: 620, from: 'm', to: '', base: 'L', ans: 0.62 },
     { v: 8.5, from: 'c', to: '', base: 'm', ans: 0.085 },
     { v: 0.045, from: '', to: 'm', base: 'L', ans: 45 }
   ];
-
-  // ---- Part 2: mass & volume ----
-  const MEASURE_ITEMS = [
-    { kind: 'mc', prompt: 'Which tool do you use to measure the mass of a rock?', choices: ['Graduated cylinder', 'Balance', 'Ruler'], correct: 1, why: 'A balance measures mass. A graduated cylinder measures the volume of a liquid.' },
-    { kind: 'num', prompt: 'A balance reads 7.346 g. Record the mass to the nearest tenth of a gram.', prefix: 'Mass =', answer: 7.3, unitText: 'g' },
-    { kind: 'disp', before: 25.0, after: 31.8 },
-    { kind: 'mc', prompt: 'A 1 kg bag of rice and a 1 kg bag of marshmallows. Which has more mass?', choices: ['The rice', 'The marshmallows', 'They have the same mass'], correct: 2, why: 'Both are 1 kg. The marshmallows take up more space (volume), but the mass is the same.' },
-    { kind: 'disp', before: 18.5, after: 24.3 },
-    { kind: 'mc', prompt: 'Two blocks have the same volume. One has a mass of 12.0 g and the other 36.0 g. What can you conclude?', choices: ['They are the same substance', 'They are probably different substances', 'The heavier one has less matter'], correct: 1, why: 'Same space, different mass: the 36.0 g block packs three times as much matter into the same volume, so they are probably different substances.' }
-  ];
-
-  // ---- Part 3: density ----
-  const TAG_PROBLEMS = [
-    { parts: ['A liquid has a density of ', { n: '1.2 g/mL', role: 'D' }, '. What volume does ', { n: '90 g', role: 'M' }, ' of it fill?'], solve: 'V' },
-    { parts: ['Zinc has a density of ', { n: '7.1 g/mL', role: 'D' }, '. A zinc bar has a volume of ', { n: '15 mL', role: 'V' }, '. What is its mass?'], solve: 'M' },
-    { parts: ['A rock found ', { n: '5 m', role: 'X' }, ' underground has a mass of ', { n: '54 g', role: 'M' }, ' and a volume of ', { n: '20 mL', role: 'V' }, '. What is its density?'], solve: 'D' }
-  ];
-  const METAL_ITEMS = [
-    { text: 'A metal sample has a mass of 54.0 g and a volume of 20.0 mL.', m: 54.0, V: 20.0, D: 2.7, metal: 'aluminum' },
-    { text: 'A metal sample has a mass of 84.0 g and a volume of 10.0 mL.', m: 84.0, V: 10.0, D: 8.4, metal: 'brass' },
-    { text: 'A metal sample has a mass of 57.0 g and a volume of 5.0 mL.', m: 57.0, V: 5.0, D: 11.4, metal: 'lead' },
-    { text: 'A sample has a mass of 4.5 g and a volume of 5.0 mL.', m: 4.5, V: 5.0, D: 0.9, metal: 'paper' },
-    { text: 'A metal sample has a mass of 96.5 g and a volume of 5.0 mL.', m: 96.5, V: 5.0, D: 19.3, metal: 'gold' }
-  ];
-  const DENSITY_CONCEPT_ITEMS = [
-    { kind: 'mc', prompt: 'A 5 g piece and a 50 g piece are both pure copper. Which property is the same for both?', choices: ['Mass', 'Volume', 'Density'], correct: 2, why: 'Density is an intensive property: it does not depend on how much you have, so both pieces are 9.0 g/mL.' },
-    { kind: 'mc', prompt: 'Which of these is an extensive property?', choices: ['Density', 'Mass', 'Both'], correct: 1, why: 'Mass depends on the amount of matter, so it is extensive. Density stays the same, so it is intensive.' }
-  ];
-
-  // ---- Part 4: cross multiply & divide ----
   const PROPORTIONS = [
     { a: 4, b: 9, c: null, d: 27, key: 'c', v: 'x' },
     { a: 8, b: 12, c: 20, d: null, key: 'd', v: 'y' },
     { a: null, b: 6, c: 15, d: 18, key: 'a', v: 'n' },
     { a: 5, b: null, c: 15, d: 21, key: 'b', v: 'k' }
   ];
-  // Density is a ratio over 1 mL: grams on top on both sides; x on top for mass, x on the bottom for volume.
-  const DENSITY_PROP_ITEMS = [
-    {
-      word: 'Aluminum has a density of 2.7 g/mL. What is the mass of 8.0 mL of aluminum?',
-      p: { a: 2.7, b: 1, c: null, d: 8.0, key: 'c', v: 'x' }, unit: 'g',
-      options: [
-        { n1: '2.7 g', d1: '1 mL', n2: '8.0 mL', d2: 'x g', why: 'Grams are on top on the left but volume is on top on the right. Keep grams on top on both sides.' },
-        { n1: '2.7 g', d1: '1 mL', n2: 'x g', d2: '8.0 mL', ok: true },
-        { n1: '2.7 g', d1: '1 mL', n2: 'x mL', d2: '8.0 g', why: '8.0 is a volume (mL), not grams. Keep each number with its own unit.' }
-      ]
-    },
-    {
-      word: 'Brass has a density of 8.4 g/mL. What volume does 42 g of brass take up?',
-      p: { a: 8.4, b: 1, c: 42, d: null, key: 'd', v: 'x' }, unit: 'mL',
-      options: [
-        { n1: '8.4 g', d1: '1 mL', n2: 'x g', d2: '42 mL', why: 'x is a volume (mL), but it is on top with the grams. To find volume, x goes on the bottom.' },
-        { n1: '1 g', d1: '8.4 mL', n2: '42 g', d2: 'x mL', why: 'Density is 8.4 g for every 1 mL — grams on top, mL on the bottom — not 1 g for 8.4 mL.' },
-        { n1: '8.4 g', d1: '1 mL', n2: '42 g', d2: 'x mL', ok: true }
-      ]
-    },
-    {
-      word: 'Zinc has a density of 7.1 g/mL. What volume does 14.2 g of zinc take up?',
-      p: { a: 7.1, b: 1, c: 14.2, d: null, key: 'd', v: 'x' }, unit: 'mL',
-      options: [
-        { n1: '7.1 g', d1: '1 mL', n2: '14.2 g', d2: 'x mL', ok: true },
-        { n1: '7.1 g', d1: '1 mL', n2: 'x g', d2: '14.2 mL', why: '14.2 is the mass in grams, not mL. The unknown volume goes on the bottom with mL.' },
-        { n1: '7.1 g', d1: '14.2 mL', n2: '1 g', d2: 'x mL', why: 'This pairs 7.1 g with 14.2 mL, but those numbers do not belong together — the 14.2 is grams.' }
-      ]
-    }
-  ];
-  // Challenge: why it works (rearrange D = M/V by undoing operations on both sides).
   const START_ROW = eqRow('D', EQ, eqvFrac('M', 'V'));
-  const STEP_TARGETS = [
-    {
-      solve: 'D', word: 'A 25 mL sample of a mineral has a mass of 70 g. Find its density.', steps: [],
-      noneRow: eqRow('D', EQ, 'M', DIVIDE, 'V'), noneLabel: 'already alone — just divide',
-      noneHint: 'Look at D = M/V: D is already by itself on one side, so there is nothing to undo.',
-      calc: { text: 'D = 70 ÷ 25', answer: 2.8, unit: 'g/mL' }
-    },
-    {
-      solve: 'V', word: 'A liquid has a density of 1.2 g/mL. What volume does 90 g of it fill?',
-      steps: [
-        { op: '× V', row: eqRow('D', TIMES, hl('V'), EQ, 'M'), hint: 'V is stuck under M as a ÷ V. What operation cancels a ÷ V?' },
-        { op: '÷ D', row: eqRow('V', EQ, eqvFrac('M', 'D', false, true)), hint: 'Now D is multiplying V. To get V alone, undo that × D.' }
-      ],
-      noneHint: 'Not yet — V is still stuck in the denominator.',
-      calc: { text: 'V = 90 ÷ 1.2', answer: 75, unit: 'mL' }
-    },
-    {
-      solve: 'M', word: 'Brass has a density of 8.4 g/mL. A brass bar has a volume of 20 mL. What is its mass?',
-      steps: [{ op: '× V', row: eqRow('D', TIMES, hl('V'), EQ, 'M'), hint: 'M is being divided by V. What cancels a ÷ V?' }],
-      noneHint: 'Not yet — M is still being divided by V.',
-      calc: { text: 'M = 8.4 × 20', answer: 168, unit: 'g' }
-    }
-  ];
   const STEP_OPS = ['× V', '÷ V', '× D', '÷ D', '× M', '÷ M'];
   const UNIT_OPTIONS = ['g', 'mL', 'cm³', 'g/mL', 'g/cm³'];
+  const DIAGONAL = { a: 'd', d: 'a', b: 'c', c: 'b' };
 
-  // ---- Parts 5-6: conversion-factor builder ----
+  // =====================================================================
+  // Language-dependent data, rebuilt by initData() on every render()
+  // =====================================================================
+  let PARTS, COVERAGE, LADDER, MEASURE_ITEMS, TAG_PROBLEMS, METAL_ITEMS, DENSITY_CONCEPT_ITEMS,
+    DENSITY_PROP_ITEMS, STEP_TARGETS, CONVERT_ITEMS, CHAIN_ITEMS, TOOLS, TOOL_ITEMS, ERROR_ITEMS, CER_ITEM, QUESTIONS;
+
   // mk(from, to, a, b): a and b are [value, unit] and a = b is the equality. The right factor
   // puts the unit you want to cancel (from) on the bottom.
   function mk(from, to, a, b, magWhy) {
     const fromSide = a[1] === from ? a : b, toSide = a[1] === from ? b : a;
     const ok = { nv: toSide[0], nu: toSide[1], dv: fromSide[0], du: fromSide[1], ok: true };
-    const flipped = { nv: fromSide[0], nu: fromSide[1], dv: toSide[0], du: toSide[1], why: `That puts ${from} on top, so it cannot cancel. Put the unit you want to get rid of (${from}) on the bottom.` };
+    const flipped = { nv: fromSide[0], nu: fromSide[1], dv: toSide[0], du: toSide[1],
+      why: L(`That puts ${from} on top, so it cannot cancel. Put the unit you want to get rid of (${from}) on the bottom.`,
+             `Eso pone ${from} arriba, así que no se puede cancelar. Pon la unidad que quieres eliminar (${from}) abajo.`) };
     const scale = v => v === 1000 ? 100 : v === 100 ? 1000 : v === 60 ? 100 : v * 10;
-    const mag = Object.assign({}, ok, { ok: false, why: magWhy || `The units cancel, but check the equality: ${formatNum(a[0])} ${a[1]} = ${formatNum(b[0])} ${b[1]}.` });
+    const mag = Object.assign({}, ok, { ok: false, why: magWhy || L(
+      `The units cancel, but check the equality: ${formatNum(a[0])} ${a[1]} = ${formatNum(b[0])} ${b[1]}.`,
+      `Las unidades se cancelan, pero revisa la equivalencia: ${formatNum(a[0])} ${a[1]} = ${formatNum(b[0])} ${b[1]}.`) });
     if (toSide[0] !== 1) mag.nv = scale(toSide[0]);
     else if (fromSide[0] !== 1) mag.dv = scale(fromSide[0]);
     else mag.nv = 10;
     return { from, to, options: [ok, flipped, mag] };
   }
-  const CONVERT_ITEMS = [
-    { prompt: 'Convert 650 mL to L.', given: [650, 'mL'], want: 'L', steps: [mk('mL', 'L', [1, 'L'], [1000, 'mL'])], ans: 0.65 },
-    { prompt: 'Convert 3.2 kg to g.', given: [3.2, 'kg'], want: 'g', steps: [mk('kg', 'g', [1, 'kg'], [1000, 'g'])], ans: 3200 },
-    { prompt: 'Convert 3.6 km to cm (two steps).', given: [3.6, 'km'], want: 'cm', steps: [mk('km', 'm', [1, 'km'], [1000, 'm']), mk('m', 'cm', [1, 'm'], [100, 'cm'])], ans: 360000 },
-    { prompt: 'Convert 0.25 L to cm³ (two steps).', given: [0.25, 'L'], want: 'cm³', steps: [mk('L', 'mL', [1, 'L'], [1000, 'mL']), mk('mL', 'cm³', [1, 'mL'], [1, 'cm³'])], ans: 250 },
-    { prompt: 'Convert 1.5 h to s (two steps).', given: [1.5, 'h'], want: 's', steps: [mk('h', 'min', [1, 'h'], [60, 'min']), mk('min', 's', [1, 'min'], [60, 's'])], ans: 5400 }
-  ];
-  const CHAIN_ITEMS = [
-    {
-      prompt: 'How many kg is 400 mL of aluminum? (Aluminum is 2.7 g/mL.)', given: [400, 'mL'], want: 'kg',
-      paths: ['mL → g → kg', 'mL → kg', 'mL → L → kg'], pathOk: 0,
-      pathWhy: 'Density takes you from volume (mL) to mass (g). Then a metric factor takes g to kg.',
-      steps: [mk('mL', 'g', [1, 'mL'], [2.7, 'g'], 'Check the density table: aluminum is 2.7 g for every 1 mL.'), mk('g', 'kg', [1, 'kg'], [1000, 'g'])],
-      ans: 1.08
-    },
-    {
-      prompt: 'What volume (mL) does 54 g of aluminum take up? (Aluminum is 2.7 g/mL.)', given: [54, 'g'], want: 'mL',
-      paths: ['g → kg → mL', 'g → L', 'g → mL'], pathOk: 2,
-      pathWhy: 'Density is the bridge between mass and volume. Flip it to go from grams to mL.',
-      steps: [mk('g', 'mL', [1, 'mL'], [2.7, 'g'], 'Check the density table: aluminum is 2.7 g for every 1 mL.')],
-      ans: 20
-    },
-    {
-      prompt: 'How many kg is 0.60 L of brass? (Brass is 8.4 g/mL.)', given: [0.60, 'L'], want: 'kg',
-      paths: ['L → g → kg', 'L → kg', 'L → mL → g → kg'], pathOk: 2,
-      pathWhy: 'Density uses mL, so change L to mL first, then use density to get g, then change g to kg.',
-      steps: [mk('L', 'mL', [1, 'L'], [1000, 'mL']), mk('mL', 'g', [1, 'mL'], [8.4, 'g'], 'Check the density table: brass is 8.4 g for every 1 mL.'), mk('g', 'kg', [1, 'kg'], [1000, 'g'])],
-      ans: 5.04
-    }
-  ];
 
-  // ---- Part 7: choose the tool, fix the mistake, explain it ----
-  const TOOLS = ['D = m ÷ V', 'Cross multiply and divide', 'Dimensional analysis (conversion factors)', 'Dimensional analysis with density as a factor'];
-  const TOOL_ITEMS = [
-    { kind: 'mc', prompt: 'A sample has a mass of 36 g and a volume of 8.0 mL. Find its density.', choices: TOOLS, correct: 0, why: 'You are given mass and volume and want density: D = m ÷ V.' },
-    { kind: 'mc', prompt: 'Aluminum’s density is 2.7 g/mL. Find the mass of 15 mL of aluminum.', choices: TOOLS, correct: 1, why: 'Given a density and asked for mass: write the density over 1 mL, cross multiply and divide.' },
-    { kind: 'mc', prompt: 'Change 4,500 mg to g.', choices: TOOLS, correct: 2, why: 'You are only changing units, so use conversion factors (dimensional analysis).' },
-    { kind: 'mc', prompt: 'Find the mass, in kg, of 0.20 L of lead.', choices: TOOLS, correct: 3, why: 'You are changing units AND using density: L → mL → g → kg, with density as one factor.' },
-    { kind: 'mc', prompt: 'If 3 notebooks cost $4.50, what do 7 notebooks cost?', choices: TOOLS, correct: 1, why: 'Two equal ratios with one missing number: cross multiply and divide.' }
-  ];
-  const ERROR_ITEMS = [
-    {
-      title: 'Converting 3.2 kg to grams',
-      lines: ['Start with 3.2 kg / 1', 'Multiply by 1 kg / 1000 g', 'Answer: 0.0032 g'], wrong: 1,
-      fixes: ['Multiply by 1000 g / 1 kg', 'Multiply by 1 g / 1000 kg', 'Multiply by 100 g / 1 kg'], fix: 0,
-      why: 'The unit you want to cancel (kg) goes on the bottom: 3.2 × 1000 = 3,200 g.'
-    },
-    {
-      title: 'Finding density',
-      lines: ['A sample has m = 54 g and V = 20 mL', 'D = V ÷ m = 20 ÷ 54', 'D ≈ 0.37 g/mL'], wrong: 1,
-      fixes: ['D = m ÷ V = 54 ÷ 20', 'D = m × V = 54 × 20', 'D = m − V = 54 − 20'], fix: 0,
-      why: 'Density is mass per unit volume: D = m ÷ V = 54 ÷ 20 = 2.7 g/mL.'
-    },
-    {
-      title: 'Solving the proportion 8/12 = x/30',
-      lines: ['8/12 = x/30', 'Cross multiply: 8 × x = 12 × 30', 'x = 360 ÷ 8 = 45'], wrong: 1,
-      fixes: ['Cross multiply: 8 × 30 = 12 × x', 'Cross multiply: 8 × 12 = x × 30', 'Cross multiply: 8 + 30 = 12 + x'], fix: 0,
-      why: 'The cross goes corner to opposite corner: 8 with 30, and 12 with x. (Then x = 240 ÷ 12 = 20.)'
-    },
-    {
-      title: 'Finding a volume',
-      lines: ['D = 1.2 g/mL, M = 90 g', 'V = M ÷ D = 90 ÷ 1.2', 'V = 75 g'], wrong: 2,
-      fixes: ['V = 75 mL', 'V = 75 g/mL', 'V = 75 cm²'], fix: 0,
-      why: 'Grams ÷ (grams per mL) leaves mL. A volume is never measured in grams.'
-    },
-    {
-      title: 'Solving D = M/V for M',
-      lines: ['D = M/V', 'Divide both sides by V: D ÷ V = M', 'So M = D ÷ V'], wrong: 1,
-      fixes: ['Multiply both sides by V: D × V = M', 'Add V to both sides: D + V = M', 'Subtract V from both sides: D − V = M'], fix: 0,
-      why: 'M is being divided by V, so the operation that cancels it is multiplying both sides by V.'
-    },
-    {
-      title: 'Converting 450 mL to L',
-      lines: ['450 mL/1 × (1000 mL / 1 L)', 'The units do not cancel: mL × mL', '= 450,000 mL²/L'], wrong: 0,
-      fixes: ['450 mL/1 × (1 L / 1000 mL)', '450 mL/1 × (1000 L / 1 mL)', '450 mL/1 × (1 mL / 1000 L)'], fix: 0,
-      why: 'Flip the factor so mL is on the bottom and cancels: 450 × 1 ÷ 1000 = 0.45 L.'
-    }
-  ];
-  const CER_ITEM = {
-    scenario: 'A seller says a bar is solid aluminum. You measure its mass as 0.84 kg and its volume as 100 mL. Is the seller right? Build your answer one piece at a time.',
-    stages: [
-      { label: 'Claim', prompt: 'Which claim does your data support?', choices: ['It is aluminum', 'It is not aluminum', 'You cannot tell from mass and volume'], correct: 1, why: 'The density will not match aluminum — see the evidence next.' },
-      { label: 'Evidence', prompt: 'Which evidence is correct?', choices: [
-        'D = 0.84 ÷ 100 = 0.0084 g/mL',
-        '0.84 kg/1 × (1000 g / 1 kg) = 840 g; D = 840 g ÷ 100 mL = 8.4 g/mL; aluminum is 2.7 g/mL',
-        'D = 100 mL ÷ 840 g = 0.12 g/mL'], correct: 1, why: 'Convert kg to g first, then D = m ÷ V. 8.4 g/mL is not 2.7 g/mL.' },
-      { label: 'Reasoning', prompt: 'Which reasoning connects the evidence to the claim?', choices: [
-        'A bigger bar is always denser, so this bar must be something else',
-        'Density is an intensive property, so a bar of any size that is aluminum would be 2.7 g/mL; 8.4 g/mL matches brass',
-        'Mass is extensive, so it identifies the substance'], correct: 1, why: 'Intensive properties like density do not depend on the amount, so they identify the substance.' }
-    ]
-  };
+  function initData() {
+    PARTS = [
+      { title: L('Part 1: Metric Units & the Ladder', 'Parte 1: Unidades métricas y la escalera'), time: L('5 min', '5 min') },
+      { title: L('Part 2: Mass & Volume', 'Parte 2: Masa y volumen'), time: L('4 min', '4 min') },
+      { title: L('Part 3: Density', 'Parte 3: Densidad'), time: L('5 min', '5 min') },
+      { title: L('Part 4: Cross Multiply & Divide', 'Parte 4: Multiplicar en cruz y dividir'), time: L('8 min', '8 min') },
+      { title: L('Part 5: 1–2 Step Unit Conversions', 'Parte 5: Conversiones de unidades de 1–2 pasos'), time: L('6 min', '6 min') },
+      { title: L('Part 6: Longer Chains & Density as a Bridge', 'Parte 6: Cadenas más largas y la densidad como puente'), time: L('5 min', '5 min') },
+      { title: L('Part 7: Choose the Tool & Fix It', 'Parte 7: Elige la herramienta y corrige'), time: L('6 min', '6 min') }
+    ];
 
-  // =====================================================================
-  // Graded check (mirrors the Mini Math Check: words, skills, fix, explain)
-  // =====================================================================
-  const QUESTIONS = [
-    { id: 'q1', part: 2, type: 'mc', prompt: 'Words to know — mass:',
-      choices: ['the amount of space a sample of matter takes up', 'the amount of matter in an object', 'mass per unit volume', 'an equation that says two ratios are equal'], correct: 1,
-      explanation: 'Mass is the amount of matter in an object.' },
-    { id: 'q2', part: 2, type: 'mc', prompt: 'Words to know — volume:',
-      choices: ['the amount of matter in an object', 'an equality written as a fraction', 'the amount of space a sample of matter takes up', 'the temperature at which a solid melts'], correct: 2,
-      explanation: 'Volume is the amount of space a sample of matter takes up.' },
-    { id: 'q3', part: 3, type: 'mc', prompt: 'Words to know — density:',
-      choices: ['mass per unit volume', 'the amount of matter in an object', 'an equality written as a fraction', 'the amount of space a sample takes up'], correct: 0,
-      explanation: 'Density is mass per unit volume: D = m ÷ V.' },
-    { id: 'q4', part: 5, type: 'mc', prompt: 'Words to know — conversion factor:',
-      choices: ['an equation that says two ratios are equal', 'mass per unit volume', 'an equality written as a fraction, like 1000 g / 1 kg', 'the amount of space a sample takes up'], correct: 2,
-      explanation: 'A conversion factor is an equality written as a fraction. It equals one.' },
-    { id: 'q5', part: 4, type: 'mc', prompt: 'Words to know — proportion:',
-      choices: ['an equation that says two ratios are equal', 'an equality written as a fraction', 'mass per unit volume', 'the amount of matter in an object'], correct: 0,
-      explanation: 'A proportion is an equation that says two ratios are equal.' },
-    { id: 'q6', part: 4, type: 'num', prompt: 'Solve for x: 5/x = 15/24', correct: 8,
-      explanation: 'Cross multiply: 5 × 24 = x × 15 → 120 = 15x → x = 8.' },
-    { id: 'q7', part: 4, type: 'num', prompt: 'Solve for x: x/6 = 14/21', correct: 4,
-      explanation: 'Cross multiply: x × 21 = 6 × 14 → 21x = 84 → x = 4.' },
-    { id: 'q8', part: 3, type: 'num', prompt: 'A metal sample has a mass of 67.5 g and a volume of 25.0 mL. What is its density (g/mL)?', correct: 2.7,
-      explanation: 'D = m ÷ V = 67.5 ÷ 25.0 = 2.7 g/mL.' },
-    { id: 'q9', part: 3, type: 'mc', prompt: 'Use the density table. Which metal has a density of 2.7 g/mL?',
-      choices: ['zinc', 'gold', 'aluminum', 'brass'], correct: 2,
-      explanation: 'Aluminum is 2.7 g/mL. Density is intensive, so it identifies the substance.' },
-    { id: 'q10', part: 4, type: 'num', prompt: 'Lead is 11.4 g/mL. What is the mass (g) of 6.0 mL of lead?', correct: 68.4,
-      explanation: '11.4 g / 1 mL = x g / 6.0 mL → x = 11.4 × 6.0 ÷ 1 = 68.4 g.' },
-    { id: 'q11', part: 4, type: 'num', prompt: 'Brass is 8.4 g/mL. What volume (mL) does 63 g of brass take up?', correct: 7.5,
-      explanation: '8.4 g / 1 mL = 63 g / x mL → x = 63 × 1 ÷ 8.4 = 7.5 mL.' },
-    { id: 'q12', part: 1, type: 'num', prompt: 'Use dimensional analysis: 0.62 L = ? mL', correct: 620,
-      explanation: '0.62 L/1 × (1000 mL / 1 L) = 620 mL.' },
-    { id: 'q13', part: 5, type: 'num', prompt: 'Use dimensional analysis: 135 min = ? h', correct: 2.25,
-      explanation: '135 min/1 × (1 h / 60 min) = 2.25 h.' },
-    { id: 'q14', part: 5, type: 'num', prompt: 'Use dimensional analysis (two steps): 5.2 km = ? cm', correct: 520000,
-      explanation: '5.2 km/1 × (1000 m / 1 km) × (100 cm / 1 m) = 520,000 cm.' },
-    { id: 'q15', part: 6, type: 'num', prompt: 'Plan the path, then solve: how many kg is 0.30 L of lead? (Lead is 11.4 g/mL.)', correct: 3.42,
-      explanation: 'L → mL → g → kg: 0.30 L/1 × (1000 mL / 1 L) × (11.4 g / 1 mL) × (1 kg / 1000 g) = 3.42 kg.' },
-    { id: 'q16', part: 2, type: 'num', prompt: 'A cylinder holds 30.0 mL of water. After a rock is added, the level is 37.6 mL. What is the volume of the rock (mL)?', correct: 7.6,
-      explanation: 'Volume of object = with − without = 37.6 − 30.0 = 7.6 mL.' },
-    { id: 'q17', part: 7, type: 'mc', prompt: 'Fix the mistake: a student writes 3.2 kg/1 × (1 kg / 1000 g) = 0.0032 g. What went wrong?',
-      choices: ['The conversion factor is upside down, so kg does not cancel', 'They should have added 1000', 'Nothing — that is correct', 'They should have used density'], correct: 0,
-      explanation: 'kg has to be on the bottom to cancel: 3.2 kg/1 × (1000 g / 1 kg) = 3,200 g.' },
-    { id: 'q18', part: 7, type: 'mc', prompt: 'Which tool finds the mass of 25 mL of copper when you are given copper’s density?',
-      choices: ['D = m ÷ V', 'Cross multiply and divide (density over 1 mL)', 'Water displacement', 'Only a balance'], correct: 1,
-      explanation: 'Given a density and asked for mass: set up density over 1 mL, then cross multiply and divide.' },
-    { id: 'q19', part: 7, type: 'mc', prompt: 'Explain it: a seller says a bar is aluminum, but its mass is 0.84 kg and its volume is 100 mL. Which response is best?',
-      choices: ['Yes — it is heavy, so it is aluminum', 'No — D = 840 g ÷ 100 mL = 8.4 g/mL, which matches brass, not aluminum (2.7 g/mL)', 'No — its density is 0.0084 g/mL', 'You cannot tell without knowing the temperature'], correct: 1,
-      explanation: 'Convert 0.84 kg to 840 g, then D = m ÷ V = 8.4 g/mL. Density is intensive, so it identifies the substance.' },
-    { id: 'q20', part: 3, type: 'mc', prompt: 'A 5 g piece and a 50 g piece are both pure zinc. Which property is the same for both?',
-      choices: ['Mass', 'Volume', 'Density', 'None of them'], correct: 2,
-      explanation: 'Density is intensive: both pieces are 7.1 g/mL, no matter the size.' }
-  ];
+    COVERAGE = [
+      ['M1.1–M1.3', L('Name metric base units and prefixes; write an equality as two conversion factors', 'Nombrar las unidades base métricas y los prefijos; escribir una equivalencia como dos factores de conversión'), L('Part 1', 'Parte 1')],
+      ['4.1–4.2', L('Measure mass with a balance; find volume, including by water displacement', 'Medir la masa con una balanza; hallar el volumen, incluso por desplazamiento de agua'), L('Part 2', 'Parte 2')],
+      ['5.1–5.3', L('Define density, solve with D = m ÷ V, identify a substance, intensive vs. extensive', 'Definir la densidad, resolver con D = m ÷ V, identificar una sustancia, intensiva vs. extensiva'), L('Part 3', 'Parte 3')],
+      ['M2.1–M2.3', L('Set up a proportion, cross multiply and divide, use density as a ratio', 'Plantear una proporción, multiplicar en cruz y dividir, usar la densidad como razón'), L('Part 4 (+ the Density & Cross-Multiplying Practice)', 'Parte 4 (+ la Práctica de Densidad y Multiplicación en Cruz)')],
+      ['M3.1–M3.3', L('Choose the factor that cancels; solve one- and two-step conversions', 'Elegir el factor que se cancela; resolver conversiones de uno y dos pasos'), L('Part 5', 'Parte 5')],
+      ['M4.1–M4.3', L('Plan a unit path; solve 2–3 step conversions; use density as a conversion factor; check it is reasonable', 'Planear una ruta de unidades; resolver conversiones de 2–3 pasos; usar la densidad como factor de conversión; verificar que sea razonable'), L('Part 6', 'Parte 6')],
+      [L('Review page', 'Página de repaso'), L('Pick the right tool, find and fix mistakes, explain with claim–evidence–reasoning', 'Elegir la herramienta correcta, encontrar y corregir errores, explicar con afirmación–evidencia–razonamiento'), L('Part 7', 'Parte 7')]
+    ];
+
+    LADDER = [
+      [L('kilo-', 'kilo-'), 'k'], [L('hecto-', 'hecto-'), 'h'], [L('deka-', 'deca-'), 'da'], [L('BASE', 'BASE'), ''],
+      [L('deci-', 'deci-'), 'd'], [L('centi-', 'centi-'), 'c'], [L('milli-', 'mili-'), 'm']
+    ];
+
+    MEASURE_ITEMS = [
+      { kind: 'mc', prompt: L('Which tool do you use to measure the mass of a rock?', '¿Qué herramienta usas para medir la masa de una roca?'),
+        choices: [L('Graduated cylinder', 'Probeta'), L('Balance', 'Balanza'), L('Ruler', 'Regla')], correct: 1,
+        why: L('A balance measures mass. A graduated cylinder measures the volume of a liquid.', 'Una balanza mide la masa. Una probeta mide el volumen de un líquido.') },
+      { kind: 'num', prompt: L('A balance reads 7.346 g. Record the mass to the nearest tenth of a gram.', 'Una balanza marca 7.346 g. Anota la masa redondeada a la décima de gramo más cercana.'), prefix: L('Mass =', 'Masa ='), answer: 7.3, unitText: 'g' },
+      { kind: 'disp', before: 25.0, after: 31.8 },
+      { kind: 'mc', prompt: L('A 1 kg bag of rice and a 1 kg bag of marshmallows. Which has more mass?', 'Una bolsa de 1 kg de arroz y una bolsa de 1 kg de malvaviscos. ¿Cuál tiene más masa?'),
+        choices: [L('The rice', 'El arroz'), L('The marshmallows', 'Los malvaviscos'), L('They have the same mass', 'Tienen la misma masa')], correct: 2,
+        why: L('Both are 1 kg. The marshmallows take up more space (volume), but the mass is the same.', 'Ambas son de 1 kg. Los malvaviscos ocupan más espacio (volumen), pero la masa es la misma.') },
+      { kind: 'disp', before: 18.5, after: 24.3 },
+      { kind: 'mc', prompt: L('Two blocks have the same volume. One has a mass of 12.0 g and the other 36.0 g. What can you conclude?', 'Dos bloques tienen el mismo volumen. Uno tiene una masa de 12.0 g y el otro de 36.0 g. ¿Qué puedes concluir?'),
+        choices: [L('They are the same substance', 'Son la misma sustancia'), L('They are probably different substances', 'Probablemente son sustancias diferentes'), L('The heavier one has less matter', 'El más pesado tiene menos materia')], correct: 1,
+        why: L('Same space, different mass: the 36.0 g block packs three times as much matter into the same volume, so they are probably different substances.', 'Mismo espacio, masa diferente: el bloque de 36.0 g tiene tres veces más materia en el mismo volumen, así que probablemente son sustancias diferentes.') }
+    ];
+
+    TAG_PROBLEMS = [
+      { parts: [L('A liquid has a density of ', 'Un líquido tiene una densidad de '), { n: '1.2 g/mL', role: 'D' }, L('. What volume does ', '. ¿Qué volumen ocupan '), { n: '90 g', role: 'M' }, L(' of it fill?', ' de él?')], solve: 'V' },
+      { parts: [L('Zinc has a density of ', 'El zinc tiene una densidad de '), { n: '7.1 g/mL', role: 'D' }, L('. A zinc bar has a volume of ', '. Una barra de zinc tiene un volumen de '), { n: '15 mL', role: 'V' }, L('. What is its mass?', '. ¿Cuál es su masa?')], solve: 'M' },
+      { parts: [L('A rock found ', 'Una roca encontrada a '), { n: '5 m', role: 'X' }, L(' underground has a mass of ', ' bajo tierra tiene una masa de '), { n: '54 g', role: 'M' }, L(' and a volume of ', ' y un volumen de '), { n: '20 mL', role: 'V' }, L('. What is its density?', '. ¿Cuál es su densidad?')], solve: 'D' }
+    ];
+
+    METAL_ITEMS = [
+      { text: L('A metal sample has a mass of 54.0 g and a volume of 20.0 mL.', 'Una muestra de metal tiene una masa de 54.0 g y un volumen de 20.0 mL.'), m: 54.0, V: 20.0, D: 2.7, metal: 'aluminum' },
+      { text: L('A metal sample has a mass of 84.0 g and a volume of 10.0 mL.', 'Una muestra de metal tiene una masa de 84.0 g y un volumen de 10.0 mL.'), m: 84.0, V: 10.0, D: 8.4, metal: 'brass' },
+      { text: L('A metal sample has a mass of 57.0 g and a volume of 5.0 mL.', 'Una muestra de metal tiene una masa de 57.0 g y un volumen de 5.0 mL.'), m: 57.0, V: 5.0, D: 11.4, metal: 'lead' },
+      { text: L('A sample has a mass of 4.5 g and a volume of 5.0 mL.', 'Una muestra tiene una masa de 4.5 g y un volumen de 5.0 mL.'), m: 4.5, V: 5.0, D: 0.9, metal: 'paper' },
+      { text: L('A metal sample has a mass of 96.5 g and a volume of 5.0 mL.', 'Una muestra de metal tiene una masa de 96.5 g y un volumen de 5.0 mL.'), m: 96.5, V: 5.0, D: 19.3, metal: 'gold' }
+    ];
+
+    DENSITY_CONCEPT_ITEMS = [
+      { prompt: L('A 5 g piece and a 50 g piece are both pure copper. Which property is the same for both?', 'Un trozo de 5 g y un trozo de 50 g son de cobre puro. ¿Qué propiedad es la misma en ambos?'),
+        choices: [L('Mass', 'La masa'), L('Volume', 'El volumen'), L('Density', 'La densidad')], correct: 2,
+        why: L('Density is an intensive property: it does not depend on how much you have, so both pieces are 9.0 g/mL.', 'La densidad es una propiedad intensiva: no depende de cuánto tengas, así que ambos trozos son de 9.0 g/mL.') },
+      { prompt: L('Which of these is an extensive property?', '¿Cuál de estas es una propiedad extensiva?'),
+        choices: [L('Density', 'La densidad'), L('Mass', 'La masa'), L('Both', 'Ambas')], correct: 1,
+        why: L('Mass depends on the amount of matter, so it is extensive. Density stays the same, so it is intensive.', 'La masa depende de la cantidad de materia, así que es extensiva. La densidad se mantiene igual, así que es intensiva.') }
+    ];
+
+    // Density is a ratio over 1 mL: grams on top on both sides; x on top for mass, x on the bottom for volume.
+    DENSITY_PROP_ITEMS = [
+      {
+        word: L('Aluminum has a density of 2.7 g/mL. What is the mass of 8.0 mL of aluminum?', 'El aluminio tiene una densidad de 2.7 g/mL. ¿Cuál es la masa de 8.0 mL de aluminio?'),
+        p: { a: 2.7, b: 1, c: null, d: 8.0, key: 'c', v: 'x' }, unit: 'g',
+        options: [
+          { n1: '2.7 g', d1: '1 mL', n2: '8.0 mL', d2: 'x g', why: L('Grams are on top on the left but volume is on top on the right. Keep grams on top on both sides.', 'Los gramos están arriba a la izquierda, pero el volumen está arriba a la derecha. Mantén los gramos arriba en ambos lados.') },
+          { n1: '2.7 g', d1: '1 mL', n2: 'x g', d2: '8.0 mL', ok: true },
+          { n1: '2.7 g', d1: '1 mL', n2: 'x mL', d2: '8.0 g', why: L('8.0 is a volume (mL), not grams. Keep each number with its own unit.', '8.0 es un volumen (mL), no gramos. Mantén cada número con su propia unidad.') }
+        ]
+      },
+      {
+        word: L('Brass has a density of 8.4 g/mL. What volume does 42 g of brass take up?', 'El latón tiene una densidad de 8.4 g/mL. ¿Qué volumen ocupan 42 g de latón?'),
+        p: { a: 8.4, b: 1, c: 42, d: null, key: 'd', v: 'x' }, unit: 'mL',
+        options: [
+          { n1: '8.4 g', d1: '1 mL', n2: 'x g', d2: '42 mL', why: L('x is a volume (mL), but it is on top with the grams. To find volume, x goes on the bottom.', 'x es un volumen (mL), pero está arriba con los gramos. Para hallar el volumen, x va abajo.') },
+          { n1: '1 g', d1: '8.4 mL', n2: '42 g', d2: 'x mL', why: L('Density is 8.4 g for every 1 mL — grams on top, mL on the bottom — not 1 g for 8.4 mL.', 'La densidad es 8.4 g por cada 1 mL — gramos arriba, mL abajo — no 1 g por 8.4 mL.') },
+          { n1: '8.4 g', d1: '1 mL', n2: '42 g', d2: 'x mL', ok: true }
+        ]
+      },
+      {
+        word: L('Zinc has a density of 7.1 g/mL. What volume does 14.2 g of zinc take up?', 'El zinc tiene una densidad de 7.1 g/mL. ¿Qué volumen ocupan 14.2 g de zinc?'),
+        p: { a: 7.1, b: 1, c: 14.2, d: null, key: 'd', v: 'x' }, unit: 'mL',
+        options: [
+          { n1: '7.1 g', d1: '1 mL', n2: '14.2 g', d2: 'x mL', ok: true },
+          { n1: '7.1 g', d1: '1 mL', n2: 'x g', d2: '14.2 mL', why: L('14.2 is the mass in grams, not mL. The unknown volume goes on the bottom with mL.', '14.2 es la masa en gramos, no mL. El volumen desconocido va abajo con los mL.') },
+          { n1: '7.1 g', d1: '14.2 mL', n2: '1 g', d2: 'x mL', why: L('This pairs 7.1 g with 14.2 mL, but those numbers do not belong together — the 14.2 is grams.', 'Esto junta 7.1 g con 14.2 mL, pero esos números no van juntos — el 14.2 son gramos.') }
+        ]
+      }
+    ];
+
+    // Challenge: why it works (rearrange D = M/V by undoing operations on both sides).
+    STEP_TARGETS = [
+      {
+        solve: 'D', word: L('A 25 mL sample of a mineral has a mass of 70 g. Find its density.', 'Una muestra de 25 mL de un mineral tiene una masa de 70 g. Halla su densidad.'), steps: [],
+        noneRow: eqRow('D', EQ, 'M', DIVIDE, 'V'), noneLabel: L('already alone — just divide', 'ya está sola — solo divide'),
+        noneHint: L('Look at D = M/V: D is already by itself on one side, so there is nothing to undo.', 'Mira D = M/V: D ya está sola en un lado, así que no hay nada que deshacer.'),
+        calc: { text: 'D = 70 ÷ 25', answer: 2.8, unit: 'g/mL' }
+      },
+      {
+        solve: 'V', word: L('A liquid has a density of 1.2 g/mL. What volume does 90 g of it fill?', 'Un líquido tiene una densidad de 1.2 g/mL. ¿Qué volumen ocupan 90 g de él?'),
+        steps: [
+          { op: '× V', row: eqRow('D', TIMES, hl('V'), EQ, 'M'), hint: L('V is stuck under M as a ÷ V. What operation cancels a ÷ V?', 'V está debajo de M como ÷ V. ¿Qué operación cancela un ÷ V?') },
+          { op: '÷ D', row: eqRow('V', EQ, eqvFrac('M', 'D', false, true)), hint: L('Now D is multiplying V. To get V alone, undo that × D.', 'Ahora D está multiplicando a V. Para dejar V sola, deshaz ese × D.') }
+        ],
+        noneHint: L('Not yet — V is still stuck in the denominator.', 'Todavía no — V sigue atrapada en el denominador.'),
+        calc: { text: 'V = 90 ÷ 1.2', answer: 75, unit: 'mL' }
+      },
+      {
+        solve: 'M', word: L('Brass has a density of 8.4 g/mL. A brass bar has a volume of 20 mL. What is its mass?', 'El latón tiene una densidad de 8.4 g/mL. Una barra de latón tiene un volumen de 20 mL. ¿Cuál es su masa?'),
+        steps: [{ op: '× V', row: eqRow('D', TIMES, hl('V'), EQ, 'M'), hint: L('M is being divided by V. What cancels a ÷ V?', 'M está siendo dividida entre V. ¿Qué cancela un ÷ V?') }],
+        noneHint: L('Not yet — M is still being divided by V.', 'Todavía no — M sigue siendo dividida entre V.'),
+        calc: { text: 'M = 8.4 × 20', answer: 168, unit: 'g' }
+      }
+    ];
+
+    CONVERT_ITEMS = [
+      { prompt: L('Convert 650 mL to L.', 'Convierte 650 mL a L.'), given: [650, 'mL'], want: 'L', steps: [mk('mL', 'L', [1, 'L'], [1000, 'mL'])], ans: 0.65 },
+      { prompt: L('Convert 3.2 kg to g.', 'Convierte 3.2 kg a g.'), given: [3.2, 'kg'], want: 'g', steps: [mk('kg', 'g', [1, 'kg'], [1000, 'g'])], ans: 3200 },
+      { prompt: L('Convert 3.6 km to cm (two steps).', 'Convierte 3.6 km a cm (dos pasos).'), given: [3.6, 'km'], want: 'cm', steps: [mk('km', 'm', [1, 'km'], [1000, 'm']), mk('m', 'cm', [1, 'm'], [100, 'cm'])], ans: 360000 },
+      { prompt: L('Convert 0.25 L to cm³ (two steps).', 'Convierte 0.25 L a cm³ (dos pasos).'), given: [0.25, 'L'], want: 'cm³', steps: [mk('L', 'mL', [1, 'L'], [1000, 'mL']), mk('mL', 'cm³', [1, 'mL'], [1, 'cm³'])], ans: 250 },
+      { prompt: L('Convert 1.5 h to s (two steps).', 'Convierte 1.5 h a s (dos pasos).'), given: [1.5, 'h'], want: 's', steps: [mk('h', 'min', [1, 'h'], [60, 'min']), mk('min', 's', [1, 'min'], [60, 's'])], ans: 5400 }
+    ];
+    const alWhy = L('Check the density table: aluminum is 2.7 g for every 1 mL.', 'Revisa la tabla de densidades: el aluminio tiene 2.7 g por cada 1 mL.');
+    CHAIN_ITEMS = [
+      {
+        prompt: L('How many kg is 400 mL of aluminum? (Aluminum is 2.7 g/mL.)', '¿Cuántos kg son 400 mL de aluminio? (El aluminio es 2.7 g/mL.)'), given: [400, 'mL'], want: 'kg',
+        paths: ['mL → g → kg', 'mL → kg', 'mL → L → kg'], pathOk: 0,
+        pathWhy: L('Density takes you from volume (mL) to mass (g). Then a metric factor takes g to kg.', 'La densidad te lleva del volumen (mL) a la masa (g). Luego un factor métrico lleva g a kg.'),
+        steps: [mk('mL', 'g', [1, 'mL'], [2.7, 'g'], alWhy), mk('g', 'kg', [1, 'kg'], [1000, 'g'])],
+        ans: 1.08
+      },
+      {
+        prompt: L('What volume (mL) does 54 g of aluminum take up? (Aluminum is 2.7 g/mL.)', '¿Qué volumen (mL) ocupan 54 g de aluminio? (El aluminio es 2.7 g/mL.)'), given: [54, 'g'], want: 'mL',
+        paths: ['g → kg → mL', 'g → L', 'g → mL'], pathOk: 2,
+        pathWhy: L('Density is the bridge between mass and volume. Flip it to go from grams to mL.', 'La densidad es el puente entre la masa y el volumen. Voltéala para ir de gramos a mL.'),
+        steps: [mk('g', 'mL', [1, 'mL'], [2.7, 'g'], alWhy)],
+        ans: 20
+      },
+      {
+        prompt: L('How many kg is 0.60 L of brass? (Brass is 8.4 g/mL.)', '¿Cuántos kg son 0.60 L de latón? (El latón es 8.4 g/mL.)'), given: [0.60, 'L'], want: 'kg',
+        paths: ['L → g → kg', 'L → kg', 'L → mL → g → kg'], pathOk: 2,
+        pathWhy: L('Density uses mL, so change L to mL first, then use density to get g, then change g to kg.', 'La densidad usa mL, así que primero cambia L a mL, luego usa la densidad para obtener g, y después cambia g a kg.'),
+        steps: [mk('L', 'mL', [1, 'L'], [1000, 'mL']), mk('mL', 'g', [1, 'mL'], [8.4, 'g'], L('Check the density table: brass is 8.4 g for every 1 mL.', 'Revisa la tabla de densidades: el latón tiene 8.4 g por cada 1 mL.')), mk('g', 'kg', [1, 'kg'], [1000, 'g'])],
+        ans: 5.04
+      }
+    ];
+
+    TOOLS = [
+      'D = m ÷ V',
+      L('Cross multiply and divide', 'Multiplicar en cruz y dividir'),
+      L('Dimensional analysis (conversion factors)', 'Análisis dimensional (factores de conversión)'),
+      L('Dimensional analysis with density as a factor', 'Análisis dimensional con la densidad como factor')
+    ];
+    TOOL_ITEMS = [
+      { prompt: L('A sample has a mass of 36 g and a volume of 8.0 mL. Find its density.', 'Una muestra tiene una masa de 36 g y un volumen de 8.0 mL. Halla su densidad.'), choices: TOOLS, correct: 0, why: L('You are given mass and volume and want density: D = m ÷ V.', 'Te dan la masa y el volumen y quieres la densidad: D = m ÷ V.') },
+      { prompt: L('Aluminum’s density is 2.7 g/mL. Find the mass of 15 mL of aluminum.', 'La densidad del aluminio es 2.7 g/mL. Halla la masa de 15 mL de aluminio.'), choices: TOOLS, correct: 1, why: L('Given a density and asked for mass: write the density over 1 mL, cross multiply and divide.', 'Te dan una densidad y te piden la masa: escribe la densidad sobre 1 mL, multiplica en cruz y divide.') },
+      { prompt: L('Change 4,500 mg to g.', 'Cambia 4,500 mg a g.'), choices: TOOLS, correct: 2, why: L('You are only changing units, so use conversion factors (dimensional analysis).', 'Solo estás cambiando unidades, así que usa factores de conversión (análisis dimensional).') },
+      { prompt: L('Find the mass, in kg, of 0.20 L of lead.', 'Halla la masa, en kg, de 0.20 L de plomo.'), choices: TOOLS, correct: 3, why: L('You are changing units AND using density: L → mL → g → kg, with density as one factor.', 'Estás cambiando unidades Y usando la densidad: L → mL → g → kg, con la densidad como uno de los factores.') },
+      { prompt: L('If 3 notebooks cost $4.50, what do 7 notebooks cost?', 'Si 3 cuadernos cuestan $4.50, ¿cuánto cuestan 7 cuadernos?'), choices: TOOLS, correct: 1, why: L('Two equal ratios with one missing number: cross multiply and divide.', 'Dos razones iguales con un número desconocido: multiplica en cruz y divide.') }
+    ];
+
+    ERROR_ITEMS = [
+      {
+        title: L('Converting 3.2 kg to grams', 'Convertir 3.2 kg a gramos'),
+        lines: [L('Start with 3.2 kg / 1', 'Empieza con 3.2 kg / 1'), L('Multiply by 1 kg / 1000 g', 'Multiplica por 1 kg / 1000 g'), L('Answer: 0.0032 g', 'Respuesta: 0.0032 g')], wrong: 1,
+        fixes: [L('Multiply by 1000 g / 1 kg', 'Multiplica por 1000 g / 1 kg'), L('Multiply by 1 g / 1000 kg', 'Multiplica por 1 g / 1000 kg'), L('Multiply by 100 g / 1 kg', 'Multiplica por 100 g / 1 kg')], fix: 0,
+        why: L('The unit you want to cancel (kg) goes on the bottom: 3.2 × 1000 = 3,200 g.', 'La unidad que quieres cancelar (kg) va abajo: 3.2 × 1000 = 3,200 g.')
+      },
+      {
+        title: L('Finding density', 'Hallar la densidad'),
+        lines: [L('A sample has m = 54 g and V = 20 mL', 'Una muestra tiene m = 54 g y V = 20 mL'), 'D = V ÷ m = 20 ÷ 54', 'D ≈ 0.37 g/mL'], wrong: 1,
+        fixes: ['D = m ÷ V = 54 ÷ 20', 'D = m × V = 54 × 20', 'D = m − V = 54 − 20'], fix: 0,
+        why: L('Density is mass per unit volume: D = m ÷ V = 54 ÷ 20 = 2.7 g/mL.', 'La densidad es la masa por unidad de volumen: D = m ÷ V = 54 ÷ 20 = 2.7 g/mL.')
+      },
+      {
+        title: L('Solving the proportion 8/12 = x/30', 'Resolver la proporción 8/12 = x/30'),
+        lines: ['8/12 = x/30', L('Cross multiply: 8 × x = 12 × 30', 'Multiplica en cruz: 8 × x = 12 × 30'), 'x = 360 ÷ 8 = 45'], wrong: 1,
+        fixes: [L('Cross multiply: 8 × 30 = 12 × x', 'Multiplica en cruz: 8 × 30 = 12 × x'), L('Cross multiply: 8 × 12 = x × 30', 'Multiplica en cruz: 8 × 12 = x × 30'), L('Cross multiply: 8 + 30 = 12 + x', 'Multiplica en cruz: 8 + 30 = 12 + x')], fix: 0,
+        why: L('The cross goes corner to opposite corner: 8 with 30, and 12 with x. (Then x = 240 ÷ 12 = 20.)', 'La cruz va de esquina a esquina opuesta: 8 con 30, y 12 con x. (Entonces x = 240 ÷ 12 = 20.)')
+      },
+      {
+        title: L('Finding a volume', 'Hallar un volumen'),
+        lines: ['D = 1.2 g/mL, M = 90 g', 'V = M ÷ D = 90 ÷ 1.2', 'V = 75 g'], wrong: 2,
+        fixes: ['V = 75 mL', 'V = 75 g/mL', 'V = 75 cm²'], fix: 0,
+        why: L('Grams ÷ (grams per mL) leaves mL. A volume is never measured in grams.', 'Gramos ÷ (gramos por mL) deja mL. Un volumen nunca se mide en gramos.')
+      },
+      {
+        title: L('Solving D = M/V for M', 'Despejar M en D = M/V'),
+        lines: ['D = M/V', L('Divide both sides by V: D ÷ V = M', 'Divide ambos lados entre V: D ÷ V = M'), L('So M = D ÷ V', 'Entonces M = D ÷ V')], wrong: 1,
+        fixes: [L('Multiply both sides by V: D × V = M', 'Multiplica ambos lados por V: D × V = M'), L('Add V to both sides: D + V = M', 'Suma V a ambos lados: D + V = M'), L('Subtract V from both sides: D − V = M', 'Resta V a ambos lados: D − V = M')], fix: 0,
+        why: L('M is being divided by V, so the operation that cancels it is multiplying both sides by V.', 'M está siendo dividida entre V, así que la operación que la cancela es multiplicar ambos lados por V.')
+      },
+      {
+        title: L('Converting 450 mL to L', 'Convertir 450 mL a L'),
+        lines: ['450 mL/1 × (1000 mL / 1 L)', L('The units do not cancel: mL × mL', 'Las unidades no se cancelan: mL × mL'), '= 450,000 mL²/L'], wrong: 0,
+        fixes: ['450 mL/1 × (1 L / 1000 mL)', '450 mL/1 × (1000 L / 1 mL)', '450 mL/1 × (1 mL / 1000 L)'], fix: 0,
+        why: L('Flip the factor so mL is on the bottom and cancels: 450 × 1 ÷ 1000 = 0.45 L.', 'Voltea el factor para que mL quede abajo y se cancele: 450 × 1 ÷ 1000 = 0.45 L.')
+      }
+    ];
+
+    CER_ITEM = {
+      scenario: L('A seller says a bar is solid aluminum. You measure its mass as 0.84 kg and its volume as 100 mL. Is the seller right? Build your answer one piece at a time.',
+                  'Un vendedor dice que una barra es de aluminio sólido. Mides su masa en 0.84 kg y su volumen en 100 mL. ¿Tiene razón el vendedor? Construye tu respuesta una parte a la vez.'),
+      stages: [
+        { label: L('Claim', 'Afirmación'), prompt: L('Which claim does your data support?', '¿Qué afirmación respaldan tus datos?'),
+          choices: [L('It is aluminum', 'Es aluminio'), L('It is not aluminum', 'No es aluminio'), L('You cannot tell from mass and volume', 'No se puede saber con la masa y el volumen')], correct: 1,
+          why: L('The density will not match aluminum — see the evidence next.', 'La densidad no coincidirá con la del aluminio — mira la evidencia a continuación.') },
+        { label: L('Evidence', 'Evidencia'), prompt: L('Which evidence is correct?', '¿Qué evidencia es correcta?'), choices: [
+          'D = 0.84 ÷ 100 = 0.0084 g/mL',
+          L('0.84 kg/1 × (1000 g / 1 kg) = 840 g; D = 840 g ÷ 100 mL = 8.4 g/mL; aluminum is 2.7 g/mL', '0.84 kg/1 × (1000 g / 1 kg) = 840 g; D = 840 g ÷ 100 mL = 8.4 g/mL; el aluminio es 2.7 g/mL'),
+          'D = 100 mL ÷ 840 g = 0.12 g/mL'], correct: 1,
+          why: L('Convert kg to g first, then D = m ÷ V. 8.4 g/mL is not 2.7 g/mL.', 'Primero convierte kg a g, luego D = m ÷ V. 8.4 g/mL no es 2.7 g/mL.') },
+        { label: L('Reasoning', 'Razonamiento'), prompt: L('Which reasoning connects the evidence to the claim?', '¿Qué razonamiento conecta la evidencia con la afirmación?'), choices: [
+          L('A bigger bar is always denser, so this bar must be something else', 'Una barra más grande siempre es más densa, así que esta barra debe ser otra cosa'),
+          L('Density is an intensive property, so a bar of any size that is aluminum would be 2.7 g/mL; 8.4 g/mL matches brass', 'La densidad es una propiedad intensiva, así que una barra de aluminio de cualquier tamaño sería 2.7 g/mL; 8.4 g/mL coincide con el latón'),
+          L('Mass is extensive, so it identifies the substance', 'La masa es extensiva, así que identifica la sustancia')], correct: 1,
+          why: L('Intensive properties like density do not depend on the amount, so they identify the substance.', 'Las propiedades intensivas, como la densidad, no dependen de la cantidad, así que identifican la sustancia.') }
+      ]
+    };
+
+    // Graded check (mirrors the Mini Math Check: words, skills, fix, explain)
+    QUESTIONS = [
+      { id: 'q1', part: 2, type: 'mc', prompt: L('Words to know — mass:', 'Palabras que debes saber — masa:'),
+        choices: [L('the amount of space a sample of matter takes up', 'la cantidad de espacio que ocupa una muestra de materia'), L('the amount of matter in an object', 'la cantidad de materia en un objeto'), L('mass per unit volume', 'masa por unidad de volumen'), L('an equation that says two ratios are equal', 'una ecuación que dice que dos razones son iguales')], correct: 1,
+        explanation: L('Mass is the amount of matter in an object.', 'La masa es la cantidad de materia en un objeto.') },
+      { id: 'q2', part: 2, type: 'mc', prompt: L('Words to know — volume:', 'Palabras que debes saber — volumen:'),
+        choices: [L('the amount of matter in an object', 'la cantidad de materia en un objeto'), L('an equality written as a fraction', 'una equivalencia escrita como fracción'), L('the amount of space a sample of matter takes up', 'la cantidad de espacio que ocupa una muestra de materia'), L('the temperature at which a solid melts', 'la temperatura a la que se derrite un sólido')], correct: 2,
+        explanation: L('Volume is the amount of space a sample of matter takes up.', 'El volumen es la cantidad de espacio que ocupa una muestra de materia.') },
+      { id: 'q3', part: 3, type: 'mc', prompt: L('Words to know — density:', 'Palabras que debes saber — densidad:'),
+        choices: [L('mass per unit volume', 'masa por unidad de volumen'), L('the amount of matter in an object', 'la cantidad de materia en un objeto'), L('an equality written as a fraction', 'una equivalencia escrita como fracción'), L('the amount of space a sample takes up', 'la cantidad de espacio que ocupa una muestra')], correct: 0,
+        explanation: L('Density is mass per unit volume: D = m ÷ V.', 'La densidad es la masa por unidad de volumen: D = m ÷ V.') },
+      { id: 'q4', part: 5, type: 'mc', prompt: L('Words to know — conversion factor:', 'Palabras que debes saber — factor de conversión:'),
+        choices: [L('an equation that says two ratios are equal', 'una ecuación que dice que dos razones son iguales'), L('mass per unit volume', 'masa por unidad de volumen'), L('an equality written as a fraction, like 1000 g / 1 kg', 'una equivalencia escrita como fracción, como 1000 g / 1 kg'), L('the amount of space a sample takes up', 'la cantidad de espacio que ocupa una muestra')], correct: 2,
+        explanation: L('A conversion factor is an equality written as a fraction. It equals one.', 'Un factor de conversión es una equivalencia escrita como fracción. Es igual a uno.') },
+      { id: 'q5', part: 4, type: 'mc', prompt: L('Words to know — proportion:', 'Palabras que debes saber — proporción:'),
+        choices: [L('an equation that says two ratios are equal', 'una ecuación que dice que dos razones son iguales'), L('an equality written as a fraction', 'una equivalencia escrita como fracción'), L('mass per unit volume', 'masa por unidad de volumen'), L('the amount of matter in an object', 'la cantidad de materia en un objeto')], correct: 0,
+        explanation: L('A proportion is an equation that says two ratios are equal.', 'Una proporción es una ecuación que dice que dos razones son iguales.') },
+      { id: 'q6', part: 4, type: 'num', prompt: L('Solve for x: 5/x = 15/24', 'Halla x: 5/x = 15/24'), correct: 8,
+        explanation: L('Cross multiply: 5 × 24 = x × 15 → 120 = 15x → x = 8.', 'Multiplica en cruz: 5 × 24 = x × 15 → 120 = 15x → x = 8.') },
+      { id: 'q7', part: 4, type: 'num', prompt: L('Solve for x: x/6 = 14/21', 'Halla x: x/6 = 14/21'), correct: 4,
+        explanation: L('Cross multiply: x × 21 = 6 × 14 → 21x = 84 → x = 4.', 'Multiplica en cruz: x × 21 = 6 × 14 → 21x = 84 → x = 4.') },
+      { id: 'q8', part: 3, type: 'num', prompt: L('A metal sample has a mass of 67.5 g and a volume of 25.0 mL. What is its density (g/mL)?', 'Una muestra de metal tiene una masa de 67.5 g y un volumen de 25.0 mL. ¿Cuál es su densidad (g/mL)?'), correct: 2.7,
+        explanation: L('D = m ÷ V = 67.5 ÷ 25.0 = 2.7 g/mL.', 'D = m ÷ V = 67.5 ÷ 25.0 = 2.7 g/mL.') },
+      { id: 'q9', part: 3, type: 'mc', prompt: L('Use the density table. Which metal has a density of 2.7 g/mL?', 'Usa la tabla de densidades. ¿Qué metal tiene una densidad de 2.7 g/mL?'),
+        choices: [substName('zinc'), substName('gold'), substName('aluminum'), substName('brass')], correct: 2,
+        explanation: L('Aluminum is 2.7 g/mL. Density is intensive, so it identifies the substance.', 'El aluminio es 2.7 g/mL. La densidad es intensiva, así que identifica la sustancia.') },
+      { id: 'q10', part: 4, type: 'num', prompt: L('Lead is 11.4 g/mL. What is the mass (g) of 6.0 mL of lead?', 'El plomo es 11.4 g/mL. ¿Cuál es la masa (g) de 6.0 mL de plomo?'), correct: 68.4,
+        explanation: L('11.4 g / 1 mL = x g / 6.0 mL → x = 11.4 × 6.0 ÷ 1 = 68.4 g.', '11.4 g / 1 mL = x g / 6.0 mL → x = 11.4 × 6.0 ÷ 1 = 68.4 g.') },
+      { id: 'q11', part: 4, type: 'num', prompt: L('Brass is 8.4 g/mL. What volume (mL) does 63 g of brass take up?', 'El latón es 8.4 g/mL. ¿Qué volumen (mL) ocupan 63 g de latón?'), correct: 7.5,
+        explanation: L('8.4 g / 1 mL = 63 g / x mL → x = 63 × 1 ÷ 8.4 = 7.5 mL.', '8.4 g / 1 mL = 63 g / x mL → x = 63 × 1 ÷ 8.4 = 7.5 mL.') },
+      { id: 'q12', part: 1, type: 'num', prompt: L('Use dimensional analysis: 0.62 L = ? mL', 'Usa análisis dimensional: 0.62 L = ? mL'), correct: 620,
+        explanation: '0.62 L/1 × (1000 mL / 1 L) = 620 mL.' },
+      { id: 'q13', part: 5, type: 'num', prompt: L('Use dimensional analysis: 135 min = ? h', 'Usa análisis dimensional: 135 min = ? h'), correct: 2.25,
+        explanation: '135 min/1 × (1 h / 60 min) = 2.25 h.' },
+      { id: 'q14', part: 5, type: 'num', prompt: L('Use dimensional analysis (two steps): 5.2 km = ? cm', 'Usa análisis dimensional (dos pasos): 5.2 km = ? cm'), correct: 520000,
+        explanation: '5.2 km/1 × (1000 m / 1 km) × (100 cm / 1 m) = 520,000 cm.' },
+      { id: 'q15', part: 6, type: 'num', prompt: L('Plan the path, then solve: how many kg is 0.30 L of lead? (Lead is 11.4 g/mL.)', 'Planea la ruta y luego resuelve: ¿cuántos kg son 0.30 L de plomo? (El plomo es 11.4 g/mL.)'), correct: 3.42,
+        explanation: 'L → mL → g → kg: 0.30 L/1 × (1000 mL / 1 L) × (11.4 g / 1 mL) × (1 kg / 1000 g) = 3.42 kg.' },
+      { id: 'q16', part: 2, type: 'num', prompt: L('A cylinder holds 30.0 mL of water. After a rock is added, the level is 37.6 mL. What is the volume of the rock (mL)?', 'Una probeta contiene 30.0 mL de agua. Después de agregar una roca, el nivel es 37.6 mL. ¿Cuál es el volumen de la roca (mL)?'), correct: 7.6,
+        explanation: L('Volume of object = with − without = 37.6 − 30.0 = 7.6 mL.', 'Volumen del objeto = con − sin = 37.6 − 30.0 = 7.6 mL.') },
+      { id: 'q17', part: 7, type: 'mc', prompt: L('Fix the mistake: a student writes 3.2 kg/1 × (1 kg / 1000 g) = 0.0032 g. What went wrong?', 'Corrige el error: un estudiante escribe 3.2 kg/1 × (1 kg / 1000 g) = 0.0032 g. ¿Qué salió mal?'),
+        choices: [L('The conversion factor is upside down, so kg does not cancel', 'El factor de conversión está al revés, así que kg no se cancela'), L('They should have added 1000', 'Debió sumar 1000'), L('Nothing — that is correct', 'Nada — eso es correcto'), L('They should have used density', 'Debió usar la densidad')], correct: 0,
+        explanation: L('kg has to be on the bottom to cancel: 3.2 kg/1 × (1000 g / 1 kg) = 3,200 g.', 'kg tiene que ir abajo para cancelarse: 3.2 kg/1 × (1000 g / 1 kg) = 3,200 g.') },
+      { id: 'q18', part: 7, type: 'mc', prompt: L('Which tool finds the mass of 25 mL of copper when you are given copper’s density?', '¿Qué herramienta halla la masa de 25 mL de cobre cuando te dan la densidad del cobre?'),
+        choices: ['D = m ÷ V', L('Cross multiply and divide (density over 1 mL)', 'Multiplicar en cruz y dividir (densidad sobre 1 mL)'), L('Water displacement', 'Desplazamiento de agua'), L('Only a balance', 'Solo una balanza')], correct: 1,
+        explanation: L('Given a density and asked for mass: set up density over 1 mL, then cross multiply and divide.', 'Te dan una densidad y te piden la masa: plantea la densidad sobre 1 mL, luego multiplica en cruz y divide.') },
+      { id: 'q19', part: 7, type: 'mc', prompt: L('Explain it: a seller says a bar is aluminum, but its mass is 0.84 kg and its volume is 100 mL. Which response is best?', 'Explícalo: un vendedor dice que una barra es de aluminio, pero su masa es 0.84 kg y su volumen es 100 mL. ¿Cuál es la mejor respuesta?'),
+        choices: [L('Yes — it is heavy, so it is aluminum', 'Sí — es pesada, así que es aluminio'), L('No — D = 840 g ÷ 100 mL = 8.4 g/mL, which matches brass, not aluminum (2.7 g/mL)', 'No — D = 840 g ÷ 100 mL = 8.4 g/mL, que coincide con el latón, no con el aluminio (2.7 g/mL)'), L('No — its density is 0.0084 g/mL', 'No — su densidad es 0.0084 g/mL'), L('You cannot tell without knowing the temperature', 'No se puede saber sin conocer la temperatura')], correct: 1,
+        explanation: L('Convert 0.84 kg to 840 g, then D = m ÷ V = 8.4 g/mL. Density is intensive, so it identifies the substance.', 'Convierte 0.84 kg a 840 g, luego D = m ÷ V = 8.4 g/mL. La densidad es intensiva, así que identifica la sustancia.') },
+      { id: 'q20', part: 3, type: 'mc', prompt: L('A 5 g piece and a 50 g piece are both pure zinc. Which property is the same for both?', 'Un trozo de 5 g y un trozo de 50 g son de zinc puro. ¿Qué propiedad es la misma en ambos?'),
+        choices: [L('Mass', 'La masa'), L('Volume', 'El volumen'), L('Density', 'La densidad'), L('None of them', 'Ninguna')], correct: 2,
+        explanation: L('Density is intensive: both pieces are 7.1 g/mL, no matter the size.', 'La densidad es intensiva: ambos trozos son de 7.1 g/mL, sin importar el tamaño.') }
+    ];
+  }
 
   // =====================================================================
   // Styles
@@ -478,6 +530,10 @@
 .mmr-lesson .step-feedback.bad { color: #b91c1c; }
 
 /* ---- Mini-Math Review additions ---- */
+.mmr-lesson .mmr-lang-toggle { position: absolute; top: 1.75rem; right: 1.75rem; z-index: 2; display: flex; gap: 0.3rem; }
+.mmr-lesson .mmr-lang-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.3rem 0.6rem; border-radius: 6px; background: transparent; border: 1px solid rgba(247,243,236,0.35); color: rgba(247,243,236,0.65); cursor: pointer; }
+.mmr-lesson .mmr-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.mmr-lesson .mmr-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
 .mmr-lesson .mmr-xref { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-muted); background: var(--cream); border-radius: 6px; padding: 0.35rem 0.6rem; margin: 0 0 1rem; display: inline-block; }
 .mmr-lesson .mmr-tool { border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 1rem 1.1rem; margin: 1.1rem 0; background: #fcfcfd; }
 .mmr-lesson .mmr-tool-title { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--navy-mid); font-weight: 700; margin-bottom: 0.6rem; }
@@ -548,32 +604,32 @@
         <div class="pp-header"><span class="pp-num">Q</span></div>
         <div class="pp-body">
           <p><strong>${escapeHtml(prompt)}</strong></p>
-          <button type="button" class="hint-btn" data-hint-target="mmrhint-${idSuffix}">💡 Hint</button>
-          <button type="button" class="reveal-btn" data-answer-target="mmrans-${idSuffix}">Reveal Answer</button>
+          <button type="button" class="hint-btn" data-hint-target="mmrhint-${idSuffix}">${L('💡 Hint', '💡 Pista')}</button>
+          <button type="button" class="reveal-btn" data-answer-target="mmrans-${idSuffix}">${L('Reveal Answer', 'Mostrar Respuesta')}</button>
           <div class="hint-box" id="mmrhint-${idSuffix}">${escapeHtml(hint)}</div>
           <div class="answer-box" id="mmrans-${idSuffix}">
-            <div class="answer-label">✓ Answer</div>
+            <div class="answer-label">${L('✓ Answer', '✓ Respuesta')}</div>
             ${escapeHtml(answer)}
           </div>
         </div>
       </div>`;
   }
   function toolBox(id, title) {
-    return `<div class="mmr-tool"><div class="mmr-tool-title">Mini-tool · ${escapeHtml(title)}</div><div id="${id}"></div></div>`;
+    return `<div class="mmr-tool"><div class="mmr-tool-title">${L('Mini-tool', 'Mini-herramienta')} · ${escapeHtml(title)}</div><div id="${id}"></div></div>`;
   }
 
   // Runs a list of items one at a time. renderItem(item, bodyEl, markSolved, index).
   function runSequence(mount, items, label, renderItem) {
     function show(i) {
       if (i >= items.length) {
-        mount.innerHTML = `<div class="mmr-tool-done">✓ ${escapeHtml(label)} complete — nice work.</div><p><button type="button" class="hint-btn" id="mmr-again">↺ Do it again</button></p>`;
+        mount.innerHTML = `<div class="mmr-tool-done">✓ ${escapeHtml(label)} ${L('complete — nice work.', 'completo — ¡buen trabajo!')}</div><p><button type="button" class="hint-btn" id="mmr-again">${L('↺ Do it again', '↺ Hacerlo otra vez')}</button></p>`;
         mount.querySelector('#mmr-again').addEventListener('click', () => show(0));
         return;
       }
       mount.innerHTML = `
-        <div class="mmr-tool-count">${escapeHtml(label)} · ${i + 1} of ${items.length}</div>
+        <div class="mmr-tool-count">${escapeHtml(label)} · ${i + 1} ${L('of', 'de')} ${items.length}</div>
         <div class="mmr-tool-body"></div>
-        <button type="button" class="mmr-next-btn" style="display:none;">${i + 1 < items.length ? 'Next problem' : 'Finish'}</button>`;
+        <button type="button" class="mmr-next-btn" style="display:none;">${i + 1 < items.length ? L('Next problem', 'Siguiente problema') : L('Finish', 'Terminar')}</button>`;
       const nextBtn = mount.querySelector('.mmr-next-btn');
       nextBtn.addEventListener('click', () => show(i + 1));
       renderItem(items[i], mount.querySelector('.mmr-tool-body'), () => { nextBtn.style.display = 'inline-block'; }, i);
@@ -589,7 +645,7 @@
   }
 
   function unitSelectHtml() {
-    return `<select class="mmr-select mmr-unit"><option value="">unit…</option>${UNIT_OPTIONS.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('')}</select>`;
+    return `<select class="mmr-select mmr-unit"><option value="">${L('unit…', 'unidad…')}</option>${UNIT_OPTIONS.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('')}</select>`;
   }
 
   // Number box + (optional) unit picker + Check. onCorrect fires once.
@@ -598,7 +654,7 @@
     box.className = 'mmr-calc';
     box.innerHTML = `
       <div>${escapeHtml(prefix)} <input type="number" step="any" class="num-input mmr-ans" placeholder="?"> ${unit ? unitSelectHtml() : `<span>${escapeHtml(unitText || '')}</span>`}</div>
-      <button type="button" class="check-btn">Check</button>
+      <button type="button" class="check-btn">${L('Check', 'Revisar')}</button>
       <div class="step-feedback"></div>`;
     container.appendChild(box);
     const input = box.querySelector('.mmr-ans');
@@ -614,12 +670,12 @@
         finished = true;
         input.disabled = true; checkBtn.disabled = true;
         if (unitSel) unitSel.disabled = true;
-        setFeedback(box, `✓ Correct! ${prefix} ${formatNum(answer)}${unit ? ' ' + unit : (unitText ? ' ' + unitText : '')}`, true);
+        setFeedback(box, `${L('✓ Correct!', '✓ ¡Correcto!')} ${prefix} ${formatNum(answer)}${unit ? ' ' + unit : (unitText ? ' ' + unitText : '')}`, true);
         onCorrect();
       } else if (numOk) {
-        setFeedback(box, 'Right number — now check the unit. Grams measure mass, mL/cm³ measure volume, g/mL or g/cm³ measure density.', false);
+        setFeedback(box, L('Right number — now check the unit. Grams measure mass, mL/cm³ measure volume, g/mL or g/cm³ measure density.', 'El número es correcto — ahora revisa la unidad. Los gramos miden masa, mL/cm³ miden volumen, g/mL o g/cm³ miden densidad.'), false);
       } else {
-        setFeedback(box, 'Not quite — redo the arithmetic and try again.', false);
+        setFeedback(box, L('Not quite — redo the arithmetic and try again.', 'No exactamente — repite la aritmética e inténtalo de nuevo.'), false);
       }
     }
     checkBtn.addEventListener('click', check);
@@ -644,7 +700,7 @@
           done();
         } else {
           btn.classList.add('bad');
-          setFeedback(body, 'Not quite — try another choice.', false);
+          setFeedback(body, L('Not quite — try another choice.', 'No exactamente — prueba otra opción.'), false);
         }
       });
     });
@@ -659,15 +715,15 @@
   // Part 1 tool — walk the metric ladder
   // =====================================================================
   function renderLadderItem(item, body, done) {
-    const fromIdx = LADDER.findIndex(r => r[1] === item.from);
-    const toIdx = LADDER.findIndex(r => r[1] === item.to);
+    const fromIdx = LADDER_SYMBOLS.indexOf(item.from);
+    const toIdx = LADDER_SYMBOLS.indexOf(item.to);
     const steps = Math.abs(toIdx - fromIdx);
     const dir = toIdx > fromIdx ? 'right' : 'left';
     const fromU = item.from + item.base, toU = item.to + item.base;
     body.innerHTML = `
-      <p class="mmr-sentence">Convert <strong>${formatNum(item.v)} ${fromU}</strong> to <strong>${toU}</strong>.</p>
+      <p class="mmr-sentence">${L('Convert', 'Convierte')} <strong>${formatNum(item.v)} ${fromU}</strong> ${L('to', 'a')} <strong>${toU}</strong>.</p>
       <div class="mmr-ladder">${LADDER.map((r, i) => `<button type="button" class="mmr-rung${i === fromIdx ? ' start' : ''}" data-i="${i}"><span>${r[0]}</span><small>${i === 3 ? item.base : r[1] + item.base}</small></button>`).join('')}</div>
-      <p class="mmr-sentence"><strong>Step 1.</strong> Tap the rung you are converting <em>to</em>.</p>
+      <p class="mmr-sentence"><strong>${L('Step 1.', 'Paso 1.')}</strong> ${L('Tap the rung you are converting <em>to</em>.', 'Toca el peldaño al que estás convirtiendo.')}</p>
       <div class="step-feedback"></div>
       <div class="mmr-solve-slot"></div>`;
     const slot = body.querySelector('.mmr-solve-slot');
@@ -676,18 +732,18 @@
       r.addEventListener('click', () => {
         if (r.disabled) return;
         if (Number(r.getAttribute('data-i')) !== toIdx) {
-          setFeedback(body, `That is not ${toU}. Find the rung for ${toU}.`, false);
+          setFeedback(body, L(`That is not ${toU}. Find the rung for ${toU}.`, `Ese no es ${toU}. Busca el peldaño de ${toU}.`), false);
           return;
         }
         rungs.forEach(x => { x.disabled = true; });
         r.classList.add('target');
-        setFeedback(body, '✓ Now count how far you moved.', true);
+        setFeedback(body, L('✓ Now count how far you moved.', '✓ Ahora cuenta cuánto te moviste.'), true);
         slot.innerHTML = `
-          <p class="mmr-sentence"><strong>Step 2.</strong> The decimal moves
+          <p class="mmr-sentence"><strong>${L('Step 2.', 'Paso 2.')}</strong> ${L('The decimal moves', 'El punto decimal se mueve')}
             <select class="mmr-select" data-k="n"><option value="">?</option>${[1, 2, 3, 4].map(n => `<option value="${n}">${n}</option>`).join('')}</select>
-            place(s) to the
-            <select class="mmr-select" data-k="dir"><option value="">?</option><option value="left">left</option><option value="right">right</option></select>.</p>
-          <button type="button" class="check-btn">Check</button>
+            ${L('place(s) to the', 'lugar(es) hacia la')}
+            <select class="mmr-select" data-k="dir"><option value="">?</option><option value="left">${L('left', 'izquierda')}</option><option value="right">${L('right', 'derecha')}</option></select>.</p>
+          <button type="button" class="check-btn">${L('Check', 'Revisar')}</button>
           <div class="step-feedback mmr-fb2"></div>
           <div class="mmr-step3"></div>`;
         const fb2 = slot.querySelector('.mmr-fb2');
@@ -697,11 +753,13 @@
           if (Number(n) === steps && d === dir) {
             btn.disabled = true;
             slot.querySelectorAll('select').forEach(s => { s.disabled = true; });
-            fb2.textContent = `✓ ${steps} step${steps > 1 ? 's' : ''} ${dir === 'right' ? 'down the ladder (big → small): the number gets bigger' : 'up the ladder (small → big): the number gets smaller'}.`;
+            fb2.textContent = dir === 'right'
+              ? L(`✓ ${steps} step${steps > 1 ? 's' : ''} down the ladder (big → small): the number gets bigger.`, `✓ ${steps} paso${steps > 1 ? 's' : ''} hacia abajo en la escalera (grande → pequeña): el número aumenta.`)
+              : L(`✓ ${steps} step${steps > 1 ? 's' : ''} up the ladder (small → big): the number gets smaller.`, `✓ ${steps} paso${steps > 1 ? 's' : ''} hacia arriba en la escalera (pequeña → grande): el número disminuye.`);
             fb2.className = 'step-feedback mmr-fb2 ok';
             appendAnswerBox(slot.querySelector('.mmr-step3'), { prefix: `${formatNum(item.v)} ${fromU} =`, answer: item.ans, unit: null, unitText: toU, onCorrect: done });
           } else {
-            fb2.textContent = 'Count the rungs between the two units. Big unit → small unit moves the decimal right (bigger number).';
+            fb2.textContent = L('Count the rungs between the two units. Big unit → small unit moves the decimal right (bigger number).', 'Cuenta los peldaños entre las dos unidades. De unidad grande → pequeña, el punto decimal se mueve a la derecha (número mayor).');
             fb2.className = 'step-feedback mmr-fb2 bad';
           }
         });
@@ -719,7 +777,7 @@
       const yy = top + h - (t / max) * h;
       ticks += `<line x1="35" y1="${yy}" x2="45" y2="${yy}" stroke="#253a52" stroke-width="1.5"/><text x="30" y="${yy + 4}" text-anchor="end" font-size="10" font-family="JetBrains Mono,monospace" fill="#5a6475">${t}</text>`;
     }
-    return `<svg viewBox="0 0 130 200" width="130" height="200" role="img" aria-label="Graduated cylinder reading ${ml} mL">
+    return `<svg viewBox="0 0 130 200" width="130" height="200" role="img" aria-label="${L('Graduated cylinder reading', 'Probeta con lectura de')} ${ml} mL">
       <rect x="36" y="${y}" width="48" height="${top + h - y}" fill="#bae6fd"/>
       <rect x="35" y="20" width="50" height="160" fill="none" stroke="#253a52" stroke-width="2"/>
       ${ticks}
@@ -731,10 +789,10 @@
     if (item.kind === 'mc') return renderMcItem(item, body, done);
     if (item.kind === 'num') return renderNumItem(item, body, done);
     body.innerHTML = `
-      <p class="mmr-sentence">An object is lowered into a graduated cylinder. <strong>What is the volume of the object?</strong> (Volume of object = with − without.)</p>
+      <p class="mmr-sentence">${L('An object is lowered into a graduated cylinder. <strong>What is the volume of the object?</strong> (Volume of object = with − without.)', 'Se baja un objeto en una probeta. <strong>¿Cuál es el volumen del objeto?</strong> (Volumen del objeto = con − sin.)')}</p>
       <div class="mmr-cyls">
-        <div><div class="mmr-cyl-label">Without the object</div>${cylinderSvg(item.before, false)}</div>
-        <div><div class="mmr-cyl-label">With the object</div>${cylinderSvg(item.after, true)}</div>
+        <div><div class="mmr-cyl-label">${L('Without the object', 'Sin el objeto')}</div>${cylinderSvg(item.before, false)}</div>
+        <div><div class="mmr-cyl-label">${L('With the object', 'Con el objeto')}</div>${cylinderSvg(item.after, true)}</div>
       </div>
       <div class="mmr-solve-slot"></div>`;
     appendAnswerBox(body.querySelector('.mmr-solve-slot'), { prefix: `${item.after.toFixed(1)} − ${item.before.toFixed(1)} =`, answer: roundNice(item.after - item.before), unit: null, unitText: 'mL', onCorrect: done });
@@ -746,12 +804,12 @@
   function renderTagItem(prob, body, done) {
     const nums = prob.parts.filter(p => typeof p !== 'string');
     const sentence = prob.parts.map(p => typeof p === 'string' ? escapeHtml(p) : `<span class="mmr-chip">${escapeHtml(p.n)}</span>`).join('');
-    const roleOpts = `<option value="">Choose…</option><option value="D">D — density</option><option value="M">M — mass</option><option value="V">V — volume</option><option value="X">Not used in D = M/V</option>`;
+    const roleOpts = `<option value="">${L('Choose…', 'Elige…')}</option><option value="D">${L('D — density', 'D — densidad')}</option><option value="M">${L('M — mass', 'M — masa')}</option><option value="V">${L('V — volume', 'V — volumen')}</option><option value="X">${L('Not used in D = M/V', 'No se usa en D = M/V')}</option>`;
     body.innerHTML = `
       <p class="mmr-sentence">${sentence}</p>
       ${nums.map((p, i) => `<div class="mmr-tag-row" data-row="${i}"><span class="mmr-chip">${escapeHtml(p.n)}</span><select class="mmr-select" data-row="${i}">${roleOpts}</select><span class="mmr-mark"></span></div>`).join('')}
-      <div class="mmr-tag-row" data-row="solve"><span class="mmr-solve-label">We are solving for…</span><select class="mmr-select" data-row="solve"><option value="">Choose…</option><option value="D">D — density</option><option value="M">M — mass</option><option value="V">V — volume</option></select><span class="mmr-mark"></span></div>
-      <button type="button" class="check-btn">Check</button>
+      <div class="mmr-tag-row" data-row="solve"><span class="mmr-solve-label">${L('We are solving for…', 'Estamos buscando…')}</span><select class="mmr-select" data-row="solve"><option value="">${L('Choose…', 'Elige…')}</option><option value="D">${L('D — density', 'D — densidad')}</option><option value="M">${L('M — mass', 'M — masa')}</option><option value="V">${L('V — volume', 'V — volumen')}</option></select><span class="mmr-mark"></span></div>
+      <button type="button" class="check-btn">${L('Check', 'Revisar')}</button>
       <div class="step-feedback"></div>`;
     const checkBtn = body.querySelector('.check-btn');
     checkBtn.addEventListener('click', () => {
@@ -768,10 +826,10 @@
       if (allOk) {
         body.querySelectorAll('select').forEach(s => { s.disabled = true; });
         checkBtn.disabled = true;
-        setFeedback(body, '✓ Every number is labeled and you know what to solve for.', true);
+        setFeedback(body, L('✓ Every number is labeled and you know what to solve for.', '✓ Cada número está etiquetado y sabes qué buscar.'), true);
         done();
       } else {
-        setFeedback(body, 'Not quite. Units are clues: g = mass · mL or cm³ = volume · g/mL or g/cm³ = density. The unknown is the thing the question asks for.', false);
+        setFeedback(body, L('Not quite. Units are clues: g = mass · mL or cm³ = volume · g/mL or g/cm³ = density. The unknown is the thing the question asks for.', 'No exactamente. Las unidades son pistas: g = masa · mL o cm³ = volumen · g/mL o g/cm³ = densidad. La incógnita es lo que pide la pregunta.'), false);
       }
     });
   }
@@ -786,8 +844,8 @@
       prefix: `D = m ÷ V = ${item.m.toFixed(1)} ÷ ${item.V.toFixed(1)} =`, answer: item.D, unit: null, unitText: 'g/mL',
       onCorrect: () => {
         pick.innerHTML = `
-          <p class="mmr-sentence"><strong>Which substance is it?</strong> Compare your density to the table.</p>
-          <div class="mmr-options">${DENSITIES.map(d => `<button type="button" class="mmr-option" data-n="${d[0]}">${d[0]} · ${d[1]} g/mL</button>`).join('')}</div>
+          <p class="mmr-sentence"><strong>${L('Which substance is it?', '¿Qué sustancia es?')}</strong> ${L('Compare your density to the table.', 'Compara tu densidad con la tabla.')}</p>
+          <div class="mmr-options">${DENSITIES.map(d => `<button type="button" class="mmr-option" data-n="${d[0]}">${substName(d[0])} · ${d[1]} g/mL</button>`).join('')}</div>
           <div class="step-feedback"></div>`;
         let solved = false;
         pick.querySelectorAll('.mmr-option').forEach(btn => {
@@ -798,12 +856,12 @@
               solved = true;
               btn.classList.add('ok');
               pick.querySelectorAll('.mmr-option').forEach(b => { b.disabled = true; });
-              setFeedback(pick, `✓ ${item.D} g/mL matches ${item.metal}. Density is intensive, so it identifies the substance.`, true);
+              setFeedback(pick, L(`✓ ${item.D} g/mL matches ${item.metal}. Density is intensive, so it identifies the substance.`, `✓ ${item.D} g/mL coincide con ${substName(item.metal)}. La densidad es intensiva, así que identifica la sustancia.`), true);
               done();
             } else {
               btn.classList.add('bad');
               const d = DENSITIES.find(x => x[0] === name)[1];
-              setFeedback(pick, `${name} is ${d} g/mL — that does not match ${item.D} g/mL.`, false);
+              setFeedback(pick, L(`${name} is ${d} g/mL — that does not match ${item.D} g/mL.`, `${substName(name)} es ${d} g/mL — eso no coincide con ${item.D} g/mL.`), false);
             }
           });
         });
@@ -820,20 +878,19 @@
     const wrap = document.createElement('div');
     wrap.className = 'eqv-flow';
     wrap.innerHTML = `
-      ${eqvArrow('multiply the diagonal without ' + p.v)}
+      ${eqvArrow(L('multiply the diagonal without ', 'multiplica la diagonal sin ') + p.v)}
       ${eqRow(lab('a'), TIMES, lab('d'), EQ, lab('b'), TIMES, lab('c'))}
-      ${eqvArrow('simplify')}
+      ${eqvArrow(L('simplify', 'simplifica'))}
       ${eqRow(formatNum(coef), TIMES, escapeHtml(p.v), EQ, formatNum(product))}
-      ${eqvArrow('divide by the number left (' + formatNum(coef) + ')')}`;
+      ${eqvArrow(L('divide by the number left (', 'divide entre el número que queda (') + formatNum(coef) + ')')}`;
     container.appendChild(wrap);
     appendAnswerBox(container, { prefix: p.v + ' =', answer, unit: null, unitText, onCorrect });
   }
 
-  const DIAGONAL = { a: 'd', d: 'a', b: 'c', c: 'b' };
   function renderCrossItem(p, body, done) {
     const cell = k => `<button type="button" class="mmr-cell${k === p.key ? ' unknown' : ''}" data-key="${k}">${escapeHtml(k === p.key ? p.v : formatNum(p[k]))}</button>`;
     body.innerHTML = `
-      <p class="mmr-sentence"><strong>Step 1.</strong> Tap two numbers that sit corner to opposite corner. Then tap the other two corners.</p>
+      <p class="mmr-sentence"><strong>${L('Step 1.', 'Paso 1.')}</strong> ${L('Tap two numbers that sit corner to opposite corner. Then tap the other two corners.', 'Toca dos números que estén en esquinas opuestas. Luego toca las otras dos esquinas.')}</p>
       <div class="mmr-xlab">
         <svg class="mmr-xsvg" xmlns="http://www.w3.org/2000/svg"></svg>
         ${eqRow(eqvFrac(cell('a'), cell('b')), EQ, eqvFrac(cell('c'), cell('d')))}
@@ -860,7 +917,7 @@
         if (pairs.length >= 2 || pairs.some(pr => pr.includes(k))) return;
         if (pending === null) {
           pending = k; cells[k].classList.add('sel');
-          setFeedback(body, 'Now tap the number in the opposite corner.', true);
+          setFeedback(body, L('Now tap the number in the opposite corner.', 'Ahora toca el número de la esquina opuesta.'), true);
         } else if (pending === k) {
           cells[k].classList.remove('sel'); pending = null;
         } else if (DIAGONAL[pending] === k) {
@@ -871,14 +928,14 @@
           pending = null;
           if (pairs.length === 2) {
             Object.values(cells).forEach(c => { c.disabled = true; });
-            setFeedback(body, '✓ That’s the X. Each pair multiplies together.', true);
+            setFeedback(body, L('✓ That’s the X. Each pair multiplies together.', '✓ Esa es la X. Cada par se multiplica.'), true);
             appendSolveBlock(slot, p, '', done);
           } else {
-            setFeedback(body, '✓ One diagonal down. Tap the other two corners.', true);
+            setFeedback(body, L('✓ One diagonal down. Tap the other two corners.', '✓ Una diagonal lista. Toca las otras dos esquinas.'), true);
           }
         } else {
           cells[pending].classList.remove('sel'); pending = null;
-          setFeedback(body, 'Those two are in the same row or column. The cross goes corner to opposite corner — try again.', false);
+          setFeedback(body, L('Those two are in the same row or column. The cross goes corner to opposite corner — try again.', 'Esos dos están en la misma fila o columna. La cruz va de una esquina a la esquina opuesta — inténtalo de nuevo.'), false);
         }
       });
     });
@@ -887,7 +944,7 @@
   function renderScaleItem(item, body, done) {
     body.innerHTML = `
       <p class="mmr-sentence">${escapeHtml(item.word)}</p>
-      <p class="mmr-sentence"><strong>Which proportion matches?</strong> Density is a ratio over 1 mL. Grams on top on both sides — for a mass, x goes on top; for a volume, x goes on the bottom.</p>
+      <p class="mmr-sentence"><strong>${L('Which proportion matches?', '¿Qué proporción corresponde?')}</strong> ${L('Density is a ratio over 1 mL. Grams on top on both sides — for a mass, x goes on top; for a volume, x goes on the bottom.', 'La densidad es una razón sobre 1 mL. Gramos arriba en ambos lados — para una masa, x va arriba; para un volumen, x va abajo.')}</p>
       <div class="mmr-options"></div>
       <div class="step-feedback"></div>
       <div class="mmr-solve-slot"></div>`;
@@ -904,7 +961,7 @@
         if (o.ok) {
           solved = true; btn.classList.add('ok');
           optsEl.querySelectorAll('.mmr-option').forEach(b => { b.disabled = true; });
-          setFeedback(body, '✓ Yes — grams on top on both sides, mL on the bottom, each pair from the same sample.', true);
+          setFeedback(body, L('✓ Yes — grams on top on both sides, mL on the bottom, each pair from the same sample.', '✓ Sí — gramos arriba en ambos lados, mL abajo, cada par de la misma muestra.'), true);
           appendSolveBlock(slot, item.p, item.unit, done);
         } else {
           btn.classList.add('bad');
@@ -916,7 +973,7 @@
 
   function renderStepItem(target, body, done) {
     body.innerHTML = `
-      <p class="mmr-sentence"><strong>Solve for ${target.solve}.</strong> ${escapeHtml(target.word)}</p>
+      <p class="mmr-sentence"><strong>${L('Solve for', 'Despeja')} ${target.solve}.</strong> ${escapeHtml(target.word)}</p>
       <div class="eqv-flow mmr-flow">${START_ROW}</div>
       <div class="mmr-ops"></div>
       <div class="step-feedback"></div>
@@ -925,12 +982,12 @@
     const opsEl = body.querySelector('.mmr-ops');
     const slot = body.querySelector('.mmr-calc-slot');
     let stepIdx = 0;
-    const choices = STEP_OPS.map(op => ({ op, label: op + ' both sides' })).concat([{ op: 'none', label: 'Nothing — it’s already alone' }]);
+    const choices = STEP_OPS.map(op => ({ op, label: op + L(' both sides', ' en ambos lados') })).concat([{ op: 'none', label: L('Nothing — it’s already alone', 'Nada — ya está sola') }]);
     opsEl.innerHTML = choices.map(c => `<button type="button" class="mmr-op-btn" data-op="${escapeHtml(c.op)}">${escapeHtml(c.label)}</button>`).join('');
 
     function finishAlgebra() {
       opsEl.querySelectorAll('button').forEach(b => { b.disabled = true; });
-      setFeedback(body, `✓ ${target.solve} is alone. Now do the math with the numbers from the problem.`, true);
+      setFeedback(body, L(`✓ ${target.solve} is alone. Now do the math with the numbers from the problem.`, `✓ ${target.solve} está sola. Ahora haz las cuentas con los números del problema.`), true);
       appendAnswerBox(slot, { prefix: target.calc.text + ' =', answer: target.calc.answer, unit: target.calc.unit, onCorrect: done });
     }
     opsEl.querySelectorAll('.mmr-op-btn').forEach(btn => {
@@ -943,23 +1000,24 @@
             finishAlgebra();
           } else {
             const step = target.steps[stepIdx];
-            flow.insertAdjacentHTML('beforeend', eqvArrow(step.op + ' on both sides') + step.row);
+            flow.insertAdjacentHTML('beforeend', eqvArrow(step.op + L(' on both sides', ' en ambos lados')) + step.row);
             stepIdx++;
-            setFeedback(body, '✓ Good move. What’s next?', true);
+            setFeedback(body, L('✓ Good move. What’s next?', '✓ Buen movimiento. ¿Qué sigue?'), true);
             if (stepIdx >= target.steps.length) finishAlgebra();
           }
         } else {
           btn.classList.add('bad');
           setTimeout(() => btn.classList.remove('bad'), 400);
           const hint = (op === 'none' || target.steps.length === 0) ? target.noneHint : target.steps[stepIdx].hint;
-          setFeedback(body, 'Not that one. ' + hint, false);
+          setFeedback(body, L('Not that one. ', 'Esa no. ') + hint, false);
         }
       });
     });
   }
 
   // =====================================================================
-  // Parts 5-6 tool — build the conversion-factor chain (units cancel as you go)
+  // Parts 5-6 tool — build the conversion-factor chain (units cancel as you go).
+  // The starting value always sits over 1, e.g. 650 mL / 1 x (1 L / 1000 mL).
   // =====================================================================
   function renderChainItem(item, body, done, idx) {
     body.innerHTML = `
@@ -986,14 +1044,14 @@
       drawExpr();
       if (stepIdx >= item.steps.length) {
         optsEl.innerHTML = '';
-        setFeedback(body, `✓ Every unit cancels except ${item.want}. Multiply the tops, divide by the bottoms.`, true);
-        appendAnswerBox(solveSlot, { prefix: 'Answer =', answer: item.ans, unit: null, unitText: item.want, onCorrect: done });
+        setFeedback(body, L(`✓ Every unit cancels except ${item.want}. Multiply the tops, divide by the bottoms.`, `✓ Todas las unidades se cancelan excepto ${item.want}. Multiplica los numeradores y divide entre los denominadores.`), true);
+        appendAnswerBox(solveSlot, { prefix: L('Answer =', 'Respuesta ='), answer: item.ans, unit: null, unitText: item.want, onCorrect: done });
         return;
       }
       const step = item.steps[stepIdx];
       const rot = (idx + stepIdx) % 3;
       const order = step.options.map((_, i) => step.options[(i + rot) % 3]);
-      optsEl.innerHTML = `<p class="mmr-sentence"><strong>Pick the factor that cancels ${escapeHtml(step.from)}</strong> (to get ${escapeHtml(step.to)}):</p>` +
+      optsEl.innerHTML = `<p class="mmr-sentence"><strong>${L('Pick the factor that cancels', 'Elige el factor que cancela')} ${escapeHtml(step.from)}</strong> (${L('to get', 'para obtener')} ${escapeHtml(step.to)}):</p>` +
         order.map((o, i) => `<button type="button" class="mmr-option" data-i="${i}">${eqRow(eqvFrac(`${formatNum(o.nv)} ${escapeHtml(o.nu)}`, `${formatNum(o.dv)} ${escapeHtml(o.du)}`))}</button>`).join('');
       optsEl.querySelectorAll('.mmr-option').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1002,7 +1060,7 @@
             terms[terms.length - 1].num.struck = true;
             terms.push({ num: { v: o.nv, u: o.nu, struck: false }, den: { v: o.dv, u: o.du, struck: true } });
             stepIdx++;
-            setFeedback(body, `✓ ${step.from} cancels.`, true);
+            setFeedback(body, L(`✓ ${step.from} cancels.`, `✓ ${step.from} se cancela.`), true);
             showStep();
           } else {
             btn.classList.add('bad');
@@ -1011,10 +1069,9 @@
         });
       });
     }
-    function startSteps() { setFeedback(body, '', true); showStep(); }
 
     if (item.paths) {
-      pathSlot.innerHTML = `<p class="mmr-sentence"><strong>Plan the path first.</strong> Which path of units do you pass through?</p>
+      pathSlot.innerHTML = `<p class="mmr-sentence"><strong>${L('Plan the path first.', 'Primero planea la ruta.')}</strong> ${L('Which path of units do you pass through?', '¿Por qué ruta de unidades pasas?')}</p>
         <div class="mmr-options">${item.paths.map((p, i) => `<button type="button" class="mmr-option" data-i="${i}">${escapeHtml(p)}</button>`).join('')}</div>`;
       let picked = false;
       pathSlot.querySelectorAll('.mmr-option').forEach(btn => {
@@ -1027,12 +1084,13 @@
             showStep();
           } else {
             btn.classList.add('bad');
-            setFeedback(body, 'Not that path. Each arrow is one conversion factor, and you cannot skip from volume to mass without density.', false);
+            setFeedback(body, L('Not that path. Each arrow is one conversion factor, and you cannot skip from volume to mass without density.', 'Esa no es la ruta. Cada flecha es un factor de conversión, y no puedes pasar de volumen a masa sin la densidad.'), false);
           }
         });
       });
     } else {
-      startSteps();
+      setFeedback(body, '', true);
+      showStep();
     }
   }
 
@@ -1041,7 +1099,7 @@
   // =====================================================================
   function renderErrorItem(item, body, done) {
     body.innerHTML = `
-      <p class="mmr-sentence"><strong>${escapeHtml(item.title)}</strong> — one line has a mistake. Tap it.</p>
+      <p class="mmr-sentence"><strong>${escapeHtml(item.title)}</strong> — ${L('one line has a mistake. Tap it.', 'una línea tiene un error. Tócala.')}</p>
       <div class="mmr-lines">${item.lines.map((l, i) => `<button type="button" class="mmr-line" data-i="${i}">${escapeHtml(l)}</button>`).join('')}</div>
       <div class="mmr-fix-slot"></div>
       <div class="step-feedback"></div>`;
@@ -1052,12 +1110,12 @@
       btn.addEventListener('click', () => {
         if (flagged) return;
         if (Number(btn.getAttribute('data-i')) !== item.wrong) {
-          setFeedback(body, 'That line is fine. Check the other steps again.', false);
+          setFeedback(body, L('That line is fine. Check the other steps again.', 'Esa línea está bien. Revisa de nuevo los otros pasos.'), false);
           return;
         }
         flagged = true;
         btn.classList.add('flag');
-        setFeedback(body, 'Yes, that line is wrong. What should it say?', true);
+        setFeedback(body, L('Yes, that line is wrong. What should it say?', 'Sí, esa línea está mal. ¿Qué debería decir?'), true);
         fixSlot.innerHTML = `<div class="mmr-fixes">${item.fixes.map((f, j) => `<button type="button" class="mmr-option" data-j="${j}">${escapeHtml(f)}</button>`).join('')}</div>`;
         fixSlot.querySelectorAll('.mmr-option').forEach(fb => {
           fb.addEventListener('click', () => {
@@ -1067,11 +1125,11 @@
               btn.classList.remove('flag'); btn.classList.add('fixed');
               btn.textContent = item.fixes[item.fix];
               linesEl.querySelectorAll('.mmr-line').forEach(b => { b.disabled = true; });
-              setFeedback(body, '✓ Fixed. ' + item.why, true);
+              setFeedback(body, L('✓ Fixed. ', '✓ Corregido. ') + item.why, true);
               done();
             } else {
               fb.classList.add('bad');
-              setFeedback(body, 'Not quite — try another fix.', false);
+              setFeedback(body, L('Not quite — try another fix.', 'No exactamente — prueba otra corrección.'), false);
             }
           });
         });
@@ -1100,117 +1158,126 @@
     return `
       <div class="mmr-ref">
         <table>
-          <thead><tr><th colspan="2">Conversion toolbox</th></tr></thead>
+          <thead><tr><th colspan="2">${L('Conversion toolbox', 'Caja de herramientas de conversión')}</th></tr></thead>
           <tbody>
             <tr><td>1 km = 1000 m</td><td>1 kg = 1000 g</td></tr>
             <tr><td>1 m = 100 cm</td><td>1 g = 1000 mg</td></tr>
             <tr><td>1 m = 1000 mm</td><td>1 L = 1000 mL</td></tr>
             <tr><td>1 cm = 10 mm</td><td>1 mL = 1 cm³</td></tr>
             <tr><td>1 min = 60 s</td><td>1 h = 60 min</td></tr>
-            <tr><td>1 day = 24 h</td><td>1 week = 7 days</td></tr>
+            <tr><td>${L('1 day = 24 h', '1 día = 24 h')}</td><td>${L('1 week = 7 days', '1 semana = 7 días')}</td></tr>
           </tbody>
         </table>
         <table>
-          <thead><tr><th>Substance</th><th>Density (g/mL)</th></tr></thead>
-          <tbody>${DENSITIES.map(d => `<tr><td>${d[0]}</td><td>${d[1]}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>${L('Substance', 'Sustancia')}</th><th>${L('Density (g/mL)', 'Densidad (g/mL)')}</th></tr></thead>
+          <tbody>${DENSITIES.map(d => `<tr><td>${substName(d[0])}</td><td>${d[1]}</td></tr>`).join('')}</tbody>
         </table>
       </div>`;
   }
 
   function startHereHtml() {
     return `
-      <p>This review covers the <strong>entire Mini Math Unit</strong>: metric units, mass and volume, density, cross multiply and divide, and unit conversions (dimensional analysis). Each part has a quick refresher, interactive mini-tools, and practice problems. The last section is a <strong>graded check</strong> in the same style as your Mini Math Check — it saves your score and gives you a completion code.</p>
-      <p><strong>How the review lines up with the unit:</strong></p>
+      <p>${L('This review covers the <strong>entire Mini Math Unit</strong>: metric units, mass and volume, density, cross multiply and divide, and unit conversions (dimensional analysis). Each part has a quick refresher, interactive mini-tools, and practice problems. The last section is a <strong>graded check</strong> in the same style as your Mini Math Check — it saves your score and gives you a completion code.',
+             'Este repaso cubre <strong>toda la Unidad Mini Math</strong>: unidades métricas, masa y volumen, densidad, multiplicar en cruz y dividir, y conversiones de unidades (análisis dimensional). Cada parte tiene un repaso rápido, mini-herramientas interactivas y problemas de práctica. La última sección es una <strong>comprobación calificada</strong> con el mismo estilo de tu Mini Math Check — guarda tu puntaje y te da un código de finalización.')}</p>
+      <p><strong>${L('How the review lines up with the unit:', 'Cómo se relaciona el repaso con la unidad:')}</strong></p>
       <table>
-        <thead><tr><th>Targets</th><th>Skill</th><th>Review part</th></tr></thead>
+        <thead><tr><th>${L('Targets', 'Objetivos')}</th><th>${L('Skill', 'Habilidad')}</th><th>${L('Review part', 'Parte del repaso')}</th></tr></thead>
         <tbody>${COVERAGE.map(r => `<tr><td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1])}</td><td>${escapeHtml(r[2])}</td></tr>`).join('')}</tbody>
       </table>
-      <p><strong>Your reference box</strong> (the same equalities and densities you can use on the Mini Math Check — keep it handy):</p>
+      <p><strong>${L('Your reference box', 'Tu caja de referencia')}</strong> ${L('(the same equalities and densities you can use on the Mini Math Check — keep it handy):', '(las mismas equivalencias y densidades que puedes usar en el Mini Math Check — tenla a mano):')}</p>
       ${referenceBoxHtml()}
-      <div class="concept-box"><div class="concept-label">Which tool?</div><p>Mass + volume → density: <strong>D = m ÷ V</strong>. Density given, mass or volume wanted: <strong>cross multiply and divide</strong>. Changing units: <strong>dimensional analysis</strong>. Changing units <em>and</em> using density: <strong>dimensional analysis with density as a factor</strong>.</p></div>`;
+      <div class="concept-box"><div class="concept-label">${L('Which tool?', '¿Qué herramienta?')}</div><p>${L('Mass + volume → density: <strong>D = m ÷ V</strong>. Density given, mass or volume wanted: <strong>cross multiply and divide</strong>. Changing units: <strong>dimensional analysis</strong>. Changing units <em>and</em> using density: <strong>dimensional analysis with density as a factor</strong>.',
+        'Masa + volumen → densidad: <strong>D = m ÷ V</strong>. Te dan la densidad y piden masa o volumen: <strong>multiplicar en cruz y dividir</strong>. Cambiar unidades: <strong>análisis dimensional</strong>. Cambiar unidades <em>y</em> usar la densidad: <strong>análisis dimensional con la densidad como factor</strong>.')}</p></div>`;
   }
 
   function partHtml(i) {
-    const xref = t => `<div class="mmr-xref">📎 Mini Math Unit: ${escapeHtml(t)}</div>`;
+    const xref = t => `<div class="mmr-xref">📎 ${L('Mini Math Unit', 'Unidad Mini Math')}: ${escapeHtml(t)}</div>`;
     if (i === 1) return `
-      ${xref('Lesson M1 · Metric Units (targets M1.1–M1.3)')}
-      <div class="concept-box"><div class="concept-label">Remember</div><p>The metric system is built on powers of ten. Base units: <strong>gram</strong> (mass), <strong>liter</strong> (volume), <strong>meter</strong> (length). Prefixes: <strong>kilo-</strong> = 1000, <strong>centi-</strong> = 1/100, <strong>milli-</strong> = 1/1000. Going from a big unit to a small unit makes the number <strong>bigger</strong>.</p></div>
-      ${eqRow(eqvFrac('1000 g', '1 kg'), '<span class="eqv-op">and</span>', eqvFrac('1 kg', '1000 g'))}
-      <p class="mmr-sentence">A conversion factor is an equality written as a fraction, so it equals one.</p>
-      ${toolBox('mmr-tool-1', 'Walk the metric ladder')}
-      <h3>Practice</h3>
-      ${practiceProblem('1a', 'Write 1 km = 1000 m as two conversion factors.', 'An equality can be written two ways as a fraction — flip it.', '1 km / 1000 m  and  1000 m / 1 km.')}
-      ${practiceProblem('1b', 'Which is longer, 62 cm or 0.7 m? Explain.', 'Change both to the same unit first.', '0.7 m = 70 cm, and 70 cm > 62 cm, so 0.7 m is longer.')}`;
+      ${xref(L('Lesson M1 · Metric Units (targets M1.1–M1.3)', 'Lección M1 · Unidades métricas (objetivos M1.1–M1.3)'))}
+      <div class="concept-box"><div class="concept-label">${L('Remember', 'Recuerda')}</div><p>${L('The metric system is built on powers of ten. Base units: <strong>gram</strong> (mass), <strong>liter</strong> (volume), <strong>meter</strong> (length). Prefixes: <strong>kilo-</strong> = 1000, <strong>centi-</strong> = 1/100, <strong>milli-</strong> = 1/1000. Going from a big unit to a small unit makes the number <strong>bigger</strong>.',
+        'El sistema métrico se basa en potencias de diez. Unidades base: <strong>gramo</strong> (masa), <strong>litro</strong> (volumen), <strong>metro</strong> (longitud). Prefijos: <strong>kilo-</strong> = 1000, <strong>centi-</strong> = 1/100, <strong>mili-</strong> = 1/1000. Pasar de una unidad grande a una pequeña hace que el número sea <strong>mayor</strong>.')}</p></div>
+      ${eqRow(eqvFrac('1000 g', '1 kg'), `<span class="eqv-op">${L('and', 'y')}</span>`, eqvFrac('1 kg', '1000 g'))}
+      <p class="mmr-sentence">${L('A conversion factor is an equality written as a fraction, so it equals one.', 'Un factor de conversión es una equivalencia escrita como fracción, así que es igual a uno.')}</p>
+      ${toolBox('mmr-tool-1', L('Walk the metric ladder', 'Recorre la escalera métrica'))}
+      <h3>${L('Practice', 'Práctica')}</h3>
+      ${practiceProblem('1a', L('Write 1 km = 1000 m as two conversion factors.', 'Escribe 1 km = 1000 m como dos factores de conversión.'), L('An equality can be written two ways as a fraction — flip it.', 'Una equivalencia se puede escribir de dos formas como fracción — voltéala.'), L('1 km / 1000 m  and  1000 m / 1 km.', '1 km / 1000 m  y  1000 m / 1 km.'))}
+      ${practiceProblem('1b', L('Which is longer, 62 cm or 0.7 m? Explain.', '¿Cuál es más largo, 62 cm o 0.7 m? Explica.'), L('Change both to the same unit first.', 'Primero cambia ambos a la misma unidad.'), L('0.7 m = 70 cm, and 70 cm > 62 cm, so 0.7 m is longer.', '0.7 m = 70 cm, y 70 cm > 62 cm, así que 0.7 m es más largo.'))}`;
     if (i === 2) return `
-      ${xref('Lesson 4 · Mass Communication (targets 4.1–4.2)')}
-      <div class="concept-box"><div class="concept-label">Remember</div><p><strong>Mass</strong> is the amount of matter in an object (balance, in g or kg). <strong>Volume</strong> is the amount of space it takes up (graduated cylinder, in mL; 1 mL = 1 cm³). Read the bottom of the curve (meniscus) at eye level, record mass to 0.1 g and volume to 0.1 mL. For an irregular object: <strong>volume = with − without</strong> (water displacement).</p></div>
-      ${toolBox('mmr-tool-2', 'Measure it')}
-      <h3>Practice</h3>
-      ${practiceProblem('2a', 'A cylinder reads 22.0 mL. After a metal bolt is added it reads 27.4 mL. What is the volume of the bolt?', 'Volume of object = with − without.', '27.4 − 22.0 = 5.4 mL.')}
-      ${practiceProblem('2b', 'What is the difference between mass and volume?', 'One is about matter, one is about space.', 'Mass is the amount of matter in an object; volume is the amount of space it takes up.')}`;
+      ${xref(L('Lesson 4 · Mass Communication (targets 4.1–4.2)', 'Lección 4 · Comunicación de masa (objetivos 4.1–4.2)'))}
+      <div class="concept-box"><div class="concept-label">${L('Remember', 'Recuerda')}</div><p>${L('<strong>Mass</strong> is the amount of matter in an object (balance, in g or kg). <strong>Volume</strong> is the amount of space it takes up (graduated cylinder, in mL; 1 mL = 1 cm³). Read the bottom of the curve (meniscus) at eye level, record mass to 0.1 g and volume to 0.1 mL. For an irregular object: <strong>volume = with − without</strong> (water displacement).',
+        'La <strong>masa</strong> es la cantidad de materia en un objeto (balanza, en g o kg). El <strong>volumen</strong> es la cantidad de espacio que ocupa (probeta, en mL; 1 mL = 1 cm³). Lee la parte de abajo de la curva (menisco) a la altura de los ojos; anota la masa con 0.1 g y el volumen con 0.1 mL. Para un objeto irregular: <strong>volumen = con − sin</strong> (desplazamiento de agua).')}</p></div>
+      ${toolBox('mmr-tool-2', L('Measure it', 'Mídelo'))}
+      <h3>${L('Practice', 'Práctica')}</h3>
+      ${practiceProblem('2a', L('A cylinder reads 22.0 mL. After a metal bolt is added it reads 27.4 mL. What is the volume of the bolt?', 'Una probeta marca 22.0 mL. Después de agregar un perno de metal marca 27.4 mL. ¿Cuál es el volumen del perno?'), L('Volume of object = with − without.', 'Volumen del objeto = con − sin.'), '27.4 − 22.0 = 5.4 mL.')}
+      ${practiceProblem('2b', L('What is the difference between mass and volume?', '¿Cuál es la diferencia entre masa y volumen?'), L('One is about matter, one is about space.', 'Una trata de la materia, la otra del espacio.'), L('Mass is the amount of matter in an object; volume is the amount of space it takes up.', 'La masa es la cantidad de materia en un objeto; el volumen es la cantidad de espacio que ocupa.'))}`;
     if (i === 3) return `
-      ${xref('Lesson 5 · All That Glitters (targets 5.1–5.3)')}
-      <div class="concept-box"><div class="concept-label">Remember</div><p><strong>Density</strong> is mass per unit volume: <strong>D = m ÷ V</strong>, in g/mL. Density is an <strong>intensive</strong> property — it does not depend on the amount — so it can identify a substance. Mass and volume are <strong>extensive</strong>. Round to the tenths place.</p></div>
+      ${xref(L('Lesson 5 · All That Glitters (targets 5.1–5.3)', 'Lección 5 · Todo lo que brilla (objetivos 5.1–5.3)'))}
+      <div class="concept-box"><div class="concept-label">${L('Remember', 'Recuerda')}</div><p>${L('<strong>Density</strong> is mass per unit volume: <strong>D = m ÷ V</strong>, in g/mL. Density is an <strong>intensive</strong> property — it does not depend on the amount — so it can identify a substance. Mass and volume are <strong>extensive</strong>. Round to the tenths place.',
+        'La <strong>densidad</strong> es la masa por unidad de volumen: <strong>D = m ÷ V</strong>, en g/mL. La densidad es una propiedad <strong>intensiva</strong> — no depende de la cantidad — así que puede identificar una sustancia. La masa y el volumen son <strong>extensivos</strong>. Redondea a las décimas.')}</p></div>
       ${eqRow('D', EQ, eqvFrac('m', 'V'))}
       <div class="mmr-ref">
         <table>
-          <thead><tr><th>Substance</th><th>Density (g/mL)</th></tr></thead>
-          <tbody>${DENSITIES.map(d => `<tr><td>${d[0]}</td><td>${d[1]}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>${L('Substance', 'Sustancia')}</th><th>${L('Density (g/mL)', 'Densidad (g/mL)')}</th></tr></thead>
+          <tbody>${DENSITIES.map(d => `<tr><td>${substName(d[0])}</td><td>${d[1]}</td></tr>`).join('')}</tbody>
         </table>
       </div>
-      ${toolBox('mmr-tool-3a', 'Label every number')}
-      ${toolBox('mmr-tool-3b', 'Metal detective')}
-      ${toolBox('mmr-tool-3c', 'Intensive or extensive?')}
-      <h3>Practice</h3>
-      ${practiceProblem('3a', 'A 3.0 mL sample has a mass of 8.1 g. What is its density, and what is it?', 'D = m ÷ V, then compare to the table.', 'D = 8.1 ÷ 3.0 = 2.7 g/mL → aluminum.')}
-      ${practiceProblem('3b', 'True or false: a bigger piece of copper has a bigger density than a smaller piece of copper.', 'Is density intensive or extensive?', 'False. Density is intensive — both pieces are 9.0 g/mL.')}`;
+      ${toolBox('mmr-tool-3a', L('Label every number', 'Etiqueta cada número'))}
+      ${toolBox('mmr-tool-3b', L('Metal detective', 'Detective de metales'))}
+      ${toolBox('mmr-tool-3c', L('Intensive or extensive?', '¿Intensiva o extensiva?'))}
+      <h3>${L('Practice', 'Práctica')}</h3>
+      ${practiceProblem('3a', L('A 3.0 mL sample has a mass of 8.1 g. What is its density, and what is it?', 'Una muestra de 3.0 mL tiene una masa de 8.1 g. ¿Cuál es su densidad y qué sustancia es?'), L('D = m ÷ V, then compare to the table.', 'D = m ÷ V, y luego compara con la tabla.'), L('D = 8.1 ÷ 3.0 = 2.7 g/mL → aluminum.', 'D = 8.1 ÷ 3.0 = 2.7 g/mL → aluminio.'))}
+      ${practiceProblem('3b', L('True or false: a bigger piece of copper has a bigger density than a smaller piece of copper.', 'Verdadero o falso: un trozo más grande de cobre tiene una densidad mayor que un trozo más pequeño de cobre.'), L('Is density intensive or extensive?', '¿La densidad es intensiva o extensiva?'), L('False. Density is intensive — both pieces are 9.0 g/mL.', 'Falso. La densidad es intensiva — ambos trozos son de 9.0 g/mL.'))}`;
     if (i === 4) return `
-      ${xref('Lesson M2 · Cross Multiply and Divide (targets M2.1–M2.3) · also the Density & Cross-Multiplying Practice')}
-      <div class="concept-box"><div class="concept-label">Rule</div><p>A <strong>proportion</strong> says two ratios are equal. Keep the same unit in the same position on both sides. To solve: <strong>multiply the diagonal without x, then divide by the number left</strong> (across from x). Density is a ratio too: 2.7 g/mL means <strong>2.7 g over 1 mL</strong>. To find a mass, put x on top; to find a volume, put x on the bottom.</p></div>
-      <div class="worked-example"><div class="we-label">Example — aluminum is 2.7 g/mL; mass of 4.0 mL?</div>
+      ${xref(L('Lesson M2 · Cross Multiply and Divide (targets M2.1–M2.3) · also the Density & Cross-Multiplying Practice', 'Lección M2 · Multiplicar en cruz y dividir (objetivos M2.1–M2.3) · también la Práctica de Densidad y Multiplicación en Cruz'))}
+      <div class="concept-box"><div class="concept-label">${L('Rule', 'Regla')}</div><p>${L('A <strong>proportion</strong> says two ratios are equal. Keep the same unit in the same position on both sides. To solve: <strong>multiply the diagonal without x, then divide by the number left</strong> (across from x). Density is a ratio too: 2.7 g/mL means <strong>2.7 g over 1 mL</strong>. To find a mass, put x on top; to find a volume, put x on the bottom.',
+        'Una <strong>proporción</strong> dice que dos razones son iguales. Mantén la misma unidad en la misma posición en ambos lados. Para resolver: <strong>multiplica la diagonal sin x, luego divide entre el número que queda</strong> (el opuesto a x). La densidad también es una razón: 2.7 g/mL significa <strong>2.7 g sobre 1 mL</strong>. Para hallar una masa, pon x arriba; para hallar un volumen, pon x abajo.')}</p></div>
+      <div class="worked-example"><div class="we-label">${L('Example — aluminum is 2.7 g/mL; mass of 4.0 mL?', 'Ejemplo — el aluminio es 2.7 g/mL; ¿masa de 4.0 mL?')}</div>
         <div class="eqv-flow">
           ${eqRow(eqvFrac('2.7 g', '1 mL'), EQ, eqvFrac('x g', '4.0 mL'))}
           ${eqvArrow('2.7 × 4.0 ÷ 1')}
           ${eqRow('x', EQ, '10.8 g')}
         </div></div>
-      ${toolBox('mmr-tool-4a', 'Draw the X, then solve')}
-      ${toolBox('mmr-tool-4b', 'Density as a proportion')}
-      <h3>Challenge: why does it work?</h3>
-      <p>Cross multiplying is the same thing as undoing operations on both sides. Rearrange D = M/V yourself:</p>
-      ${toolBox('mmr-tool-4c', 'Pick each algebra move')}
-      <h3>Practice</h3>
-      ${practiceProblem('4a', 'Solve 4/x = 10/15.', 'Multiply the diagonal without x: 4 × 15.', '4 × 15 = 10 × x → 60 = 10x → x = 6.')}
-      ${practiceProblem('4b', 'Brass is 8.4 g/mL. What is the mass of 5.0 mL of brass?', 'Write 8.4 g over 1 mL, with x grams over 5.0 mL.', '8.4 g/1 mL = x g/5.0 mL → x = 8.4 × 5.0 ÷ 1 = 42 g.')}
-      ${practiceProblem('4c', 'Lead is 11.4 g/mL. What volume does 57 g of lead take up?', 'For a volume, x goes on the bottom.', '11.4 g/1 mL = 57 g/x mL → x = 57 × 1 ÷ 11.4 = 5.0 mL.')}`;
+      ${toolBox('mmr-tool-4a', L('Draw the X, then solve', 'Dibuja la X y luego resuelve'))}
+      ${toolBox('mmr-tool-4b', L('Density as a proportion', 'La densidad como proporción'))}
+      <h3>${L('Challenge: why does it work?', 'Desafío: ¿por qué funciona?')}</h3>
+      <p>${L('Cross multiplying is the same thing as undoing operations on both sides. Rearrange D = M/V yourself:', 'Multiplicar en cruz es lo mismo que deshacer operaciones en ambos lados. Despeja tú mismo D = M/V:')}</p>
+      ${toolBox('mmr-tool-4c', L('Pick each algebra move', 'Elige cada paso de álgebra'))}
+      <h3>${L('Practice', 'Práctica')}</h3>
+      ${practiceProblem('4a', L('Solve 4/x = 10/15.', 'Resuelve 4/x = 10/15.'), L('Multiply the diagonal without x: 4 × 15.', 'Multiplica la diagonal sin x: 4 × 15.'), '4 × 15 = 10 × x → 60 = 10x → x = 6.')}
+      ${practiceProblem('4b', L('Brass is 8.4 g/mL. What is the mass of 5.0 mL of brass?', 'El latón es 8.4 g/mL. ¿Cuál es la masa de 5.0 mL de latón?'), L('Write 8.4 g over 1 mL, with x grams over 5.0 mL.', 'Escribe 8.4 g sobre 1 mL, con x gramos sobre 5.0 mL.'), '8.4 g/1 mL = x g/5.0 mL → x = 8.4 × 5.0 ÷ 1 = 42 g.')}
+      ${practiceProblem('4c', L('Lead is 11.4 g/mL. What volume does 57 g of lead take up?', 'El plomo es 11.4 g/mL. ¿Qué volumen ocupan 57 g de plomo?'), L('For a volume, x goes on the bottom.', 'Para un volumen, x va abajo.'), '11.4 g/1 mL = 57 g/x mL → x = 57 × 1 ÷ 11.4 = 5.0 mL.')}`;
     if (i === 5) return `
-      ${xref('Lesson M3 · 1–2 Step Unit Conversions (targets M3.1–M3.3)')}
-      <div class="concept-box"><div class="concept-label">Steps</div><p>1) Write the given number and unit <strong>over 1</strong>. 2) Multiply by a conversion factor with the <strong>unwanted unit on the bottom</strong>. 3) Cancel the units, then multiply the tops and divide by the bottoms. 4) Units do not cancel? <strong>Flip the factor.</strong> For two steps, keep adding factors until only the wanted unit is left.</p></div>
-      <div class="worked-example"><div class="we-label">Example — two steps</div>
+      ${xref(L('Lesson M3 · 1–2 Step Unit Conversions (targets M3.1–M3.3)', 'Lección M3 · Conversiones de unidades de 1–2 pasos (objetivos M3.1–M3.3)'))}
+      <div class="concept-box"><div class="concept-label">${L('Steps', 'Pasos')}</div><p>${L('1) Write the given number and unit <strong>over 1</strong>. 2) Multiply by a conversion factor with the <strong>unwanted unit on the bottom</strong>. 3) Cancel the units, then multiply the tops and divide by the bottoms. 4) Units do not cancel? <strong>Flip the factor.</strong> For two steps, keep adding factors until only the wanted unit is left.',
+        '1) Escribe el número dado y su unidad <strong>sobre 1</strong>. 2) Multiplica por un factor de conversión con la <strong>unidad no deseada abajo</strong>. 3) Cancela las unidades, luego multiplica los numeradores y divide entre los denominadores. 4) ¿Las unidades no se cancelan? <strong>Voltea el factor.</strong> Para dos pasos, sigue agregando factores hasta que solo quede la unidad deseada.')}</p></div>
+      <div class="worked-example"><div class="we-label">${L('Example — two steps', 'Ejemplo — dos pasos')}</div>
         <div class="eqv-flow">${eqRow(eqvFrac('3.0 <s>h</s>', '1'), TIMES, eqvFrac('60 min', '1 <s>h</s>'), TIMES, eqvFrac('60 s', '1 min'), EQ, '10,800 s')}</div></div>
-      ${toolBox('mmr-tool-5', 'Build the conversion')}
-      <h3>Practice</h3>
-      ${practiceProblem('5a', 'Convert 7.5 L to mL.', 'Put the unit you want to cancel (L) on the bottom.', '7.5 L/1 × (1000 mL / 1 L) = 7,500 mL.')}
-      ${practiceProblem('5b', 'Convert 250 g to kg.', 'Which factor has g on the bottom?', '250 g/1 × (1 kg / 1000 g) = 0.25 kg.')}
-      ${practiceProblem('5c', 'Convert 0.8 km to mm (two steps).', 'km → m → mm.', '0.8 km/1 × (1000 m / 1 km) × (1000 mm / 1 m) = 800,000 mm.')}`;
+      ${toolBox('mmr-tool-5', L('Build the conversion', 'Arma la conversión'))}
+      <h3>${L('Practice', 'Práctica')}</h3>
+      ${practiceProblem('5a', L('Convert 7.5 L to mL.', 'Convierte 7.5 L a mL.'), L('Put the unit you want to cancel (L) on the bottom.', 'Pon la unidad que quieres cancelar (L) abajo.'), '7.5 L/1 × (1000 mL / 1 L) = 7,500 mL.')}
+      ${practiceProblem('5b', L('Convert 250 g to kg.', 'Convierte 250 g a kg.'), L('Which factor has g on the bottom?', '¿Qué factor tiene g abajo?'), '250 g/1 × (1 kg / 1000 g) = 0.25 kg.')}
+      ${practiceProblem('5c', L('Convert 0.8 km to mm (two steps).', 'Convierte 0.8 km a mm (dos pasos).'), 'km → m → mm.', '0.8 km/1 × (1000 m / 1 km) × (1000 mm / 1 m) = 800,000 mm.')}`;
     if (i === 6) return `
-      ${xref('Lesson M4 · 2–3 Step Unit Conversions (targets M4.1–M4.3)')}
-      <div class="concept-box"><div class="concept-label">Remember</div><p><strong>Plan a path of units</strong> before you start — every arrow is one conversion factor. <strong>Density is a conversion factor too:</strong> it bridges volume (mL) and mass (g). Flip it to go from mass to volume. Then ask: <strong>is my answer reasonable?</strong> (Big unit → small unit should give a bigger number.)</p></div>
-      <div class="worked-example"><div class="we-label">Example — mL → g → kg</div>
-        <div class="eqv-flow">${eqRow(eqvFrac('300 <s>mL</s>', '1'), TIMES, eqvFrac('2.7 g', '1 <s>mL</s>'), TIMES, eqvFrac('1 kg', '1000 g'), EQ, '0.81 kg of aluminum')}</div></div>
-      ${toolBox('mmr-tool-6', 'Plan the path, then build it')}
-      <h3>Practice</h3>
-      ${practiceProblem('6a', 'How many minutes are in 2.0 days? Write the path first.', 'days → h → min.', 'days → h → min: 2.0 days/1 × (24 h / 1 day) × (60 min / 1 h) = 2,880 min.')}
-      ${practiceProblem('6b', 'How many grams are in 0.50 L of water? (Water is 1.0 g/mL.)', 'L → mL → g.', '0.50 L/1 × (1000 mL / 1 L) × (1.0 g / 1 mL) = 500 g.')}
-      ${practiceProblem('6c', 'Is it reasonable that 3.0 kg = 0.003 g?', 'Big unit → small unit should make the number bigger.', 'No. kg is bigger than g, so the number should get bigger: 3.0 kg = 3,000 g.')}`;
+      ${xref(L('Lesson M4 · 2–3 Step Unit Conversions (targets M4.1–M4.3)', 'Lección M4 · Conversiones de unidades de 2–3 pasos (objetivos M4.1–M4.3)'))}
+      <div class="concept-box"><div class="concept-label">${L('Remember', 'Recuerda')}</div><p>${L('<strong>Plan a path of units</strong> before you start — every arrow is one conversion factor. <strong>Density is a conversion factor too:</strong> it bridges volume (mL) and mass (g). Flip it to go from mass to volume. Then ask: <strong>is my answer reasonable?</strong> (Big unit → small unit should give a bigger number.)',
+        '<strong>Planea una ruta de unidades</strong> antes de empezar — cada flecha es un factor de conversión. <strong>La densidad también es un factor de conversión:</strong> conecta el volumen (mL) con la masa (g). Voltéala para ir de masa a volumen. Luego pregunta: <strong>¿es razonable mi respuesta?</strong> (De unidad grande → pequeña debe dar un número mayor.)')}</p></div>
+      <div class="worked-example"><div class="we-label">${L('Example — mL → g → kg', 'Ejemplo — mL → g → kg')}</div>
+        <div class="eqv-flow">${eqRow(eqvFrac('300 <s>mL</s>', '1'), TIMES, eqvFrac('2.7 g', '1 <s>mL</s>'), TIMES, eqvFrac('1 kg', '1000 g'), EQ, L('0.81 kg of aluminum', '0.81 kg de aluminio'))}</div></div>
+      ${toolBox('mmr-tool-6', L('Plan the path, then build it', 'Planea la ruta y luego arma la conversión'))}
+      <h3>${L('Practice', 'Práctica')}</h3>
+      ${practiceProblem('6a', L('How many minutes are in 2.0 days? Write the path first.', '¿Cuántos minutos hay en 2.0 días? Escribe la ruta primero.'), L('days → h → min.', 'días → h → min.'), L('days → h → min: 2.0 days/1 × (24 h / 1 day) × (60 min / 1 h) = 2,880 min.', 'días → h → min: 2.0 días/1 × (24 h / 1 día) × (60 min / 1 h) = 2,880 min.'))}
+      ${practiceProblem('6b', L('How many grams are in 0.50 L of water? (Water is 1.0 g/mL.)', '¿Cuántos gramos hay en 0.50 L de agua? (El agua es 1.0 g/mL.)'), 'L → mL → g.', '0.50 L/1 × (1000 mL / 1 L) × (1.0 g / 1 mL) = 500 g.')}
+      ${practiceProblem('6c', L('Is it reasonable that 3.0 kg = 0.003 g?', '¿Es razonable que 3.0 kg = 0.003 g?'), L('Big unit → small unit should make the number bigger.', 'De unidad grande → pequeña, el número debe aumentar.'), L('No. kg is bigger than g, so the number should get bigger: 3.0 kg = 3,000 g.', 'No. El kg es más grande que el g, así que el número debe aumentar: 3.0 kg = 3,000 g.'))}`;
     return `
-      ${xref('Mini Math Review page — “Which tool?”, fix the mistake, Explain It')}
-      <div class="concept-box"><div class="concept-label">Check your work</div><p>Before you move on, ask: Did I pick the right tool? Did I put the unwanted unit on the bottom so it cancels? Did I cross multiply corner to opposite corner? Does my unit match what I was solving for? Is the answer reasonable?</p></div>
-      ${toolBox('mmr-tool-7a', 'Which tool do I use?')}
-      ${toolBox('mmr-tool-7b', 'Find the mistake')}
-      ${toolBox('mmr-tool-7c', 'Explain it (claim · evidence · reasoning)')}
-      <h3>Practice</h3>
-      ${practiceProblem('7a', 'Which tool: “Find the volume, in L, of 2.7 kg of aluminum (2.7 g/mL).”', 'You are changing units and using density.', 'Dimensional analysis with density as a factor: 2.7 kg/1 × (1000 g / 1 kg) × (1 mL / 2.7 g) × (1 L / 1000 mL) = 1.0 L.')}
-      ${practiceProblem('7b', 'In your own words: when do you use cross multiply and divide, and when do you use dimensional analysis?', 'Think about what is given and what is changing.', 'Cross multiply and divide when two ratios are equal and one number is missing (like density, recipes, prices). Dimensional analysis when changing units, especially in more than one step.')}`;
+      ${xref(L('Mini Math Review page — “Which tool?”, fix the mistake, Explain It', 'Página de repaso de Mini Math — “¿Qué herramienta?”, corrige el error, Explícalo'))}
+      <div class="concept-box"><div class="concept-label">${L('Check your work', 'Revisa tu trabajo')}</div><p>${L('Before you move on, ask: Did I pick the right tool? Did I put the unwanted unit on the bottom so it cancels? Did I cross multiply corner to opposite corner? Does my unit match what I was solving for? Is the answer reasonable?',
+        'Antes de seguir, pregúntate: ¿Elegí la herramienta correcta? ¿Puse la unidad no deseada abajo para que se cancele? ¿Multipliqué en cruz de una esquina a la esquina opuesta? ¿Mi unidad coincide con lo que buscaba? ¿Es razonable la respuesta?')}</p></div>
+      ${toolBox('mmr-tool-7a', L('Which tool do I use?', '¿Qué herramienta uso?'))}
+      ${toolBox('mmr-tool-7b', L('Find the mistake', 'Encuentra el error'))}
+      ${toolBox('mmr-tool-7c', L('Explain it (claim · evidence · reasoning)', 'Explícalo (afirmación · evidencia · razonamiento)'))}
+      <h3>${L('Practice', 'Práctica')}</h3>
+      ${practiceProblem('7a', L('Which tool: “Find the volume, in L, of 2.7 kg of aluminum (2.7 g/mL).”', '¿Qué herramienta?: “Halla el volumen, en L, de 2.7 kg de aluminio (2.7 g/mL).”'), L('You are changing units and using density.', 'Estás cambiando unidades y usando la densidad.'), L('Dimensional analysis with density as a factor: 2.7 kg/1 × (1000 g / 1 kg) × (1 mL / 2.7 g) × (1 L / 1000 mL) = 1.0 L.', 'Análisis dimensional con la densidad como factor: 2.7 kg/1 × (1000 g / 1 kg) × (1 mL / 2.7 g) × (1 L / 1000 mL) = 1.0 L.'))}
+      ${practiceProblem('7b', L('In your own words: when do you use cross multiply and divide, and when do you use dimensional analysis?', 'Con tus propias palabras: ¿cuándo usas multiplicar en cruz y dividir, y cuándo usas análisis dimensional?'), L('Think about what is given and what is changing.', 'Piensa en qué te dan y qué está cambiando.'), L('Cross multiply and divide when two ratios are equal and one number is missing (like density, recipes, prices). Dimensional analysis when changing units, especially in more than one step.', 'Multiplicar en cruz y dividir cuando dos razones son iguales y falta un número (como densidad, recetas, precios). Análisis dimensional cuando cambias unidades, sobre todo en más de un paso.'))}`;
   }
 
   // =====================================================================
@@ -1228,12 +1295,12 @@
     const q = QUESTIONS[index];
     const pct = Math.round((index / QUESTIONS.length) * 100);
     mount.innerHTML = `
-      <div class="quiz-question-count">Question ${index + 1} of ${QUESTIONS.length}</div>
+      <div class="quiz-question-count">${L(`Question ${index + 1} of ${QUESTIONS.length}`, `Pregunta ${index + 1} de ${QUESTIONS.length}`)}</div>
       <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
       <p class="quiz-prompt">${escapeHtml(q.prompt)}</p>
       <div id="mmr-answer-area"></div>
       <div id="mmr-feedback-area"></div>
-      <button type="button" class="mmr-next-btn" id="mmr-next-btn" style="display:none;">${index + 1 < QUESTIONS.length ? 'Next Question' : 'See my score'}</button>`;
+      <button type="button" class="mmr-next-btn" id="mmr-next-btn" style="display:none;">${index + 1 < QUESTIONS.length ? L('Next Question', 'Siguiente Pregunta') : L('See my score', 'Ver mi puntaje')}</button>`;
     const answerArea = mount.querySelector('#mmr-answer-area');
     const feedbackArea = mount.querySelector('#mmr-feedback-area');
     const nextBtn = mount.querySelector('#mmr-next-btn');
@@ -1242,7 +1309,7 @@
     if (q.type === 'mc') {
       answerArea.innerHTML = q.choices.map((c, i) => `<button type="button" class="mmr-choice" data-choice="${i}">${escapeHtml(c)}</button>`).join('');
     } else {
-      answerArea.innerHTML = `<input type="number" step="any" id="mmr-num-answer" class="num-input" placeholder="Your answer"><button type="button" class="reveal-btn" id="mmr-submit-num">Submit Answer</button>`;
+      answerArea.innerHTML = `<input type="number" step="any" id="mmr-num-answer" class="num-input" placeholder="${L('Your answer', 'Tu respuesta')}"><button type="button" class="reveal-btn" id="mmr-submit-num">${L('Submit Answer', 'Enviar Respuesta')}</button>`;
     }
 
     function submit(response, btnEl) {
@@ -1258,7 +1325,7 @@
       } else {
         answerArea.querySelectorAll('input, button').forEach(el => { el.disabled = true; });
       }
-      feedbackArea.innerHTML = `<div class="mmr-feedback ${correct ? 'correct' : 'incorrect'}">${correct ? '✓ Correct!' : '✗ Not quite.'} ${escapeHtml(q.explanation)}</div>`;
+      feedbackArea.innerHTML = `<div class="mmr-feedback ${correct ? 'correct' : 'incorrect'}">${correct ? L('✓ Correct!', '✓ ¡Correcto!') : L('✗ Not quite.', '✗ No exactamente.')} ${escapeHtml(q.explanation)}</div>`;
       nextBtn.style.display = 'inline-block';
       const answers = answersSoFar.concat([{ questionId: q.id, response, correct }]);
       ctx.saveProgress({ status: 'in_progress', score: answers.filter(a => a.correct).length, totalQuestions: QUESTIONS.length, answers });
@@ -1295,11 +1362,11 @@
       <div class="mmr-summary">
         <div class="mmr-score">${score} / ${total}</div>
         ${code
-          ? `<p class="mmr-code-label">Your completion code</p><div class="mmr-code">${escapeHtml(code)}</div>`
-          : `<p><button type="button" class="mmr-retake-btn" id="mmr-show-code-btn">Show my code</button></p>`}
-        ${missedParts.length ? `<div class="mmr-revisit"><strong>Worth another look:</strong><ul>${missedParts.map(n => `<li>${escapeHtml(PARTS[n - 1].title)}</li>`).join('')}</ul></div>` : ''}
-        <p>Nice work! You can retake this any time — your most recent attempt is what’s saved and sent to your teacher.</p>
-        <button type="button" class="mmr-retake-btn" id="mmr-retake-btn">Retake Quiz</button>
+          ? `<p class="mmr-code-label">${L('Your completion code', 'Tu código de finalización')}</p><div class="mmr-code">${escapeHtml(code)}</div>`
+          : `<p><button type="button" class="mmr-retake-btn" id="mmr-show-code-btn">${L('Show my code', 'Mostrar mi código')}</button></p>`}
+        ${missedParts.length ? `<div class="mmr-revisit"><strong>${L('Worth another look:', 'Vale la pena repasar:')}</strong><ul>${missedParts.map(n => `<li>${escapeHtml(PARTS[n - 1].title)}</li>`).join('')}</ul></div>` : ''}
+        <p>${L('Nice work! You can retake this any time — your most recent attempt is what’s saved and sent to your teacher.', '¡Buen trabajo! Puedes repetirlo en cualquier momento — se guarda y se envía a tu maestro tu intento más reciente.')}</p>
+        <button type="button" class="mmr-retake-btn" id="mmr-retake-btn">${L('Retake Quiz', 'Repetir el Quiz')}</button>
       </div>`;
     const showCodeBtn = mount.querySelector('#mmr-show-code-btn');
     if (showCodeBtn) {
@@ -1319,8 +1386,10 @@
   // Top-level render (accordion shell, same pattern as the other reviews)
   // =====================================================================
   function render(host, ctx) {
+    LANG = getLang();
+    initData();
     ensureStylesInjected();
-    const sections = [{ title: 'Start Here', time: '3 min', body: startHereHtml() }]
+    const sections = [{ title: L('Start Here', 'Empieza Aquí'), time: L('3 min', '3 min'), body: startHereHtml() }]
       .concat(PARTS.map((p, i) => ({ title: p.title, time: p.time, body: partHtml(i + 1) })));
 
     const sectionsHtml = sections.map((sec, i) => `
@@ -1333,34 +1402,41 @@
         </div>
         <div class="section-body">
           ${sec.body}
-          <button type="button" class="mark-done-btn" data-mark-done="${i}">✓ Mark Section Complete</button>
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">${L('✓ Mark Section Complete', '✓ Marcar Sección como Completa')}</button>
         </div>
       </div>`).join('');
+
+    const sectionCountText = done => L(`${done} / ${SECTION_COUNT} sections`, `${done} / ${SECTION_COUNT} secciones`);
 
     host.innerHTML = `
       <div class="mmr-lesson">
         <div class="mmr-header">
-          <div class="mmr-header-label">Mini Math Unit · Cumulative Review</div>
+          <div class="mmr-lang-toggle" role="group" aria-label="${L('Language', 'Idioma')}">
+            <button type="button" class="mmr-lang-btn${LANG === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="mmr-lang-btn${LANG === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="mmr-header-label">${L('Mini Math Unit · Cumulative Review', 'Unidad Mini Math · Repaso Acumulativo')}</div>
           <h1>${escapeHtml(ctx.activity.title)}</h1>
-          <div class="mmr-header-meta">Self-Paced Review · ~55 Minutes · Interactive mini-tools + graded check</div>
+          <div class="mmr-header-meta">${L('Self-Paced Review · ~55 Minutes · Interactive mini-tools + graded check', 'Repaso a tu Propio Ritmo · ~55 Minutos · Mini-herramientas interactivas + comprobación calificada')}</div>
         </div>
         <div class="mmr-progress-wrap">
-          <span class="mmr-progress-label">Progress</span>
+          <span class="mmr-progress-label">${L('Progress', 'Progreso')}</span>
           <div class="mmr-progress-track"><div class="mmr-progress-fill" id="mmr-progress-fill"></div></div>
-          <span class="mmr-progress-count" id="mmr-progress-count">0 / ${SECTION_COUNT} sections</span>
+          <span class="mmr-progress-count" id="mmr-progress-count">${sectionCountText(0)}</span>
         </div>
         <main>
           ${sectionsHtml}
           <div class="section-card" id="mmr-sec-${QUIZ_INDEX}" data-section="${QUIZ_INDEX}">
             <div class="section-header" data-toggle="${QUIZ_INDEX}">
               <span class="section-num">✓</span>
-              <span class="section-title">Check for Understanding</span>
-              <span class="section-time">14 min · graded</span>
+              <span class="section-title">${L('Check for Understanding', 'Comprobación de Comprensión')}</span>
+              <span class="section-time">${L('14 min · graded', '14 min · calificado')}</span>
               <span class="section-arrow">▼</span>
             </div>
             <div class="section-body">
-              <div class="quiz-note">Like the Mini Math Check, this has Words to Know, Show the Skill, Fix the Mistake, and Explain It questions. It <strong>saves your score</strong> and reports it to your teacher, and when you finish you’ll get a <strong>completion code</strong> — write it down. You can retake it any time; your most recent attempt is what’s saved.
-                <details class="mmr-details"><summary>Reference box (equalities and densities)</summary>${referenceBoxHtml()}</details></div>
+              <div class="quiz-note">${L('Like the Mini Math Check, this has Words to Know, Show the Skill, Fix the Mistake, and Explain It questions. It <strong>saves your score</strong> and reports it to your teacher, and when you finish you’ll get a <strong>completion code</strong> — write it down. You can retake it any time; your most recent attempt is what’s saved.',
+                'Igual que el Mini Math Check, tiene preguntas de Palabras que Debes Saber, Muestra la Habilidad, Corrige el Error y Explícalo. <strong>Guarda tu puntaje</strong> y se lo reporta a tu maestro, y al terminar recibirás un <strong>código de finalización</strong> — anótalo. Puedes repetirlo en cualquier momento; se guarda tu intento más reciente.')}
+                <details class="mmr-details"><summary>${L('Reference box (equalities and densities)', 'Caja de referencia (equivalencias y densidades)')}</summary>${referenceBoxHtml()}</details></div>
               <div id="mmr-quiz-mount"></div>
             </div>
           </div>
@@ -1373,7 +1449,7 @@
     function updateProgress() {
       const done = completed.filter(Boolean).length;
       root.querySelector('#mmr-progress-fill').style.width = Math.round((done / SECTION_COUNT) * 100) + '%';
-      root.querySelector('#mmr-progress-count').textContent = `${done} / ${SECTION_COUNT} sections`;
+      root.querySelector('#mmr-progress-count').textContent = sectionCountText(done);
     }
     function openSection(i, scroll) {
       const card = root.querySelector(`#mmr-sec-${i}`);
@@ -1398,7 +1474,7 @@
         if (completed[i]) return;
         completed[i] = true;
         root.querySelector(`#mmr-sec-${i}`).classList.add('done');
-        btn.textContent = '✓ Section Complete';
+        btn.textContent = L('✓ Section Complete', '✓ Sección Completa');
         btn.disabled = true;
         updateProgress();
         setTimeout(() => openSection(i + 1, true), 250);
@@ -1407,31 +1483,40 @@
     root.querySelectorAll('[data-hint-target]').forEach(btn => {
       btn.addEventListener('click', () => {
         const open = root.querySelector('#' + btn.getAttribute('data-hint-target')).classList.toggle('open');
-        btn.textContent = open ? '▲ Hide Hint' : '💡 Hint';
+        btn.textContent = open ? L('▲ Hide Hint', '▲ Ocultar Pista') : L('💡 Hint', '💡 Pista');
       });
     });
     root.querySelectorAll('[data-answer-target]').forEach(btn => {
       btn.addEventListener('click', () => {
         const open = root.querySelector('#' + btn.getAttribute('data-answer-target')).classList.toggle('open');
-        btn.textContent = open ? 'Hide Answer' : 'Reveal Answer';
+        btn.textContent = open ? L('Hide Answer', 'Ocultar Respuesta') : L('Reveal Answer', 'Mostrar Respuesta');
+      });
+    });
+
+    root.querySelectorAll('[data-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newLang = btn.getAttribute('data-lang');
+        if (newLang === LANG) return;
+        setLang(newLang);
+        render(host, ctx); // full re-render; graded progress lives in ctx.getProgress(), untouched by language
       });
     });
 
     // Mini-tools (ungraded, session-only state).
     const tool = id => root.querySelector('#' + id);
-    runSequence(tool('mmr-tool-1'), LADDER_ITEMS, 'Metric ladder', renderLadderItem);
-    runSequence(tool('mmr-tool-2'), MEASURE_ITEMS, 'Measure it', renderMeasureItem);
-    runSequence(tool('mmr-tool-3a'), TAG_PROBLEMS, 'Label the numbers', renderTagItem);
-    runSequence(tool('mmr-tool-3b'), METAL_ITEMS, 'Metal detective', renderMetalItem);
-    runSequence(tool('mmr-tool-3c'), DENSITY_CONCEPT_ITEMS, 'Intensive or extensive', renderMcItem);
-    runSequence(tool('mmr-tool-4a'), PROPORTIONS, 'Cross-multiply', renderCrossItem);
-    runSequence(tool('mmr-tool-4b'), DENSITY_PROP_ITEMS, 'Density as a proportion', renderScaleItem);
-    runSequence(tool('mmr-tool-4c'), STEP_TARGETS, 'Rearrange D = M/V', renderStepItem);
-    runSequence(tool('mmr-tool-5'), CONVERT_ITEMS, 'Conversions', renderChainItem);
-    runSequence(tool('mmr-tool-6'), CHAIN_ITEMS, 'Unit paths', renderChainItem);
-    runSequence(tool('mmr-tool-7a'), TOOL_ITEMS, 'Which tool', renderMcItem);
-    runSequence(tool('mmr-tool-7b'), ERROR_ITEMS, 'Find the mistake', renderErrorItem);
-    runSequence(tool('mmr-tool-7c'), [CER_ITEM], 'Explain it', renderCerItem);
+    runSequence(tool('mmr-tool-1'), LADDER_ITEMS, L('Metric ladder', 'Escalera métrica'), renderLadderItem);
+    runSequence(tool('mmr-tool-2'), MEASURE_ITEMS, L('Measure it', 'Mídelo'), renderMeasureItem);
+    runSequence(tool('mmr-tool-3a'), TAG_PROBLEMS, L('Label the numbers', 'Etiqueta los números'), renderTagItem);
+    runSequence(tool('mmr-tool-3b'), METAL_ITEMS, L('Metal detective', 'Detective de metales'), renderMetalItem);
+    runSequence(tool('mmr-tool-3c'), DENSITY_CONCEPT_ITEMS, L('Intensive or extensive', 'Intensiva o extensiva'), renderMcItem);
+    runSequence(tool('mmr-tool-4a'), PROPORTIONS, L('Cross-multiply', 'Multiplica en cruz'), renderCrossItem);
+    runSequence(tool('mmr-tool-4b'), DENSITY_PROP_ITEMS, L('Density as a proportion', 'La densidad como proporción'), renderScaleItem);
+    runSequence(tool('mmr-tool-4c'), STEP_TARGETS, L('Rearrange D = M/V', 'Despeja D = M/V'), renderStepItem);
+    runSequence(tool('mmr-tool-5'), CONVERT_ITEMS, L('Conversions', 'Conversiones'), renderChainItem);
+    runSequence(tool('mmr-tool-6'), CHAIN_ITEMS, L('Unit paths', 'Rutas de unidades'), renderChainItem);
+    runSequence(tool('mmr-tool-7a'), TOOL_ITEMS, L('Which tool', 'Qué herramienta'), renderMcItem);
+    runSequence(tool('mmr-tool-7b'), ERROR_ITEMS, L('Find the mistake', 'Encuentra el error'), renderErrorItem);
+    runSequence(tool('mmr-tool-7c'), [CER_ITEM], L('Explain it', 'Explícalo'), renderCerItem);
 
     renderQuiz(root.querySelector('#mmr-quiz-mount'), ctx);
 
