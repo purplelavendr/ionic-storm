@@ -511,7 +511,8 @@
 .mmr-lesson .mmr-choice:disabled { cursor: default; }
 .mmr-lesson .mmr-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
 .mmr-lesson .mmr-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
-.mmr-lesson .num-input { display: block; width: 160px; margin: 0.4rem 0 0.8rem; padding: 0.55rem 0.7rem; border: 1.5px solid var(--cream-dark); border-radius: 8px; font-size: 0.95rem; font-family: 'JetBrains Mono', monospace; }
+.mmr-lesson .num-input { display: block; width: 160px; margin: 0.4rem 0 0.8rem; padding: 0.55rem 0.7rem; border: 1.5px solid var(--cream-dark); border-radius: 8px; font-size: 0.95rem; font-family: 'JetBrains Mono', monospace; color: var(--text); background: #fff; color-scheme: light; }
+.mmr-lesson .num-input::placeholder { color: #94a3b8; }
 .mmr-lesson .num-input:focus { outline: none; border-color: var(--teal); }
 .mmr-lesson .mmr-feedback { border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600; }
 .mmr-lesson .mmr-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
