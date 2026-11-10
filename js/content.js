@@ -101,6 +101,21 @@ const CONTENT = {
           estimatedMinutes: 55
         }
       ]
+    },
+    {
+      id: 'unit3-weather',
+      title: 'Unit 3: Weather',
+      description: 'Phase changes, temperature, and the behavior of gases.',
+      activities: [
+        {
+          id: 'thermometer-lab',
+          chapter: 'Chapter 10 · Physically Changing Matter',
+          type: 'review',
+          title: 'Lesson 52: Hot Enough (Virtual Lab)',
+          description: 'A virtual version of the thermometer lab procedure — mark the liquid level of an ethylene glycol thermometer in five conditions, then trap air in an upside-down graduated cylinder and watch its volume change as it cools. Do the procedure here and answer the questions on your worksheet. Not graded; ends with a completion code.',
+          estimatedMinutes: 25
+        }
+      ]
     }
   ]
 };
