@@ -6,6 +6,10 @@
 //   conditions, wait for the liquid to stop moving, and mark the level. A ruler beside the
 //   straw gives each mark's height. Temperatures are deliberately NOT shown: students build
 //   their own scale from the ice-water and boiling-water marks (worksheet question 3).
+//   The "Build your own scale" box under the thermometer lets them pick a number for each
+//   of those two marks; the lab then draws that scale beside the straw (ten equal steps
+//   between the marks) so they can read their other marks off it. It never states a
+//   reading for them.
 //
 //   Part 2 (gas thermometer): invert a 10 mL graduated cylinder in ~80 °C water for a
 //   minute, move it to room-temperature water, then add ice, reading the trapped air volume
@@ -55,12 +59,13 @@
   function newEnv() {
     return { room: rnd(21, 23.5), hand: rnd(29.5, 32.5), salt: rnd(-7, -4.5), ice: rnd(1, 3) };
   }
-  function newState() { return { env: newEnv(), marks: {}, rec: {}, tab: 1 }; }
+  function newScale() { return { lo: '', hi: '', unit: '', show: true }; }
+  function newState() { return { env: newEnv(), marks: {}, rec: {}, tab: 1, scale: newScale() }; }
   function loadState(progress) {
     const a = progress && progress.answers && progress.answers[0];
     const s = a && a.questionId === '_lab' && a.state;
     if (!s || !s.env || typeof s.env.room !== 'number') return newState();
-    return { env: s.env, marks: s.marks || {}, rec: s.rec || {}, tab: s.tab === 2 ? 2 : 1 };
+    return { env: s.env, marks: s.marks || {}, rec: s.rec || {}, tab: s.tab === 2 ? 2 : 1, scale: Object.assign(newScale(), s.scale || {}) };
   }
 
   // ---------------------------------------------------------------- styles
@@ -148,6 +153,16 @@
 .tl-lesson .tl-count { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 600; }
 .tl-lesson .tl-code-label { font-weight: 600; }
 .tl-lesson .tl-code { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--navy); border: 2px dashed var(--navy); border-radius: 10px; padding: 0.3rem 1rem; user-select: all; }
+.tl-lesson .tl-scale { border-top: 1px solid var(--cream-dark); padding: 0.7rem 0.3rem 0.3rem; display: flex; flex-direction: column; gap: 0.55rem; }
+.tl-lesson .tl-scale p { margin: 0; }
+.tl-lesson .tl-field { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; font-size: 0.9rem; font-weight: 600; line-height: 1.3; }
+.tl-lesson .tl-field input { width: 5.2rem; flex: none; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; padding: 0.4rem 0.5rem; border: 1.5px solid var(--navy-light); border-radius: 8px; background: white; color: var(--text); color-scheme: light; }
+.tl-lesson .tl-field input:focus { outline: 3px solid var(--teal); outline-offset: 1px; }
+.tl-lesson .tl-field input:disabled { background: var(--cream); border-color: var(--cream-dark); }
+.tl-lesson .tl-seg { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.tl-lesson .tl-seg .tl-btn.small { padding: 0.4rem 0.7rem; font-size: 0.64rem; }
+.tl-lesson .tl-scale-hint { font-size: 0.86rem; font-weight: 600; color: var(--wait); }
+.tl-lesson .tl-scale-hint.ok { color: var(--ok); }
 .tl-lesson .g-stroke { fill: none; stroke: var(--glass); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .tl-lesson .g-fill { fill: var(--glassfill); stroke: var(--glass); stroke-width: 2.5; stroke-linejoin: round; }
 .tl-lesson svg .t { font-family: 'JetBrains Mono', monospace; fill: var(--text); }
@@ -174,6 +189,7 @@
     </g>
   </g>
   <g data-id="p1-ruler"></g>
+  <g data-id="p1-scale" class="tl-off"></g>
   <rect x="139" y="384" width="70" height="94" rx="10" class="g-fill"/>
   <rect x="142" y="394" width="64" height="81" rx="7" fill="var(--liquid)" opacity=".8"/>
   <rect x="160" y="366" width="28" height="20" class="g-fill"/>
@@ -330,6 +346,18 @@
             <div class="tl-bench">
               ${P1_SVG}
               <div class="tl-status" data-id="p1-status" aria-live="polite"></div>
+              <div class="tl-scale">
+                <h3>${escapeHtml(_('Build your own scale', 'Crea tu propia escala'))}</h3>
+                <p class="tl-note">${escapeHtml(_('Choose a number for your ice water mark and a number for your boiling water mark. The lab divides the space between them into ten equal steps.', 'Elige un número para tu marca de agua con hielo y un número para tu marca de agua hirviendo. El laboratorio divide el espacio entre ellas en diez pasos iguales.'))}</p>
+                <label class="tl-field"><span>${escapeHtml(_('Boiling water mark =', 'Marca de agua hirviendo ='))}</span><input type="number" step="any" inputmode="decimal" data-id="sc-hi"></label>
+                <label class="tl-field"><span>${escapeHtml(_('Ice water mark =', 'Marca de agua con hielo ='))}</span><input type="number" step="any" inputmode="decimal" data-id="sc-lo"></label>
+                <label class="tl-field"><span>${escapeHtml(_('Name your degrees (optional)', 'Nombra tus grados (opcional)'))}</span><input type="text" maxlength="4" data-id="sc-unit" placeholder="°?"></label>
+                <p class="tl-scale-hint" data-id="sc-hint" aria-live="polite"></p>
+                <div class="tl-seg" role="group" aria-label="${escapeHtml(_('Show beside the straw', 'Mostrar junto al popote'))}">
+                  <button type="button" class="tl-btn small" data-id="sc-show-scale">${escapeHtml(_('My scale', 'Mi escala'))}</button>
+                  <button type="button" class="tl-btn small" data-id="sc-show-ruler">${escapeHtml(_('Ruler (cm)', 'Regla (cm)'))}</button>
+                </div>
+              </div>
             </div>
             <div class="tl-side">
               <div class="tl-block">
@@ -454,7 +482,55 @@
       show('p1-boil', c === 'boil'); show('p1-plate', c === 'boil');
       q('p1-envlabel').textContent = CONDS[c].label;
     }
+    // ---- build-your-own scale: two numbers on two marks, drawn as a paper strip in place of the ruler
+    function scaleNum(v) { const n = parseFloat(v); return (v === '' || v == null || !isFinite(n)) ? null : n; }
+    function fmtScale(v) {
+      const r = Math.round(v * 100) / 100;
+      const str = String(r);
+      return str.length > 6 ? r.toFixed(1) : str;
+    }
+    function renderScale(syncInputs) {
+      if (syncInputs) { q('sc-lo').value = S.scale.lo; q('sc-hi').value = S.scale.hi; q('sc-unit').value = S.scale.unit; }
+      const haveMarks = S.marks.ice != null && S.marks.boil != null;
+      const lo = scaleNum(S.scale.lo), hi = scaleNum(S.scale.hi);
+      const valid = haveMarks && lo != null && hi != null && lo !== hi;
+      const hint = q('sc-hint');
+      hint.className = 'tl-scale-hint' + (valid ? ' ok' : '');
+      hint.textContent = !haveMarks ? _('First mark the ice water level and the boiling water level.', 'Primero marca el nivel del agua con hielo y el del agua hirviendo.')
+        : (lo == null || hi == null) ? _('Type a number for each of the two marks.', 'Escribe un número para cada una de las dos marcas.')
+        : lo === hi ? _('The two numbers must be different.', 'Los dos números deben ser diferentes.')
+        : _('Your scale is drawn beside the straw. Use it to read your other marks.', 'Tu escala está dibujada junto al popote. Úsala para leer tus otras marcas.');
+      q('sc-lo').disabled = !haveMarks; q('sc-hi').disabled = !haveMarks; q('sc-unit').disabled = !haveMarks;
+      const showScale = valid && S.scale.show;
+      q('sc-show-scale').disabled = !valid; q('sc-show-ruler').disabled = !valid;
+      q('sc-show-scale').classList.toggle('secondary', !showScale);
+      q('sc-show-ruler').classList.toggle('secondary', showScale || !valid);
+      q('sc-show-scale').setAttribute('aria-pressed', showScale);
+      q('sc-show-ruler').setAttribute('aria-pressed', valid && !showScale);
+      show('p1-ruler', !showScale); show('p1-scale', showScale);
+      const g = q('p1-scale'); g.textContent = '';
+      if (!showScale) return;
+      const top = ZERO - 16 * PX - 14, bottom = ZERO + 6;
+      g.appendChild(svgEl('rect', { x: 98, y: top, width: 54, height: bottom - top, rx: 3, fill: 'white', stroke: 'var(--glass)', 'stroke-width': 1 }));
+      const yLo = ZERO - S.marks.ice * PX, yHi = ZERO - S.marks.boil * PX;
+      const stepY = (yHi - yLo) / 10, stepV = (hi - lo) / 10;
+      if (Math.abs(stepY) < 2) return; // marks too close together to draw a scale
+      for (let i = -40; i <= 80; i++) {            // half-steps: even i = labeled step, odd i = small tick
+        const y = yLo + (i / 2) * stepY;
+        if (y < top + 12 || y > ZERO) continue;
+        const big = i % 2 === 0;
+        g.appendChild(svgEl('line', { x1: big ? 140 : 146, x2: 152, y1: y, y2: y, stroke: 'var(--text)', 'stroke-width': big ? 1.4 : 0.8 }));
+        if (big) {
+          const anchor = (i === 0 || i === 20);
+          const label = svgEl('text', { x: 137, y: y + 3.5, 'text-anchor': 'end', 'font-size': 9.5, 'class': 't', 'font-weight': anchor ? 700 : 500 }, fmtScale(lo + (i / 2) * stepV));
+          if (anchor) label.style.fill = 'var(--teal-dim)';
+          g.appendChild(label);
+        }
+      }
+      g.appendChild(svgEl('text', { x: 125, y: top - 4, 'text-anchor': 'middle', 'font-size': 10, 'class': 'tm' }, S.scale.unit || _('my scale', 'mi escala')));
+    }
     function renderMarks() {
+      renderScale(false);
       const g = q('p1-marks'); g.textContent = '';
       const list = COND_IDS.filter(k => S.marks[k] != null).map(k => ({ k, y: ZERO - S.marks[k] * PX }));
       list.sort((a, b) => a.y - b.y);
@@ -493,6 +569,12 @@
       renderMarks(); dataChanged();
     });
     q('p1-clear').addEventListener('click', () => { S.marks = {}; renderMarks(); dataChanged(); });
+    ['lo', 'hi', 'unit'].forEach(k => q('sc-' + k).addEventListener('input', e => {
+      S.scale[k] = e.target.value; if (k !== 'unit') S.scale.show = true;
+      renderScale(false); save(false);
+    }));
+    q('sc-show-scale').addEventListener('click', () => { S.scale.show = true; renderScale(false); save(false); });
+    q('sc-show-ruler').addEventListener('click', () => { S.scale.show = false; renderScale(false); save(false); });
 
     function stepP1(dt) {
       const target = condTemp(p1.cur);
@@ -657,7 +739,7 @@
         const tab = S.tab;
         S = newState(); S.tab = tab;
         p1.cur = 'room'; p1.T = S.env.room;
-        renderEnv(); renderMarks(); resetP2(false);
+        renderEnv(); renderMarks(); renderScale(true); resetP2(false);
         const p = ctx.saveProgress({ status: 'in_progress', score: null, totalQuestions: null, answers: [{ questionId: '_lab', state: S }] });
         renderDone();
         await p;
@@ -666,7 +748,7 @@
 
     // ---- start
     selectTab(S.tab);
-    renderEnv(); renderMarks(); resetP2(false); renderDone();
+    renderEnv(); renderMarks(); renderScale(true); resetP2(false); renderDone();
     let last = performance.now();
     // A timer (not requestAnimationFrame) so the lab keeps running even when the tab is not being painted.
     const timer = setInterval(() => {
