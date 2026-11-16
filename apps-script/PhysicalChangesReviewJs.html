@@ -1,0 +1,2023 @@
+<script>
+// "Chapter 10 Review: Physically Changing Matter" (registered as CONTENT
+// activity id 'physical-changes-review'). Same accordion + graded-quiz shape as
+// the Chapter 1-4 reviews, built from the Chapter 10 packet (Lessons 50-54) and
+// the Chapter 10 Quiz A/B. Lesson 54 (Charles's law) is deliberately the heavy
+// part: three sections (a balloon/graph simulator, a step-by-step solver, and a
+// spot-the-mistake tool) plus about half of the graded questions.
+// Interactive widgets are an ungraded warm-up; only the quiz saves a score
+// (via ctx.saveProgress) and shows a completion code.
+//
+// Supports an EN/ES language toggle (shared LANG_KEY). Grading is always by the
+// answer's positional index (QUESTIONS[i].correct), never by displayed text.
+(function () {
+  const STYLE_ID = 'pc-lesson-styles';
+  const FONT_LINK_ID = 'el-lesson-fonts'; // shared Google Fonts <link>, same font family as every other review
+  const LANG_KEY = 'ionicstorm_lang_v1';  // shared literal: keeps language in sync across all activities
+  const SECTION_COUNT = 9; // sections 0-7 (7 content sections + intro) + the graded quiz at index 8
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function getLang() {
+    return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en';
+  }
+  function setLang(lang) {
+    localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en');
+  }
+  function tr(field, lang) {
+    return (field && typeof field === 'object') ? (field[lang] || field.en) : field;
+  }
+  function t(key, lang, ...args) {
+    const entry = STRINGS[key] || {};
+    const val = entry[lang] || entry.en;
+    return typeof val === 'function' ? val(...args) : val;
+  }
+  // Round to d decimals and drop trailing zeros ("4.40" -> "4.4").
+  function fmt(n, d) {
+    const p = Math.pow(10, d === undefined ? 1 : d);
+    return String(Math.round(n * p) / p);
+  }
+  function parseNum(s) {
+    let v = String(s).trim().replace(/\s/g, '');
+    if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(v)) v = v.replace(/,/g, '');
+    else v = v.replace(',', '.');
+    v = v.replace('−', '-');
+    const n = parseFloat(v);
+    return isNaN(n) || !/^-?\d*\.?\d+$/.test(v) ? NaN : n;
+  }
+
+  const DIFF_LABELS = {
+    en: { basic: 'Basic', medium: 'Medium', challenge: 'Challenge' },
+    es: { basic: 'Básico', medium: 'Medio', challenge: 'Desafío' }
+  };
+
+  const STRINGS = {
+    headerLabel: { en: 'Chapter 10 · Physically Changing Matter', es: 'Capítulo 10 · Cambios Físicos de la Materia' },
+    headerMeta: { en: 'Self-Paced Review · ~65 Minutes · Lesson 54 focus · Good prep for Quiz A/B', es: 'Repaso a tu Propio Ritmo · ~65 Minutos · Enfoque en la Lección 54 · Buena preparación para el Quiz A/B' },
+    langToggleAria: { en: 'Language', es: 'Idioma' },
+    progress: { en: 'Progress', es: 'Progreso' },
+    sectionCount: { en: (done, total) => `${done} / ${total} sections`, es: (done, total) => `${done} / ${total} secciones` },
+    checkForUnderstanding: { en: 'Check for Understanding', es: 'Comprobación de Comprensión' },
+    quizTimeGraded: { en: '26 min · graded', es: '26 min · calificado' },
+    quizNote: {
+      en: 'Unlike the sections above, this quiz <strong>saves your score</strong> and reports it to your teacher. You can retake it any time — your most recent attempt is what\'s saved. Calculators are fine.',
+      es: 'A diferencia de las secciones anteriores, este quiz <strong>guarda tu puntaje</strong> y se lo reporta a tu maestro. Puedes volver a hacerlo en cualquier momento — se guarda tu intento más reciente. Puedes usar calculadora.'
+    },
+    markSectionComplete: { en: '✓ Mark Section Complete', es: '✓ Marcar Sección como Completa' },
+    sectionComplete: { en: '✓ Section Complete', es: '✓ Sección Completa' },
+    hintShow: { en: '💡 Hint', es: '💡 Pista' },
+    hintHide: { en: '▲ Hide Hint', es: '▲ Ocultar Pista' },
+    revealAnswer: { en: 'Reveal Answer', es: 'Mostrar Respuesta' },
+    hideAnswer: { en: 'Hide Answer', es: 'Ocultar Respuesta' },
+    answerLabel: { en: '✓ Answer', es: '✓ Respuesta' },
+    questionCount: { en: (n, total) => `Question ${n} of ${total}`, es: (n, total) => `Pregunta ${n} de ${total}` },
+    nextQuestion: { en: 'Next Question', es: 'Siguiente Pregunta' },
+    correctPrefix: { en: '✓ Correct!', es: '✓ ¡Correcto!' },
+    incorrectPrefix: { en: '✗ Not quite.', es: '✗ No exactamente.' },
+    retakeQuiz: { en: 'Retake Quiz', es: 'Repetir el Quiz' },
+    showMyCode: { en: 'Show my code', es: 'Mostrar mi código' },
+    completionCode: { en: 'Your completion code — show this to your teacher:', es: 'Tu código de finalización — muéstraselo a tu maestro:' },
+    summaryText: {
+      en: 'Nice work! You can retake this any time — your most recent attempt is what\'s saved and sent to your teacher.',
+      es: '¡Buen trabajo! Puedes repetirlo en cualquier momento — se guarda y se envía a tu maestro tu intento más reciente.'
+    },
+    guidedModeLabel: { en: 'Guided Example', es: 'Ejemplo Guiado' },
+    independentModeLabel: { en: 'Your Turn — Independent', es: 'Tu Turno — Independiente' },
+    focusBadge: { en: 'Lesson 54 · Quiz focus', es: 'Lección 54 · Enfoque del quiz' }
+  };
+
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.pc-lesson {
+  --navy: #0d1b2a; --navy-mid: #1b2d42; --navy-light: #253a52;
+  --teal: #2ec4b6; --teal-dim: #1a8c83; --amber: #f4a261;
+  --cream: #f7f3ec; --cream-dark: #ede8df;
+  --text: #1a1a2e; --text-muted: #5a6475;
+  --note-bg: #fff8e7; --note-border: #f4a261;
+  --correct-bg: #e8f8f5; --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text); font-size: 17px; line-height: 1.7;
+  background: var(--cream); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.pc-lesson * { box-sizing: border-box; }
+.pc-lesson .pc-header { background: var(--navy); color: var(--cream); padding: 2rem 1.75rem 1.6rem; position: relative; overflow: hidden; }
+.pc-lesson .pc-header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; border: 32px solid rgba(46,196,182,0.12); }
+.pc-lesson .pc-lang-toggle { position: absolute; top: 1.75rem; right: 1.75rem; z-index: 2; display: flex; gap: 0.3rem; }
+.pc-lesson .pc-lang-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.3rem 0.6rem; border-radius: 6px; background: transparent; border: 1px solid rgba(247,243,236,0.35); color: rgba(247,243,236,0.65); cursor: pointer; }
+.pc-lesson .pc-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.pc-lesson .pc-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
+.pc-lesson .pc-header-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem; position: relative; }
+.pc-lesson .pc-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; line-height: 1.2; margin: 0 0 0.4rem; position: relative; }
+.pc-lesson .pc-header-meta { font-size: 0.82rem; color: rgba(247,243,236,0.65); font-family: 'JetBrains Mono', monospace; position: relative; }
+.pc-lesson .pc-progress-wrap { background: var(--navy-mid); padding: 0.7rem 1.75rem; display: flex; align-items: center; gap: 0.9rem; position: sticky; top: 0; z-index: 10; }
+.pc-lesson .pc-progress-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+.pc-lesson .pc-progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; }
+.pc-lesson .pc-progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber)); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+.pc-lesson .pc-progress-count { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(247,243,236,0.55); white-space: nowrap; }
+.pc-lesson main { padding: 1.5rem 1.25rem 2.5rem; }
+.pc-lesson .section-card { background: white; border-radius: 12px; margin-bottom: 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+.pc-lesson .section-header { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.2rem; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; }
+.pc-lesson .section-header:hover { background: #fafafa; }
+.pc-lesson .section-header.open { border-bottom-color: var(--cream-dark); }
+.pc-lesson .section-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; color: white; background: var(--navy); border-radius: 6px; padding: 0.22rem 0.5rem; flex-shrink: 0; }
+.pc-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.pc-lesson .section-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; flex: 1; }
+.pc-lesson .section-time { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); }
+.pc-lesson .section-arrow { font-size: 0.9rem; color: var(--text-muted); transition: transform 0.25s; flex-shrink: 0; }
+.pc-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.pc-lesson .section-body { display: none; padding: 1.3rem; }
+.pc-lesson .section-body.open { display: block; animation: meFadeIn 0.25s ease; }
+@keyframes meFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.pc-lesson h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--navy); margin: 0 0 0.6rem; }
+.pc-lesson h3 { font-size: 0.95rem; font-weight: 600; color: var(--navy-mid); margin: 1.1rem 0 0.5rem; }
+.pc-lesson p { margin: 0 0 0.85rem; }
+.pc-lesson p:last-child { margin-bottom: 0; }
+.pc-lesson .note-box { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin: 1.1rem 0; display: flex; gap: 0.7rem; font-size: 0.9rem; }
+.pc-lesson .note-box .note-icon { font-size: 1.15rem; flex-shrink: 0; }
+.pc-lesson .concept-box { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%); color: var(--cream); border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.1rem 0; }
+.pc-lesson .concept-box .concept-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--teal); margin-bottom: 0.4rem; }
+.pc-lesson .concept-box p { color: rgba(247,243,236,0.92); margin-bottom: 0; }
+.pc-lesson .info-panel { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 0.9rem 1.1rem; margin: 1.1rem 0; font-size: 0.9rem; }
+.pc-lesson .info-panel .panel-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.14em; color: #0369a1; margin-bottom: 0.35rem; }
+.pc-lesson table { width: 100%; border-collapse: collapse; margin: 0.9rem 0; font-size: 0.85rem; }
+.pc-lesson th { background: var(--navy); color: var(--cream); font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; text-align: left; }
+.pc-lesson td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cream-dark); }
+.pc-lesson tr:nth-child(even) td { background: #fafafa; }
+.pc-lesson ul, .pc-lesson ol { padding-left: 1.3rem; margin: 0 0 0.85rem; }
+.pc-lesson li { margin-bottom: 0.3rem; font-size: 0.93rem; }
+.pc-lesson .objectives-list { list-style: none; padding: 0; margin: 0.4rem 0; }
+.pc-lesson .objectives-list li { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.4rem 0; font-size: 0.92rem; border-bottom: 1px solid var(--cream-dark); }
+.pc-lesson .objectives-list li:last-child { border-bottom: none; }
+.pc-lesson .obj-check { color: var(--teal); flex-shrink: 0; }
+.pc-lesson .practice-problem { border: 1.5px solid var(--cream-dark); border-radius: 10px; margin-bottom: 1.1rem; overflow: hidden; }
+.pc-lesson .pp-header { display: flex; align-items: center; gap: 0.65rem; padding: 0.85rem 1.1rem; background: #fafafa; border-bottom: 1px solid var(--cream-dark); }
+.pc-lesson .pp-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700; color: white; background: var(--amber); border-radius: 6px; padding: 0.18rem 0.45rem; flex-shrink: 0; }
+.pc-lesson .pp-difficulty { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; margin-left: auto; }
+.pc-lesson .diff-basic { color: #16a34a; }
+.pc-lesson .diff-medium { color: #d97706; }
+.pc-lesson .diff-challenge { color: #dc2626; }
+.pc-lesson .pp-body { padding: 0.95rem 1.1rem; }
+.pc-lesson .pp-body p { font-size: 0.92rem; }
+.pc-lesson .hint-btn, .pc-lesson .reveal-btn, .pc-lesson .mark-done-btn, .pc-lesson .pc-choice, .pc-lesson .pc-next-btn, .pc-lesson .pc-retake-btn, .pc-lesson .pc-flame-btn, .pc-lesson .pc-builder-btn {
+  font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none;
+}
+.pc-lesson .hint-btn, .pc-lesson .reveal-btn { border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.pc-lesson .hint-btn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; margin-right: 0.5rem; }
+.pc-lesson .hint-btn:hover { background: #fde68a; }
+.pc-lesson .reveal-btn { background: var(--navy); color: white; }
+.pc-lesson .reveal-btn:hover { background: var(--navy-light); }
+.pc-lesson .hint-box, .pc-lesson .answer-box { border-radius: 7px; padding: 0.75rem 0.95rem; margin-top: 0.7rem; font-size: 0.87rem; display: none; }
+.pc-lesson .hint-box.open, .pc-lesson .answer-box.open { display: block; animation: meFadeIn 0.2s ease; }
+.pc-lesson .hint-box { background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; }
+.pc-lesson .answer-box { background: var(--correct-bg); border: 1px solid var(--correct-border); color: #065f46; }
+.pc-lesson .answer-box .answer-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim); margin-bottom: 0.35rem; font-weight: 700; }
+.pc-lesson .mark-done-btn { display: block; width: 100%; margin-top: 1.2rem; background: var(--navy); color: var(--cream); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; transition: background 0.2s; }
+.pc-lesson .mark-done-btn:hover:not(:disabled) { background: var(--teal-dim); }
+.pc-lesson .mark-done-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.pc-lesson .quiz-note { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin-bottom: 1.1rem; font-size: 0.88rem; }
+.pc-lesson .quiz-progress-bar { height: 6px; background: var(--cream-dark); border-radius: 999px; overflow: hidden; margin: 0.6rem 0 0.9rem; }
+.pc-lesson .quiz-progress-fill { height: 100%; background: linear-gradient(90deg, var(--navy), var(--teal)); transition: width 0.2s ease; }
+.pc-lesson .quiz-question-count { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+.pc-lesson .quiz-prompt { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--navy); margin: 0.5rem 0 1rem; }
+.pc-lesson .pc-choice { display: block; width: 100%; text-align: left; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem; font-size: 0.93rem; color: var(--text); font-family: 'Source Serif 4', serif; transition: border-color 0.15s, background 0.15s; }
+.pc-lesson .pc-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.pc-lesson .pc-choice:disabled { cursor: default; }
+.pc-lesson .pc-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.pc-lesson .pc-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.pc-lesson .pc-feedback { border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600; }
+.pc-lesson .pc-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.pc-lesson .pc-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.pc-lesson .pc-next-btn, .pc-lesson .pc-retake-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem; }
+.pc-lesson .pc-next-btn:hover, .pc-lesson .pc-retake-btn:hover { background: var(--navy-light); }
+.pc-lesson .pc-summary { text-align: center; padding: 1rem 0.5rem; }
+.pc-summary .pc-code-label { margin: 0.6rem 0 0.2rem; font-weight: 600; }
+.pc-summary .pc-code { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--navy); border: 2px dashed var(--navy); border-radius: 10px; padding: 0.3rem 1rem; margin-bottom: 0.8rem; user-select: all; }
+.pc-lesson .pc-score { font-family: 'JetBrains Mono', monospace; font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0; }
+
+/* ---- Shared interactive-widget styles ---- */
+.pc-lesson .pc-header-label { padding-right: 5.5rem; }
+.pc-lesson .pc-widget { background: var(--cream-dark); border-radius: 12px; padding: 1.1rem; margin: 1rem 0; }
+.pc-lesson .pc-lead { margin: 0 0 0.5rem; }
+.pc-lesson .pc-choices { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.3rem 0 0.9rem; }
+.pc-lesson .pc-opt { background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; cursor: pointer; color: var(--text); }
+.pc-lesson .pc-opt:hover { border-color: var(--teal); }
+.pc-lesson .pc-opt.selected { border-color: var(--navy); background: var(--navy); color: white; }
+.pc-lesson .pc-btn { font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none; background: var(--navy); color: white; border-radius: 8px; padding: 0.5rem 0.9rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.pc-lesson .pc-btn:hover:not(:disabled) { background: var(--navy-light); }
+.pc-lesson .pc-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.pc-lesson .pc-btn.secondary { background: white; color: var(--navy); border: 1.5px solid var(--navy-light); }
+.pc-lesson .pc-stage { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: center; }
+.pc-lesson .pc-svg { max-width: 100%; height: auto; }
+.pc-lesson .pc-panel { flex: 1 1 230px; min-width: 220px; display: flex; flex-direction: column; gap: 0.55rem; }
+.pc-lesson .pc-panel label { font-size: 0.85rem; }
+.pc-lesson input[type=range] { width: 100%; accent-color: var(--teal-dim); }
+.pc-lesson .pc-formula { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.55rem 0.7rem; line-height: 1.5; }
+.pc-lesson .pc-formula-label { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--teal-dim); font-weight: 700; margin-bottom: 0.3rem; }
+.pc-lesson .pc-formula.good { border-color: var(--correct-border); background: var(--correct-bg); }
+.pc-lesson .pc-compare { font-size: 0.8rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.pc-lesson .pc-insight { margin-top: 0.7rem; font-size: 0.88rem; font-weight: 600; color: var(--teal-dim); min-height: 1.3em; }
+.pc-lesson .pc-insight.warn { color: #b45309; }
+.pc-lesson .pc-key { font-size: 0.82rem; font-style: italic; color: var(--text-muted); margin: 0.6rem 0 0; }
+.pc-lesson .pc-table { width: 100%; max-width: 420px; margin: 0.7rem auto 0; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; }
+.pc-lesson .pc-table th { font-size: 0.6rem; }
+.pc-lesson .pc-mode-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 999px; background: var(--cream-dark); color: var(--navy-mid); margin-bottom: 0.5rem; }
+.pc-lesson .pc-mode-badge.guided { background: var(--amber); color: white; }
+.pc-lesson .pc-focus-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; padding: 0.3rem 0.7rem; border-radius: 999px; background: var(--teal); color: var(--navy); margin-bottom: 0.6rem; }
+
+/* ---- Phase / density bars ---- */
+.pc-lesson .pc-bars { display: flex; gap: 1rem; justify-content: center; align-items: flex-end; height: 190px; margin: 0.6rem 0; }
+.pc-lesson .pc-bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; width: 28%; max-width: 110px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; text-align: center; }
+.pc-lesson .pc-bar { width: 100%; border-radius: 6px 6px 0 0; transition: height 0.45s ease; border: 2px solid var(--navy-light); border-bottom-width: 3px; }
+.pc-lesson .pc-bar.snow { background: #e8f1f8; }
+.pc-lesson .pc-bar.ice { background: #bfdcf0; }
+.pc-lesson .pc-bar.water { background: #5bb6e8; }
+.pc-lesson .pc-bar-label { margin-top: 0.3rem; font-weight: 700; }
+
+/* ---- Temperature converter ---- */
+.pc-lesson .pc-input { font-family: 'JetBrains Mono', monospace; font-size: 1rem; padding: 0.4rem 0.6rem; border: 1.5px solid var(--navy-light); border-radius: 8px; width: 7.5rem; background: white; color: var(--text); }
+.pc-lesson .pc-results { display: grid; gap: 0.45rem; }
+.pc-lesson .pc-result { background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.5rem 0.7rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+.pc-lesson .pc-result.given { border-color: var(--navy); }
+.pc-lesson .pc-result strong { font-size: 1rem; }
+
+/* ---- Gas particle simulator ---- */
+.pc-lesson .pc-canvas { background: #0d1b2a; border-radius: 10px; max-width: 100%; display: block; margin: 0 auto; }
+.pc-lesson .pc-energy { height: 8px; background: rgba(13,27,42,0.15); border-radius: 4px; overflow: hidden; }
+.pc-lesson .pc-energy-fill { height: 100%; background: linear-gradient(90deg, #4a8fe7, #e8384f); transition: width 0.2s; }
+
+/* ---- Step-by-step Charles's law solver ---- */
+.pc-lesson .pc-step { background: white; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.7rem 0.9rem; margin: 0.6rem 0; }
+.pc-lesson .pc-step.locked { opacity: 0.45; pointer-events: none; }
+.pc-lesson .pc-step.done { border-color: var(--correct-border); background: var(--correct-bg); }
+.pc-lesson .pc-step-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.4rem; }
+.pc-lesson .pc-fields { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 0.5rem; }
+.pc-lesson .pc-field { display: flex; align-items: center; gap: 0.35rem; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+.pc-lesson .pc-field input { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; padding: 0.35rem 0.5rem; width: 7rem; border: 1.5px solid var(--navy-light); border-radius: 6px; background: white; color: var(--text); }
+.pc-lesson .pc-mc { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
+.pc-lesson .pc-mc button { text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.5rem 0.7rem; cursor: pointer; color: var(--text); }
+.pc-lesson .pc-mc button:hover:not(:disabled) { border-color: var(--teal); }
+.pc-lesson .pc-mc button.right { border-color: var(--correct-border); background: var(--correct-bg); }
+.pc-lesson .pc-mc button.wrong { border-color: #dc2626; background: #fef2f2; }
+.pc-lesson .pc-hint { font-size: 0.82rem; background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; border-radius: 7px; padding: 0.5rem 0.7rem; margin: 0.4rem 0; display: none; }
+.pc-lesson .pc-hint.open { display: block; }
+.pc-lesson .pc-msg { font-size: 0.84rem; font-weight: 600; min-height: 1.2em; margin-top: 0.3rem; }
+.pc-lesson .pc-msg.ok { color: var(--teal-dim); }
+.pc-lesson .pc-msg.bad { color: #b91c1c; }
+.pc-lesson .pc-solved { background: var(--correct-bg); border: 1.5px solid var(--correct-border); border-radius: 10px; padding: 0.7rem 0.9rem; margin-top: 0.6rem; font-weight: 600; color: var(--teal-dim); }
+
+/* ---- Spot the mistake ---- */
+.pc-lesson .pc-work { background: white; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.4rem; margin: 0.5rem 0; }
+.pc-lesson .pc-line { display: block; width: 100%; text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; background: transparent; border: 1.5px solid transparent; border-radius: 6px; padding: 0.45rem 0.6rem; cursor: pointer; color: var(--text); }
+.pc-lesson .pc-line:hover:not(:disabled) { background: #f3fdfc; border-color: var(--teal); }
+.pc-lesson .pc-line.error { background: #fef2f2; border-color: #dc2626; }
+.pc-lesson .pc-line.picked-wrong { background: #fff7ed; border-color: #f59e0b; }
+.pc-lesson .pc-line:disabled { cursor: default; }
+
+`;
+    document.head.appendChild(style);
+  }
+
+  function practiceProblem(lang, idSuffix, prompt, difficulty, hint, answer) {
+    const diffClass = { basic: 'diff-basic', medium: 'diff-medium', challenge: 'diff-challenge' }[difficulty] || 'diff-basic';
+    const diffLabel = (DIFF_LABELS[lang] || DIFF_LABELS.en)[difficulty] || difficulty;
+    return `
+      <div class="practice-problem">
+        <div class="pp-header">
+          <span class="pp-num">Q</span>
+          <span class="pp-difficulty ${diffClass}">● ${escapeHtml(diffLabel)}</span>
+        </div>
+        <div class="pp-body">
+          <p><strong>${prompt}</strong></p>
+          <button type="button" class="hint-btn" data-hint-target="hint-${idSuffix}">${escapeHtml(t('hintShow', lang))}</button>
+          <button type="button" class="reveal-btn" data-answer-target="ans-${idSuffix}">${escapeHtml(t('revealAnswer', lang))}</button>
+          <div class="hint-box" id="hint-${idSuffix}">${hint}</div>
+          <div class="answer-box" id="ans-${idSuffix}">
+            <div class="answer-label">${escapeHtml(t('answerLabel', lang))}</div>
+            ${answer}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ======================================================================
+  // Widget A (Lesson 50): rain gauges -- V = base area x height, so V is
+  // proportional to h; the same rain height gives different volumes.
+  // ======================================================================
+  const GAUGE_TXT = {
+    en: {
+      pick: 'Pick a rain gauge (base area):',
+      names: ['Narrow · 1.5 cm²', 'Medium · 3.0 cm²', 'Wide · 5.0 cm²'],
+      height: 'Rain height',
+      mathLabel: 'The math for this reading',
+      formula: (a, h, v) => `V = base area × height\nV = ${a} cm² × ${h} cm = ${v} mL`,
+      compare: (a, b, c) => `Same rain height in each gauge → narrow: ${a} mL · medium: ${b} mL · wide: ${c} mL`,
+      record: 'Record this reading', clear: 'Clear table',
+      th: ['Height h (cm)', 'Volume V (mL)', 'V ÷ h (mL/cm)'],
+      prop: (k) => `V ÷ h is ${k} mL/cm every time — a constant. That is what "proportional" means: V = k × h (here k is just the base area).`,
+      tryMore: 'Record a few different heights to see the pattern.',
+      key: 'Same rain, same height — but each gauge holds a different volume. That is why meteorologists report rainfall as a height, not a volume.'
+    },
+    es: {
+      pick: 'Elige un pluviómetro (área de la base):',
+      names: ['Angosto · 1.5 cm²', 'Mediano · 3.0 cm²', 'Ancho · 5.0 cm²'],
+      height: 'Altura de la lluvia',
+      mathLabel: 'La matemática de esta lectura',
+      formula: (a, h, v) => `V = área de la base × altura\nV = ${a} cm² × ${h} cm = ${v} mL`,
+      compare: (a, b, c) => `Misma altura de lluvia en cada pluviómetro → angosto: ${a} mL · mediano: ${b} mL · ancho: ${c} mL`,
+      record: 'Registrar esta lectura', clear: 'Borrar tabla',
+      th: ['Altura h (cm)', 'Volumen V (mL)', 'V ÷ h (mL/cm)'],
+      prop: (k) => `V ÷ h es ${k} mL/cm cada vez — una constante. Eso significa "proporcional": V = k × h (aquí k es simplemente el área de la base).`,
+      tryMore: 'Registra varias alturas diferentes para ver el patrón.',
+      key: 'La misma lluvia, la misma altura — pero cada pluviómetro contiene un volumen distinto. Por eso los meteorólogos reportan la lluvia como una altura, no como un volumen.'
+    }
+  };
+  const GAUGE_AREAS = [1.5, 3.0, 5.0];
+
+  function gaugeSvg(area, h) {
+    const px = 15, H = 10 * px, w = Math.round(26 * Math.sqrt(area));
+    const x0 = 110 - w / 2, yTop = 14, yBot = yTop + H, fillH = h * px;
+    let s = `<svg viewBox="0 0 220 200" class="pc-svg" width="220" xmlns="http://www.w3.org/2000/svg" role="img">`;
+    s += `<rect x="${x0}" y="${yBot - fillH}" width="${w}" height="${fillH}" fill="#2ec4b6" opacity="0.75"/>`;
+    s += `<rect x="${x0}" y="${yTop}" width="${w}" height="${H}" rx="3" fill="none" stroke="#253a52" stroke-width="2"/>`;
+    for (let c = 0; c <= 10; c++) {
+      const y = yBot - c * px;
+      s += `<line x1="${x0 - 6}" y1="${y}" x2="${x0}" y2="${y}" stroke="#253a52" stroke-width="1.5"/>`;
+      if (c % 2 === 0) s += `<text x="${x0 - 9}" y="${y + 3.5}" font-size="10" text-anchor="end" fill="#5a6475" font-family="JetBrains Mono, monospace">${c}</text>`;
+    }
+    s += `<text x="110" y="${yBot + 18}" font-size="10.5" text-anchor="middle" fill="#253a52" font-family="JetBrains Mono, monospace">cm</text>`;
+    return s + `</svg>`;
+  }
+
+  function renderGaugeWidget(mount, lang) {
+    const X = GAUGE_TXT[lang];
+    let ai = 1, h = 4.5, rows = [];
+    mount.innerHTML = `
+      <div class="pc-widget">
+        <p class="pc-lead"><strong>${escapeHtml(X.pick)}</strong></p>
+        <div class="pc-choices">${X.names.map((n, i) => `<button type="button" class="pc-opt${i === ai ? ' selected' : ''}" data-area="${i}">${escapeHtml(n)}</button>`).join('')}</div>
+        <div class="pc-stage">
+          <div data-svg></div>
+          <div class="pc-panel">
+            <label>${escapeHtml(X.height)}: <strong data-hval></strong></label>
+            <input type="range" data-h min="0" max="10" step="0.5" value="${h}">
+            <div class="pc-formula"><div class="pc-formula-label">${escapeHtml(X.mathLabel)}</div><div data-formula style="white-space:pre-line"></div></div>
+            <div class="pc-compare" data-compare></div>
+            <div><button type="button" class="pc-btn" data-rec>${escapeHtml(X.record)}</button> <button type="button" class="pc-btn secondary" data-clr>${escapeHtml(X.clear)}</button></div>
+          </div>
+        </div>
+        <table class="pc-table" data-table></table>
+        <div class="pc-insight" data-insight></div>
+        <p class="pc-key">${escapeHtml(X.key)}</p>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+
+    function redraw() {
+      const a = GAUGE_AREAS[ai], v = a * h;
+      $('[data-svg]').innerHTML = gaugeSvg(a, h);
+      $('[data-hval]').textContent = `${fmt(h, 1)} cm`;
+      $('[data-formula]').textContent = X.formula(fmt(a, 1), fmt(h, 1), fmt(v, 2));
+      $('[data-compare]').textContent = X.compare(...GAUGE_AREAS.map(x => fmt(x * h, 2)));
+      let tbl = `<thead><tr>${X.th.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>`;
+      tbl += rows.map(r => `<tr><td>${fmt(r.h, 1)}</td><td>${fmt(r.v, 2)}</td><td>${fmt(r.v / r.h, 2)}</td></tr>`).join('');
+      $('[data-table]').innerHTML = rows.length ? tbl + '</tbody>' : '';
+      $('[data-insight]').textContent = rows.length >= 2 ? X.prop(fmt(GAUGE_AREAS[ai], 1)) : (rows.length ? X.tryMore : '');
+    }
+    mount.querySelectorAll('[data-area]').forEach(b => b.addEventListener('click', () => {
+      ai = Number(b.getAttribute('data-area')); rows = [];
+      mount.querySelectorAll('[data-area]').forEach(x => x.classList.toggle('selected', x === b));
+      redraw();
+    }));
+    $('[data-h]').addEventListener('input', (e) => { h = Number(e.target.value); redraw(); });
+    $('[data-rec]').addEventListener('click', () => {
+      if (h > 0 && rows.length < 6 && !rows.some(r => r.h === h)) { rows.push({ h, v: GAUGE_AREAS[ai] * h }); redraw(); }
+    });
+    $('[data-clr]').addEventListener('click', () => { rows = []; redraw(); });
+    redraw();
+  }
+
+  // ======================================================================
+  // Widget B (Lesson 51): density across phases of water -- phase changes
+  // keep mass the same but change volume and density.
+  // ======================================================================
+  const PHASES = [
+    { id: 'snow', d: 0.5 }, { id: 'ice', d: 0.92 }, { id: 'water', d: 1.0 }
+  ];
+  const PHASE_TXT = {
+    en: {
+      modes: ['Same mass', 'Same volume'],
+      names: { snow: 'Snow', ice: 'Ice', water: 'Liquid water' },
+      amountMass: 'Mass of each sample', amountVol: 'Volume of each sample',
+      mathMass: 'The math: volume of each sample (V = m ÷ D)', mathVol: 'The math: mass of each sample (m = D × V)',
+      dens: (d) => `D = ${d} g/mL`,
+      volLine: (m, d, v) => `V = m ÷ D = ${m} g ÷ ${d} g/mL = ${v} mL`,
+      massLine: (d, v, m) => `m = D × V = ${d} g/mL × ${v} mL = ${m} g`,
+      meltMass: (m) => `Melt the snow: ${m} g of snow becomes ${m} g of liquid water, which is ${m} mL. The mass stays the same — only the volume changes (it shrinks).`,
+      meltVol: 'With equal volumes, liquid water has the most mass because it is the densest. Snow packs the least mass into the same space.',
+      unitBar: (v) => `${v} mL`, unitBarMass: (m) => `${m} g`
+    },
+    es: {
+      modes: ['Misma masa', 'Mismo volumen'],
+      names: { snow: 'Nieve', ice: 'Hielo', water: 'Agua líquida' },
+      amountMass: 'Masa de cada muestra', amountVol: 'Volumen de cada muestra',
+      mathMass: 'La matemática: volumen de cada muestra (V = m ÷ D)', mathVol: 'La matemática: masa de cada muestra (m = D × V)',
+      dens: (d) => `D = ${d} g/mL`,
+      volLine: (m, d, v) => `V = m ÷ D = ${m} g ÷ ${d} g/mL = ${v} mL`,
+      massLine: (d, v, m) => `m = D × V = ${d} g/mL × ${v} mL = ${m} g`,
+      meltMass: (m) => `Derrite la nieve: ${m} g de nieve se convierten en ${m} g de agua líquida, que son ${m} mL. La masa se mantiene — solo cambia el volumen (se reduce).`,
+      meltVol: 'Con volúmenes iguales, el agua líquida tiene la mayor masa porque es la más densa. La nieve guarda la menor masa en el mismo espacio.',
+      unitBar: (v) => `${v} mL`, unitBarMass: (m) => `${m} g`
+    }
+  };
+
+  function renderPhaseWidget(mount, lang) {
+    const X = PHASE_TXT[lang];
+    const dstr = (d) => (Number.isInteger(d) ? d.toFixed(1) : String(d));
+    let mode = 0, amount = 100;
+    mount.innerHTML = `
+      <div class="pc-widget">
+        <div class="pc-choices">${X.modes.map((m, i) => `<button type="button" class="pc-opt${i === mode ? ' selected' : ''}" data-mode="${i}">${escapeHtml(m)}</button>`).join('')}</div>
+        <label style="font-size:0.85rem;"><span data-amtlabel></span>: <strong data-amtval></strong></label>
+        <input type="range" data-amt min="50" max="200" step="10" value="${amount}">
+        <div class="pc-bars" data-bars></div>
+        <div class="pc-formula"><div class="pc-formula-label" data-mathlabel></div><div data-lines style="white-space:pre-line"></div></div>
+        <div class="pc-insight" data-note></div>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+
+    function redraw() {
+      const massMode = mode === 0;
+      $('[data-amtlabel]').textContent = massMode ? X.amountMass : X.amountVol;
+      $('[data-amtval]').textContent = massMode ? `${amount} g` : `${amount} mL`;
+      // bar height is proportional to the quantity that differs: volume (same mass) or mass (same volume)
+      const vals = PHASES.map(p => massMode ? amount / p.d : amount * p.d);
+      const max = massMode ? 200 / 0.5 : 200;
+      $('[data-bars]').innerHTML = PHASES.map((p, i) => `
+        <div class="pc-bar-col">
+          <div>${massMode ? X.unitBar(fmt(vals[i], 0)) : X.unitBarMass(fmt(vals[i], 0))}</div>
+          <div class="pc-bar ${p.id}" style="height:${Math.max(4, Math.round(vals[i] / max * 140))}px"></div>
+          <div class="pc-bar-label">${escapeHtml(X.names[p.id])}</div>
+          <div>${escapeHtml(X.dens(dstr(p.d)))}</div>
+        </div>`).join('');
+      $('[data-mathlabel]').textContent = massMode ? X.mathMass : X.mathVol;
+      $('[data-lines]').textContent = PHASES.map((p, i) => `${X.names[p.id]}:  ` + (massMode
+        ? X.volLine(amount, dstr(p.d), fmt(vals[i], 0))
+        : X.massLine(dstr(p.d), amount, fmt(vals[i], 0)))).join('\n');
+      $('[data-note]').textContent = massMode ? X.meltMass(amount) : X.meltVol;
+    }
+    mount.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+      mode = Number(b.getAttribute('data-mode'));
+      mount.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('selected', x === b));
+      redraw();
+    }));
+    $('[data-amt]').addEventListener('input', (e) => { amount = Number(e.target.value); redraw(); });
+    redraw();
+  }
+
+  // ======================================================================
+  // Widget C (Lessons 52-53): temperature scale converter with the working shown.
+  // ======================================================================
+  const TEMP_TXT = {
+    en: {
+      pick: 'Type a temperature and choose its scale, or jump to a landmark:',
+      scales: ['Celsius (°C)', 'Fahrenheit (°F)', 'Kelvin (K)'],
+      marks: ['Water freezes', 'Room temperature', 'Body temperature', 'Water boils', 'Absolute zero'],
+      names: ['Celsius', 'Fahrenheit', 'Kelvin'],
+      impossible: 'Nothing can be colder than absolute zero (0 K = −273 °C).',
+      invalid: 'Enter a number to convert.',
+      rules: 'F = 9/5(C) + 32  ·  C = 5/9(F − 32)  ·  K = °C + 273  ·  °C = K − 273'
+    },
+    es: {
+      pick: 'Escribe una temperatura y elige su escala, o salta a un punto de referencia:',
+      scales: ['Celsius (°C)', 'Fahrenheit (°F)', 'Kelvin (K)'],
+      marks: ['El agua se congela', 'Temperatura ambiente', 'Temperatura corporal', 'El agua hierve', 'Cero absoluto'],
+      names: ['Celsius', 'Fahrenheit', 'Kelvin'],
+      impossible: 'Nada puede estar más frío que el cero absoluto (0 K = −273 °C).',
+      invalid: 'Escribe un número para convertir.',
+      rules: 'F = 9/5(C) + 32  ·  C = 5/9(F − 32)  ·  K = °C + 273  ·  °C = K − 273'
+    }
+  };
+  const TEMP_MARKS_C = [0, 20, 37, 100, -273];
+
+  function thermoSvg(c) {
+    const lo = -50, hi = 150, y0 = 190, y1 = 12;
+    const clamp = Math.max(lo, Math.min(hi, c));
+    const yOf = (v) => y0 - (v - lo) / (hi - lo) * (y0 - y1);
+    let s = `<svg viewBox="0 0 150 210" class="pc-svg" width="120" role="img" xmlns="http://www.w3.org/2000/svg">`;
+    s += `<rect x="30" y="${y1}" width="14" height="${y0 - y1 + 6}" rx="7" fill="#fff" stroke="#253a52" stroke-width="2"/>`;
+    s += `<circle cx="37" cy="${y0 + 6}" r="12" fill="#e8384f" stroke="#253a52" stroke-width="2"/>`;
+    s += `<rect x="33" y="${yOf(clamp)}" width="8" height="${y0 + 6 - yOf(clamp)}" fill="#e8384f"/>`;
+    [[0, '0 °C · 32 °F'], [37, '37 °C · 98.6 °F'], [100, '100 °C · 212 °F']].forEach(([v, label]) => {
+      s += `<line x1="44" y1="${yOf(v)}" x2="54" y2="${yOf(v)}" stroke="#253a52" stroke-width="1.5"/><text x="58" y="${yOf(v) + 3.5}" font-size="9" fill="#253a52" font-family="JetBrains Mono, monospace">${label}</text>`;
+    });
+    return s + `</svg>`;
+  }
+
+  function renderTempConverter(mount, lang) {
+    const X = TEMP_TXT[lang];
+    let scale = 0, value = 37;
+    mount.innerHTML = `
+      <div class="pc-widget">
+        <p class="pc-lead"><strong>${escapeHtml(X.pick)}</strong></p>
+        <div class="pc-choices">${X.marks.map((m, i) => `<button type="button" class="pc-opt" data-mark="${i}">${escapeHtml(m)}</button>`).join('')}</div>
+        <div class="pc-stage">
+          <div data-thermo></div>
+          <div class="pc-panel">
+            <div><input type="text" inputmode="decimal" class="pc-input" data-val value="${value}" aria-label="temperature"></div>
+            <div class="pc-choices" style="margin:0;">${X.scales.map((s, i) => `<button type="button" class="pc-opt${i === scale ? ' selected' : ''}" data-scale="${i}">${escapeHtml(s)}</button>`).join('')}</div>
+            <div class="pc-results" data-results></div>
+            <div class="pc-insight warn" data-warn></div>
+          </div>
+        </div>
+        <p class="pc-key" style="font-family:'JetBrains Mono',monospace;font-style:normal;">${escapeHtml(X.rules)}</p>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+
+    function toC(v, sc) { return sc === 0 ? v : sc === 1 ? 5 / 9 * (v - 32) : v - 273; }
+    function redraw() {
+      const input = $('[data-val]');
+      const v = parseNum(input.value);
+      if (isNaN(v)) { $('[data-results]').innerHTML = `<div class="pc-result">${escapeHtml(X.invalid)}</div>`; $('[data-warn]').textContent = ''; return; }
+      const c = toC(v, scale), f = 9 / 5 * c + 32, k = c + 273;
+      const given = [c, f, k];
+      const unit = ['°C', '°F', 'K'];
+      const work = [
+        scale === 0 ? '' : scale === 1 ? `°C = 5/9(${fmt(v, 1)} − 32) = ${fmt(c, 1)}` : `°C = ${fmt(v, 1)} − 273 = ${fmt(c, 1)}`,
+        scale === 1 ? '' : `°F = 9/5(${fmt(c, 1)}) + 32 = ${fmt(f, 1)}`,
+        scale === 2 ? '' : `K = ${fmt(c, 1)} + 273 = ${fmt(k, 1)}`
+      ];
+      $('[data-results]').innerHTML = [0, 1, 2].map(i => `
+        <div class="pc-result${i === scale ? ' given' : ''}">${escapeHtml(X.names[i])}: <strong>${fmt(given[i], 1)} ${unit[i]}</strong>${work[i] ? `<br><span style="color:var(--text-muted)">${escapeHtml(work[i])}</span>` : ''}</div>`).join('');
+      $('[data-thermo]').innerHTML = thermoSvg(c);
+      $('[data-warn]').textContent = k < 0 ? X.impossible : '';
+    }
+    mount.querySelectorAll('[data-scale]').forEach(b => b.addEventListener('click', () => {
+      scale = Number(b.getAttribute('data-scale'));
+      mount.querySelectorAll('[data-scale]').forEach(x => x.classList.toggle('selected', x === b));
+      redraw();
+    }));
+    mount.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', () => {
+      scale = 0;
+      mount.querySelectorAll('[data-scale]').forEach(x => x.classList.toggle('selected', Number(x.getAttribute('data-scale')) === 0));
+      $('[data-val]').value = TEMP_MARKS_C[Number(b.getAttribute('data-mark'))];
+      redraw();
+    }));
+    $('[data-val]').addEventListener('input', redraw);
+    redraw();
+  }
+
+  // ======================================================================
+  // Widget D (Lesson 53): kinetic theory -- particle speed vs temperature.
+  // ======================================================================
+  const SIM_TXT = {
+    en: {
+      temp: 'Temperature', avg: 'Average speed of the particles (relative)', energy: 'Average energy of motion',
+      presets: ['0 K (absolute zero)', '273 K (0 °C)', '373 K (100 °C)'],
+      zero: 'Absolute zero: all particle motion stops (in theory — nothing can actually get this cold).',
+      note: 'Hotter gas = faster particles on average. The particles do not all move at the same speed, they move in straight lines, and they change direction when they collide with each other or the walls.'
+    },
+    es: {
+      temp: 'Temperatura', avg: 'Rapidez promedio de las partículas (relativa)', energy: 'Energía de movimiento promedio',
+      presets: ['0 K (cero absoluto)', '273 K (0 °C)', '373 K (100 °C)'],
+      zero: 'Cero absoluto: todo el movimiento de las partículas se detiene (en teoría — nada puede llegar realmente a estar tan frío).',
+      note: 'Gas más caliente = partículas más rápidas en promedio. Las partículas no se mueven todas a la misma rapidez, se mueven en línea recta, y cambian de dirección cuando chocan entre sí o con las paredes.'
+    }
+  };
+
+  function renderParticleSim(mount, lang) {
+    const X = SIM_TXT[lang];
+    let T = 300;
+    mount.innerHTML = `
+      <div class="pc-widget">
+        <canvas class="pc-canvas" width="360" height="190"></canvas>
+        <div class="pc-choices" style="justify-content:center;margin-top:0.7rem;">${X.presets.map((p, i) => `<button type="button" class="pc-opt" data-preset="${i}">${escapeHtml(p)}</button>`).join('')}</div>
+        <label style="font-size:0.85rem;">${escapeHtml(X.temp)}: <strong data-tval></strong></label>
+        <input type="range" data-t min="0" max="600" step="5" value="${T}">
+        <div class="pc-compare" data-avg style="margin:0.4rem 0 0.2rem;"></div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">${escapeHtml(X.energy)}</div>
+        <div class="pc-energy"><div class="pc-energy-fill" data-energy></div></div>
+        <div class="pc-insight" data-zero></div>
+        <p class="pc-key">${escapeHtml(X.note)}</p>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+    const cv = $('canvas'), g = cv.getContext('2d');
+    const W = cv.width, H = cv.height, R = 5;
+    const parts = Array.from({ length: 30 }, () => {
+      const a = Math.random() * Math.PI * 2;
+      return { x: R + Math.random() * (W - 2 * R), y: R + Math.random() * (H - 2 * R), ux: Math.cos(a), uy: Math.sin(a), m: 0.45 + Math.random() * 1.1 };
+    });
+
+    function label() {
+      $('[data-tval]').textContent = `${T} K (${T - 273} °C)`;
+      $('[data-avg]').textContent = `${X.avg}: ${fmt(Math.sqrt(T / 300), 2)}`;
+      $('[data-energy]').style.width = `${Math.round(T / 600 * 100)}%`;
+      $('[data-zero]').textContent = T === 0 ? X.zero : '';
+    }
+    function frame() {
+      if (!cv.isConnected) return;
+      if (cv.offsetParent !== null) {
+        const sp = 2.4 * Math.sqrt(T / 300);
+        g.fillStyle = '#0d1b2a'; g.fillRect(0, 0, W, H);
+        const hue = Math.round(220 - 220 * (T / 600));
+        g.fillStyle = `hsl(${hue}, 85%, 60%)`;
+        parts.forEach(p => {
+          p.x += p.ux * sp * p.m; p.y += p.uy * sp * p.m;
+          if (p.x < R) { p.x = R; p.ux = Math.abs(p.ux); } else if (p.x > W - R) { p.x = W - R; p.ux = -Math.abs(p.ux); }
+          if (p.y < R) { p.y = R; p.uy = Math.abs(p.uy); } else if (p.y > H - R) { p.y = H - R; p.uy = -Math.abs(p.uy); }
+          g.beginPath(); g.arc(p.x, p.y, R, 0, Math.PI * 2); g.fill();
+        });
+      }
+      requestAnimationFrame(frame);
+    }
+    $('[data-t]').addEventListener('input', (e) => { T = Number(e.target.value); label(); });
+    mount.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+      T = [0, 273, 373][Number(b.getAttribute('data-preset'))];
+      $('[data-t]').value = T; label();
+    }));
+    label();
+    requestAnimationFrame(frame);
+  }
+
+  // ======================================================================
+  // Widget E (Lesson 54 core): balloon + volume-vs-temperature graph.
+  // V = kT with T in kelvins. Toggling the axis to degrees Celsius shows
+  // why volume is NOT proportional to Celsius temperature.
+  // ======================================================================
+  const BAL_TXT = {
+    en: {
+      pick: 'Pick a gas sample:',
+      samples: ['Balloon A · 3 breaths of air (k = 1.4 mL/K)', 'Balloon B · 5 breaths of air (k = 2.1 mL/K)'],
+      readLabel: 'Live readout for the red point on the graph',
+      temp: 'Temperature', axisK: 'Graph with kelvins', axisC: 'Graph with °C',
+      vol: 'Volume',
+      ratioK: (r) => `k = V ÷ T (kelvins) = ${r} mL/K — the same constant at every temperature`,
+      ratioC: (r) => `V ÷ T (°C) = ${r} mL/°C — it keeps changing, so it is not a constant k`,
+      ratioC0: 'V ÷ T (°C) = undefined at 0 °C (you cannot divide by zero)',
+      dens: (d) => `Relative density of the gas: ${d}  (same gas, more volume → less dense → it rises)`,
+      insightK: 'With kelvins, the graph is a straight line through the origin (0, 0): volume is directly proportional to Kelvin temperature. This is Charles\'s law: V = kT.',
+      insightC: 'With °C, the line does NOT go through (0, 0) and V ÷ T keeps changing, so volume is NOT proportional to °C. That is why you must convert to kelvins before using Charles\'s law.',
+      xlab: ['T (K)', 'T (°C)'], ylab: 'V (mL)', zero: 'V = 0 at −273 °C (0 K)', int0: 'V at 0 °C is not 0'
+    },
+    es: {
+      pick: 'Elige una muestra de gas:',
+      samples: ['Globo A · 3 soplos de aire (k = 1.4 mL/K)', 'Globo B · 5 soplos de aire (k = 2.1 mL/K)'],
+      readLabel: 'Lectura en vivo del punto rojo de la gráfica',
+      temp: 'Temperatura', axisK: 'Graficar con kelvin', axisC: 'Graficar con °C',
+      vol: 'Volumen',
+      ratioK: (r) => `k = V ÷ T (kelvin) = ${r} mL/K — la misma constante a cualquier temperatura`,
+      ratioC: (r) => `V ÷ T (°C) = ${r} mL/°C — sigue cambiando, así que no es una constante k`,
+      ratioC0: 'V ÷ T (°C) = indefinido a 0 °C (no se puede dividir entre cero)',
+      dens: (d) => `Densidad relativa del gas: ${d}  (el mismo gas, más volumen → menos denso → sube)`,
+      insightK: 'Con kelvin, la gráfica es una línea recta que pasa por el origen (0, 0): el volumen es directamente proporcional a la temperatura Kelvin. Esta es la ley de Charles: V = kT.',
+      insightC: 'Con °C, la línea NO pasa por (0, 0) y V ÷ T sigue cambiando, así que el volumen NO es proporcional a los °C. Por eso debes convertir a kelvin antes de usar la ley de Charles.',
+      xlab: ['T (K)', 'T (°C)'], ylab: 'V (mL)', zero: 'V = 0 a −273 °C (0 K)', int0: 'V a 0 °C no es 0'
+    }
+  };
+  const BAL_K = [1.4, 2.1];
+
+  function renderBalloonWidget(mount, lang) {
+    const X = BAL_TXT[lang];
+    let si = 0, T = 285, axis = 0; // axis 0 = kelvins, 1 = Celsius
+    mount.innerHTML = `
+      <div class="pc-widget">
+        <p class="pc-lead"><strong>${escapeHtml(X.pick)}</strong></p>
+        <div class="pc-choices">${X.samples.map((s, i) => `<button type="button" class="pc-opt${i === si ? ' selected' : ''}" data-sample="${i}">${escapeHtml(s)}</button>`).join('')}</div>
+        <div class="pc-stage">
+          <div data-balloon></div>
+          <div data-graph></div>
+        </div>
+        <label style="font-size:0.85rem;">${escapeHtml(X.temp)}: <strong data-tval></strong></label>
+        <input type="range" data-t min="0" max="600" step="5" value="${T}">
+        <div class="pc-choices" style="margin-top:0.6rem;">
+          <button type="button" class="pc-opt selected" data-axis="0">${escapeHtml(X.axisK)}</button>
+          <button type="button" class="pc-opt" data-axis="1">${escapeHtml(X.axisC)}</button>
+        </div>
+        <div class="pc-formula"><div class="pc-formula-label">${escapeHtml(X.readLabel)}</div><div data-read style="white-space:pre-line"></div></div>
+        <div class="pc-insight" data-insight></div>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+
+    function graphSvg(k) {
+      const Wd = 330, Ht = 250, ml = 46, mr = 12, mt = 12, mb = 36;
+      const pw = Wd - ml - mr, ph = Ht - mt - mb;
+      const x0 = axis === 0 ? 0 : -300, x1 = axis === 0 ? 600 : 330, y1 = 1300;
+      const sx = (v) => ml + (v - x0) / (x1 - x0) * pw;
+      const sy = (v) => mt + ph - v / y1 * ph;
+      const xv = (tk) => axis === 0 ? tk : tk - 273;
+      let s = `<svg viewBox="0 0 ${Wd} ${Ht}" class="pc-svg" width="330" role="img" xmlns="http://www.w3.org/2000/svg">`;
+      const font = `font-family="JetBrains Mono, monospace" font-size="9.5" fill="#5a6475"`;
+      const xt = axis === 0 ? [0, 100, 200, 300, 400, 500, 600] : [-300, -200, -100, 0, 100, 200, 300];
+      xt.forEach(v => { s += `<line x1="${sx(v)}" y1="${mt}" x2="${sx(v)}" y2="${mt + ph}" stroke="#e5e0d6"/><text x="${sx(v)}" y="${mt + ph + 13}" text-anchor="middle" ${font}>${v}</text>`; });
+      [0, 500, 1000].forEach(v => { s += `<line x1="${ml}" y1="${sy(v)}" x2="${ml + pw}" y2="${sy(v)}" stroke="#e5e0d6"/><text x="${ml - 5}" y="${sy(v) + 3}" text-anchor="end" ${font}>${v}</text>`; });
+      s += `<line x1="${ml}" y1="${mt}" x2="${ml}" y2="${mt + ph}" stroke="#253a52" stroke-width="1.6"/><line x1="${ml}" y1="${mt + ph}" x2="${ml + pw}" y2="${mt + ph}" stroke="#253a52" stroke-width="1.6"/>`;
+      if (axis === 1) s += `<line x1="${sx(0)}" y1="${mt}" x2="${sx(0)}" y2="${mt + ph}" stroke="#253a52" stroke-width="1.6"/>`;
+      s += `<text x="${ml + pw / 2}" y="${Ht - 4}" text-anchor="middle" ${font}>${escapeHtml(X.xlab[axis])}</text><text x="10" y="${mt + ph / 2}" transform="rotate(-90 10 ${mt + ph / 2})" text-anchor="middle" ${font}>${escapeHtml(X.ylab)}</text>`;
+      BAL_K.forEach((kk, i) => {
+        const on = i === si;
+        s += `<line x1="${sx(xv(0))}" y1="${sy(0)}" x2="${sx(xv(600))}" y2="${sy(Math.min(y1, kk * 600))}" stroke="${on ? '#1a8c83' : '#9aa5b5'}" stroke-width="${on ? 3 : 1.5}" ${on ? '' : 'stroke-dasharray="4 3"'}/>`;
+      });
+      if (axis === 1) {
+        s += `<circle cx="${sx(0)}" cy="${sy(k * 273)}" r="4" fill="#f4a261"/><text x="${sx(0) + 8}" y="${sy(k * 273) + 16}" ${font}>${escapeHtml(X.int0)}</text>`;
+        s += `<circle cx="${sx(-273)}" cy="${sy(0)}" r="4" fill="#e8384f"/><text x="${sx(-273) + 8}" y="${sy(0) - 26}" ${font}>${escapeHtml(X.zero)}</text>`;
+      } else {
+        s += `<text x="${sx(0) + 6}" y="${sy(0) - 6}" ${font}>(0, 0)</text>`;
+      }
+      s += `<circle cx="${sx(xv(T))}" cy="${sy(Math.min(y1, k * T))}" r="6" fill="#e8384f" stroke="#fff" stroke-width="2"/>`;
+      return s + `</svg>`;
+    }
+    function balloonSvg(v) {
+      const r = 16 + 44 * Math.sqrt(v / 1300);
+      return `<svg viewBox="0 0 150 150" class="pc-svg" width="150" role="img" xmlns="http://www.w3.org/2000/svg"><line x1="75" y1="${75 + r}" x2="75" y2="145" stroke="#5a6475" stroke-width="2"/><circle cx="75" cy="75" r="${r}" fill="${T > 285 ? '#f4a261' : '#7fb8e6'}" stroke="#253a52" stroke-width="2.5"/><text x="75" y="${79}" text-anchor="middle" font-size="12" font-weight="700" fill="#0d1b2a" font-family="JetBrains Mono, monospace">${fmt(v, 0)} mL</text></svg>`;
+    }
+    function redraw() {
+      const k = BAL_K[si], v = k * T, c = T - 273;
+      $('[data-tval]').textContent = `${T} K (${c} °C)`;
+      $('[data-balloon]').innerHTML = balloonSvg(v);
+      $('[data-graph]').innerHTML = graphSvg(k);
+      let read = `${X.vol}: V = kT = ${k} mL/K × ${T} K = ${fmt(v, 0)} mL\n`;
+      read += axis === 0 ? X.ratioK(fmt(k, 1)) : (c === 0 ? X.ratioC0 : X.ratioC(fmt(v / c, 1)));
+      if (T > 0) read += `\n${X.dens(fmt(300 / T, 2))}`;
+      $('[data-read]').textContent = read;
+      $('[data-insight]').textContent = axis === 0 ? X.insightK : X.insightC;
+    }
+    mount.querySelectorAll('[data-sample]').forEach(b => b.addEventListener('click', () => {
+      si = Number(b.getAttribute('data-sample'));
+      mount.querySelectorAll('[data-sample]').forEach(x => x.classList.toggle('selected', x === b));
+      redraw();
+    }));
+    mount.querySelectorAll('[data-axis]').forEach(b => b.addEventListener('click', () => {
+      axis = Number(b.getAttribute('data-axis'));
+      mount.querySelectorAll('[data-axis]').forEach(x => x.classList.toggle('selected', x === b));
+      redraw();
+    }));
+    $('[data-t]').addEventListener('input', (e) => { T = Number(e.target.value); redraw(); });
+    redraw();
+  }
+
+  // ======================================================================
+  // Widget F (Lesson 54): step-by-step Charles's law solver, done the way
+  // it is done in class: convert to kelvins, find the proportionality
+  // constant k = V / T from the starting data, then V = kT (or T = V / k).
+  // First problem is guided (hints shown, steps unlock in order); the rest
+  // are independent (hints on request). Specific wrong-answer feedback
+  // targets the classic mistakes: Celsius instead of kelvins, k upside
+  // down, using k the wrong way, and forgetting the final conversion.
+  // ======================================================================
+  const CHARLES_PROBLEMS = [
+    { id: 'c1', kind: 'V2', V1: 720, vu: 'mL', T1: 15, T2: 45, correctIdx: 1,
+      prompt: { en: 'A balloon holds 720 mL of air at 15 °C. It is warmed to 45 °C (pressure and amount of gas stay the same). What is the new volume?', es: 'Un globo contiene 720 mL de aire a 15 °C. Se calienta a 45 °C (la presión y la cantidad de gas no cambian). ¿Cuál es el nuevo volumen?' } },
+    { id: 'c2', kind: 'V2', V1: 450, vu: 'mL', T1: 27, T2: -23, correctIdx: 0,
+      prompt: { en: 'A sealed syringe holds 450 mL of gas at 27 °C. It is cooled to −23 °C. What is the new volume?', es: 'Una jeringa sellada contiene 450 mL de gas a 27 °C. Se enfría a −23 °C. ¿Cuál es el nuevo volumen?' } },
+    { id: 'c3', kind: 'V2', V1: 819, vu: 'mL', T1: 0, T2: 100, correctIdx: 2,
+      prompt: { en: 'A gas takes up 819 mL at 0 °C. It is heated to 100 °C. What is its new volume?', es: 'Un gas ocupa 819 mL a 0 °C. Se calienta a 100 °C. ¿Cuál es su nuevo volumen?' } },
+    { id: 'c4', kind: 'T2', V1: 750, V2: 1200, vu: 'mL', T1: -23, correctIdx: 1,
+      prompt: { en: 'A gas sample is 750 mL at −23 °C. At constant pressure, to what temperature (in °C) must it be heated for its volume to reach 1200 mL?', es: 'Una muestra de gas ocupa 750 mL a −23 °C. A presión constante, ¿a qué temperatura (en °C) debe calentarse para que su volumen llegue a 1200 mL?' } },
+    { id: 'c5', kind: 'V2', V1: 87900, vu: 'L', T1: 20, T2: 100, correctIdx: 0,
+      prompt: { en: 'A hot-air balloon is filled with 87,900 L of air at 20 °C. The burner heats the air to 100 °C. What is the new volume of the air?', es: 'Un globo aerostático se llena con 87,900 L de aire a 20 °C. El quemador calienta el aire a 100 °C. ¿Cuál es el nuevo volumen del aire?' } }
+  ];
+
+  const SOLVER_TXT = {
+    en: {
+      pick: 'Pick a problem:', probLabel: (n) => `Problem ${n}`,
+      stepTitles: {
+        convT: 'Step 1 · Convert the temperature(s) to kelvins (K = °C + 273)',
+        findK: 'Step 2 · Find the proportionality constant: k = V₁ ÷ T₁ (use the kelvin temperature)',
+        setup: 'Step 3 · Choose the correct equation for what you are solving for',
+        solveV: (u) => `Step 4 · Use k to find the new volume V₂ (in ${u})`,
+        solveT: 'Step 4 · Use k to find the new temperature T₂ (in kelvins)',
+        backC: 'Step 5 · Convert T₂ back to °C (°C = K − 273)'
+      },
+      hints: {
+        convT: 'Add 273 to each Celsius temperature. Charles\'s law only works with kelvins.',
+        findK: 'k = V ÷ T, using the starting volume and the starting temperature in kelvins. Keep the unit (for example mL/K). In class we rounded k to one decimal.',
+        setup: 'You already know V = kT. To find a volume, multiply k by the temperature. To find a temperature, rearrange: T = V ÷ k.',
+        solveV: 'V₂ = k × T₂ (T₂ in kelvins). Sanity check: warming should make the volume bigger, cooling smaller.',
+        solveT: 'T₂ = V₂ ÷ k. A bigger volume means a higher temperature.',
+        backC: 'Subtract 273 from the kelvin answer to get °C.'
+      },
+      fieldLabels: { T1: 'T₁ =', T2: 'T₂ =', V2: 'V₂ =', k: 'k =' },
+      check: 'Check', showHint: '💡 Show hint', hideHint: '▲ Hide hint', next: 'Next problem →', again: 'Back to Problem 1',
+      right: '✓ Correct!', wrongGeneric: 'Not quite — check your arithmetic (about 1% rounding is fine).',
+      stillC: 'That looks like the Celsius number. Add 273 to convert to kelvins.',
+      kC: 'It looks like you divided using °C. Use the kelvin temperature: k = V₁ ÷ T₁(K).',
+      kFlipped: 'It looks like k is upside down. k = V ÷ T — the volume goes on top.',
+      usedC: 'It looks like you multiplied by the Celsius temperature. Use T₂ in kelvins.',
+      divided: 'Check the operation: V = k × T, so multiply k by the kelvin temperature.',
+      multiplied: 'Check the operation: T = V ÷ k, so divide the volume by k.',
+      isC: 'That looks like °C. This step asks for kelvins.',
+      needNum: 'Type a number first.',
+      setupWrong: 'Not that one. Remember V = kT: volume is k times the temperature, so temperature is the volume divided by k.',
+      choices: {
+        V2: ['V₂ = k ÷ T₂', 'V₂ = k × T₂', 'V₂ = T₂ ÷ k'],
+        T2: ['T₂ = k × V₂', 'T₂ = V₂ ÷ k', 'T₂ = k ÷ V₂']
+      },
+      solvedV: (k, v, u, dir, dir2) => `✓ Solved! k = ${k} ${u}/K, so V₂ = ${k} × T₂ = ${v} ${u}. Check: the gas ${dir}, so the volume should ${dir2} — and it did.`,
+      dirUp: 'was heated', dirDown: 'was cooled', dir2Up: 'grow', dir2Down: 'shrink',
+      solvedT: (k, u, tk, c) => `✓ Solved! k = ${k} ${u}/K, so T₂ = V₂ ÷ k = ${tk} K = ${c} °C. A larger volume needed a higher temperature.`
+    },
+    es: {
+      pick: 'Elige un problema:', probLabel: (n) => `Problema ${n}`,
+      stepTitles: {
+        convT: 'Paso 1 · Convierte la(s) temperatura(s) a kelvin (K = °C + 273)',
+        findK: 'Paso 2 · Encuentra la constante de proporcionalidad: k = V₁ ÷ T₁ (usa la temperatura en kelvin)',
+        setup: 'Paso 3 · Elige la ecuación correcta para lo que vas a calcular',
+        solveV: (u) => `Paso 4 · Usa k para encontrar el nuevo volumen V₂ (en ${u})`,
+        solveT: 'Paso 4 · Usa k para encontrar la nueva temperatura T₂ (en kelvin)',
+        backC: 'Paso 5 · Convierte T₂ de nuevo a °C (°C = K − 273)'
+      },
+      hints: {
+        convT: 'Suma 273 a cada temperatura Celsius. La ley de Charles solo funciona con kelvin.',
+        findK: 'k = V ÷ T, usando el volumen inicial y la temperatura inicial en kelvin. Conserva la unidad (por ejemplo mL/K). En clase redondeamos k a un decimal.',
+        setup: 'Ya conoces V = kT. Para hallar un volumen, multiplica k por la temperatura. Para hallar una temperatura, despeja: T = V ÷ k.',
+        solveV: 'V₂ = k × T₂ (T₂ en kelvin). Verificación: calentar debe aumentar el volumen, enfriar debe reducirlo.',
+        solveT: 'T₂ = V₂ ÷ k. Un volumen mayor significa una temperatura más alta.',
+        backC: 'Resta 273 a la respuesta en kelvin para obtener °C.'
+      },
+      fieldLabels: { T1: 'T₁ =', T2: 'T₂ =', V2: 'V₂ =', k: 'k =' },
+      check: 'Revisar', showHint: '💡 Ver pista', hideHint: '▲ Ocultar pista', next: 'Siguiente problema →', again: 'Volver al Problema 1',
+      right: '✓ ¡Correcto!', wrongGeneric: 'No exactamente — revisa tus cálculos (un redondeo de cerca del 1% está bien).',
+      stillC: 'Ese parece el número en Celsius. Suma 273 para convertir a kelvin.',
+      kC: 'Parece que dividiste usando °C. Usa la temperatura en kelvin: k = V₁ ÷ T₁(K).',
+      kFlipped: 'Parece que k está al revés. k = V ÷ T — el volumen va arriba.',
+      usedC: 'Parece que multiplicaste por la temperatura en Celsius. Usa T₂ en kelvin.',
+      divided: 'Revisa la operación: V = k × T, así que multiplica k por la temperatura en kelvin.',
+      multiplied: 'Revisa la operación: T = V ÷ k, así que divide el volumen entre k.',
+      isC: 'Eso parece °C. Este paso pide kelvin.',
+      needNum: 'Escribe un número primero.',
+      setupWrong: 'Esa no. Recuerda V = kT: el volumen es k por la temperatura, así que la temperatura es el volumen dividido entre k.',
+      choices: {
+        V2: ['V₂ = k ÷ T₂', 'V₂ = k × T₂', 'V₂ = T₂ ÷ k'],
+        T2: ['T₂ = k × V₂', 'T₂ = V₂ ÷ k', 'T₂ = k ÷ V₂']
+      },
+      solvedV: (k, v, u, dir, dir2) => `✓ ¡Resuelto! k = ${k} ${u}/K, así que V₂ = ${k} × T₂ = ${v} ${u}. Verificación: el gas ${dir}, así que el volumen debe ${dir2} — y así fue.`,
+      dirUp: 'se calentó', dirDown: 'se enfrió', dir2Up: 'aumentar', dir2Down: 'disminuir',
+      solvedT: (k, u, tk, c) => `✓ ¡Resuelto! k = ${k} ${u}/K, así que T₂ = V₂ ÷ k = ${tk} K = ${c} °C. Un volumen mayor necesitó una temperatura más alta.`
+    }
+  };
+
+  function solveProblem(p) {
+    const T1K = p.T1 + 273, k = p.V1 / T1K;
+    const base = { T1K, k, kFlip: T1K / p.V1, kC: p.T1 !== 0 ? p.V1 / p.T1 : null };
+    if (p.kind === 'V2') {
+      const T2K = p.T2 + 273;
+      return Object.assign(base, { T2K, V2: k * T2K, usedC: base.kC !== null ? base.kC * p.T2 : null, divided: k / T2K });
+    }
+    const T2K = p.V2 / k;
+    return Object.assign(base, { T2K, T2C: T2K - 273, multiplied: p.V2 * k });
+  }
+  const closeTo = (a, b, rel, abs) => Math.abs(a - b) <= Math.max(abs || 0, Math.abs(b) * (rel || 0));
+
+  function renderCharlesSolver(mount, lang) {
+    const X = SOLVER_TXT[lang];
+    mount.innerHTML = `
+      <div class="pc-widget">
+        <p class="pc-lead"><strong>${escapeHtml(X.pick)}</strong></p>
+        <div class="pc-choices">${CHARLES_PROBLEMS.map((p, i) => `<button type="button" class="pc-opt${i === 0 ? ' selected' : ''}" data-prob="${i}">${escapeHtml(X.probLabel(i + 1))}</button>`).join('')}</div>
+        <div data-stage></div>
+      </div>`;
+    const stage = mount.querySelector('[data-stage]');
+
+    function mountProblem(pi) {
+      const p = CHARLES_PROBLEMS[pi], sol = solveProblem(p), guided = pi === 0;
+      const isV = p.kind === 'V2';
+      const kUnit = `${p.vu}/K`;
+      const steps = [];
+      steps.push({
+        key: 'convT', title: X.stepTitles.convT, hint: X.hints.convT, type: 'num',
+        fields: isV ? [{ id: 'T1', label: X.fieldLabels.T1, unit: 'K' }, { id: 'T2', label: X.fieldLabels.T2, unit: 'K' }] : [{ id: 'T1', label: X.fieldLabels.T1, unit: 'K' }],
+        check(v) {
+          const exp = isV ? [sol.T1K, sol.T2K] : [sol.T1K], given = isV ? [p.T1, p.T2] : [p.T1];
+          if (exp.every((e, i) => Math.abs(v[i] - e) <= 1)) return { ok: true };
+          if (v.some((x, i) => x === given[i] && given[i] !== exp[i])) return { ok: false, msg: X.stillC };
+          return { ok: false, msg: X.wrongGeneric };
+        }
+      });
+      steps.push({
+        key: 'findK', title: X.stepTitles.findK, hint: X.hints.findK, type: 'num',
+        fields: [{ id: 'k', label: X.fieldLabels.k, unit: kUnit }],
+        check(v) {
+          if (closeTo(v[0], sol.k, 0.03)) return { ok: true };
+          if (closeTo(v[0], sol.kFlip, 0.05)) return { ok: false, msg: X.kFlipped };
+          if (sol.kC !== null && closeTo(v[0], sol.kC, 0.03)) return { ok: false, msg: X.kC };
+          return { ok: false, msg: X.wrongGeneric };
+        }
+      });
+      const kind = isV ? 'V2' : 'T2';
+      steps.push({
+        key: 'setup', title: X.stepTitles.setup, hint: X.hints.setup, type: 'mc',
+        choices: X.choices[kind].slice(), correct: 1, wrong: X.setupWrong
+      });
+      if (isV) {
+        steps.push({
+          key: 'solveV', title: X.stepTitles.solveV(p.vu), hint: X.hints.solveV, type: 'num',
+          fields: [{ id: 'V2', label: X.fieldLabels.V2, unit: p.vu }],
+          check(v) {
+            if (closeTo(v[0], sol.V2, 0.012)) return { ok: true };
+            if (sol.usedC !== null && closeTo(v[0], sol.usedC, 0.012)) return { ok: false, msg: X.usedC };
+            if (closeTo(v[0], sol.divided, 0.05)) return { ok: false, msg: X.divided };
+            return { ok: false, msg: X.wrongGeneric };
+          }
+        });
+      } else {
+        steps.push({
+          key: 'solveT', title: X.stepTitles.solveT, hint: X.hints.solveT, type: 'num',
+          fields: [{ id: 'T2', label: X.fieldLabels.T2, unit: 'K' }],
+          check(v) {
+            if (closeTo(v[0], sol.T2K, 0.006, 1)) return { ok: true };
+            if (closeTo(v[0], sol.multiplied, 0.01, 1)) return { ok: false, msg: X.multiplied };
+            if (closeTo(v[0], sol.T2C, 0.01, 1)) return { ok: false, msg: X.isC };
+            return { ok: false, msg: X.wrongGeneric };
+          }
+        });
+        steps.push({
+          key: 'backC', title: X.stepTitles.backC, hint: X.hints.backC, type: 'num',
+          fields: [{ id: 'T2', label: X.fieldLabels.T2, unit: '°C' }],
+          check(v) { return closeTo(v[0], sol.T2C, 0, 1) ? { ok: true } : { ok: false, msg: X.wrongGeneric }; }
+        });
+      }
+      // Rotate the correct choice position per problem so it is not always the same slot.
+      const mcStep = steps[2];
+      const good = mcStep.choices[1];
+      const others = mcStep.choices.filter((_, i) => i !== 1);
+      mcStep.choices = others.slice(0, p.correctIdx).concat([good], others.slice(p.correctIdx));
+      mcStep.correct = p.correctIdx;
+
+      stage.innerHTML = `
+        <div class="pc-mode-badge${guided ? ' guided' : ''}">${escapeHtml(t(guided ? 'guidedModeLabel' : 'independentModeLabel', lang))}</div>
+        <p style="margin:0.2rem 0 0.4rem;"><strong>${escapeHtml(tr(p.prompt, lang))}</strong></p>
+        <div data-steps></div>
+        <div data-end></div>`;
+      const stepsHost = stage.querySelector('[data-steps]');
+      stepsHost.innerHTML = steps.map((s, i) => `
+        <div class="pc-step${i === 0 ? '' : ' locked'}" data-step="${i}">
+          <div class="pc-step-title">${escapeHtml(s.title)}</div>
+          ${s.type === 'num'
+            ? `<div class="pc-fields">${s.fields.map(f => `<label class="pc-field">${escapeHtml(f.label)} <input type="text" inputmode="decimal" data-f="${f.id}" autocomplete="off"> ${escapeHtml(f.unit)}</label>`).join('')}</div>`
+            : `<div class="pc-mc">${s.choices.map((c, ci) => `<button type="button" data-c="${ci}">${escapeHtml(c)}</button>`).join('')}</div>`}
+          <div class="pc-hint${guided ? ' open' : ''}" data-hint>${escapeHtml(s.hint)}</div>
+          <div>${s.type === 'num' ? `<button type="button" class="pc-btn" data-check>${escapeHtml(X.check)}</button> ` : ''}${guided ? '' : `<button type="button" class="pc-btn secondary" data-hbtn>${escapeHtml(X.showHint)}</button>`}</div>
+          <div class="pc-msg" data-msg></div>
+        </div>`).join('');
+
+      function finishStep(i) {
+        const card = stepsHost.querySelector(`[data-step="${i}"]`);
+        card.classList.add('done');
+        card.querySelector('[data-msg]').className = 'pc-msg ok';
+        card.querySelector('[data-msg]').textContent = X.right;
+        card.querySelectorAll('input,button[data-c],[data-check]').forEach(e => { e.disabled = true; });
+        if (i + 1 < steps.length) {
+          stepsHost.querySelector(`[data-step="${i + 1}"]`).classList.remove('locked');
+        } else {
+          const end = stage.querySelector('[data-end]');
+          const up = isV ? sol.V2 > p.V1 : true;
+          const kTxt = fmt(sol.k, 2);
+          const msg = isV
+            ? X.solvedV(kTxt, Math.round(sol.V2).toLocaleString('en-US'), p.vu, up ? X.dirUp : X.dirDown, up ? X.dir2Up : X.dir2Down)
+            : X.solvedT(kTxt, p.vu, fmt(sol.T2K, 0), fmt(sol.T2C, 0));
+          const nextLabel = pi + 1 < CHARLES_PROBLEMS.length ? X.next : X.again;
+          end.innerHTML = `<div class="pc-solved">${escapeHtml(msg)}</div><p style="margin-top:0.6rem;"><button type="button" class="pc-btn" data-nextprob>${escapeHtml(nextLabel)}</button></p>`;
+          end.querySelector('[data-nextprob]').addEventListener('click', () => pickProblem((pi + 1) % CHARLES_PROBLEMS.length));
+        }
+      }
+
+      steps.forEach((s, i) => {
+        const card = stepsHost.querySelector(`[data-step="${i}"]`);
+        const msg = card.querySelector('[data-msg]');
+        const hbtn = card.querySelector('[data-hbtn]');
+        if (hbtn) hbtn.addEventListener('click', () => {
+          const open = card.querySelector('[data-hint]').classList.toggle('open');
+          hbtn.textContent = open ? X.hideHint : X.showHint;
+        });
+        if (s.type === 'num') {
+          const run = () => {
+            const vals = s.fields.map(f => parseNum(card.querySelector(`[data-f="${f.id}"]`).value));
+            if (vals.some(isNaN)) { msg.className = 'pc-msg bad'; msg.textContent = X.needNum; return; }
+            const res = s.check(vals);
+            if (res.ok) finishStep(i); else { msg.className = 'pc-msg bad'; msg.textContent = res.msg; }
+          };
+          card.querySelector('[data-check]').addEventListener('click', run);
+          card.querySelectorAll('input').forEach(inp => inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); }));
+        } else {
+          card.querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
+            const ci = Number(b.getAttribute('data-c'));
+            if (ci === s.correct) { b.classList.add('right'); finishStep(i); }
+            else { b.classList.add('wrong'); b.disabled = true; msg.className = 'pc-msg bad'; msg.textContent = s.wrong; }
+          }));
+        }
+      });
+    }
+
+    function pickProblem(i) {
+      mount.querySelectorAll('[data-prob]').forEach(b => b.classList.toggle('selected', Number(b.getAttribute('data-prob')) === i));
+      mountProblem(i);
+    }
+    mount.querySelectorAll('[data-prob]').forEach(b => b.addEventListener('click', () => pickProblem(Number(b.getAttribute('data-prob')))));
+    mountProblem(0);
+  }
+
+  // ======================================================================
+  // Widget G (Lesson 54): spot the mistake in a worked Charles's law solution.
+  // ======================================================================
+  const SPOT_ITEMS = [
+    { lines: ['T₁ = 27 °C   T₂ = 77 °C', 'k = 450 ÷ 27 = 16.7', 'V₂ = 16.7 × 77 = 1286 mL'], err: 0,
+      problem: { en: 'A gas is 450 mL at 27 °C. Find its volume at 77 °C.', es: 'Un gas ocupa 450 mL a 27 °C. Encuentra su volumen a 77 °C.' },
+      why: { en: 'The temperatures were never converted to kelvins, so k and V₂ are both wrong. Correct: T₁ = 300 K, T₂ = 350 K, k = 450 ÷ 300 = 1.5 mL/K, V₂ = 1.5 × 350 = 525 mL. (1286 mL is a huge, unreasonable jump for a 50-degree change.)', es: 'Las temperaturas nunca se convirtieron a kelvin, así que k y V₂ están mal. Correcto: T₁ = 300 K, T₂ = 350 K, k = 450 ÷ 300 = 1.5 mL/K, V₂ = 1.5 × 350 = 525 mL. (1286 mL es un salto enorme e irrazonable para un cambio de 50 grados.)' } },
+    { lines: ['k = 600 mL ÷ 300 K = 2.0 mL/K', 'V₂ = 200 K ÷ 2.0 mL/K', 'V₂ = 100 mL'], err: 1,
+      problem: { en: 'A gas is 600 mL at 300 K. It is cooled to 200 K. Find the new volume.', es: 'Un gas ocupa 600 mL a 300 K. Se enfría a 200 K. Encuentra el nuevo volumen.' },
+      why: { en: 'k was found correctly, but it was used the wrong way. To find a volume you MULTIPLY: V₂ = k × T₂ = 2.0 × 200 = 400 mL. (Cooling should shrink the gas a bit — 600 mL down to 100 mL is far too much.)', es: 'k se encontró correctamente, pero se usó al revés. Para hallar un volumen se MULTIPLICA: V₂ = k × T₂ = 2.0 × 200 = 400 mL. (Enfriar debe reducir un poco el gas — de 600 mL a 100 mL es demasiado.)' } },
+    { lines: ['T₁ = 25 − 273 = −248 K   T₂ = 100 − 273 = −173 K', 'k = 596 ÷ −248 = −2.4 mL/K', 'V₂ = −2.4 × −173 = 416 mL'], err: 0,
+      problem: { en: 'A gas is 596 mL at 25 °C. It is heated to 100 °C. Find the new volume.', es: 'Un gas ocupa 596 mL a 25 °C. Se calienta a 100 °C. Encuentra el nuevo volumen.' },
+      why: { en: 'To get kelvins you ADD 273 (K = °C + 273), not subtract. Kelvin temperatures are never negative. Correct: 298 K and 373 K, k = 596 ÷ 298 = 2.0 mL/K, V₂ = 2.0 × 373 = 746 mL — and heating should make the volume grow (746 > 596).', es: 'Para obtener kelvin se SUMA 273 (K = °C + 273), no se resta. Las temperaturas Kelvin nunca son negativas. Correcto: 298 K y 373 K, k = 596 ÷ 298 = 2.0 mL/K, V₂ = 2.0 × 373 = 746 mL — y calentar debe hacer crecer el volumen (746 > 596).' } },
+    { lines: ['k = 600 mL ÷ 300 K = 2.0 mL/K', 'T₂ = 750 mL ÷ 2.0 mL/K = 375', 'Answer: 375 °C'], err: 2,
+      problem: { en: 'A gas is 600 mL at 300 K. At what temperature in °C will it be 750 mL?', es: 'Un gas ocupa 600 mL a 300 K. ¿A qué temperatura en °C ocupará 750 mL?' },
+      why: { en: 'The math gives 375 K, which is the kelvin answer. The question asks for °C, so subtract 273: 375 − 273 = 102 °C.', es: 'El cálculo da 375 K, que es la respuesta en kelvin. La pregunta pide °C, así que resta 273: 375 − 273 = 102 °C.' } }
+  ];
+  const SPOT_TXT = {
+    en: { pick: 'Click the line that contains the mistake:', item: (n, t) => `Mistake ${n} of ${t}`, right: '✓ You found it!', wrong: 'Not that line — look again.', next: 'Next →', again: 'Start over', problem: 'Problem' },
+    es: { pick: 'Haz clic en la línea que contiene el error:', item: (n, t) => `Error ${n} de ${t}`, right: '✓ ¡Lo encontraste!', wrong: 'Esa no es la línea — mira otra vez.', next: 'Siguiente →', again: 'Empezar de nuevo', problem: 'Problema' }
+  };
+
+  function renderSpotMistake(mount, lang) {
+    const X = SPOT_TXT[lang];
+    let idx = 0;
+    function show() {
+      const it = SPOT_ITEMS[idx];
+      mount.innerHTML = `
+        <div class="pc-widget">
+          <div class="pc-mode-badge">${escapeHtml(X.item(idx + 1, SPOT_ITEMS.length))}</div>
+          <p style="margin:0.2rem 0;"><strong>${escapeHtml(X.problem)}:</strong> ${escapeHtml(tr(it.problem, lang))}</p>
+          <p class="pc-lead">${escapeHtml(X.pick)}</p>
+          <div class="pc-work">${it.lines.map((l, i) => `<button type="button" class="pc-line" data-line="${i}">${escapeHtml(l)}</button>`).join('')}</div>
+          <div class="pc-msg" data-msg></div>
+          <div data-why></div>
+          <p data-nextwrap style="display:none;margin-top:0.6rem;"><button type="button" class="pc-btn" data-next></button></p>
+        </div>`;
+      const msg = mount.querySelector('[data-msg]');
+      mount.querySelectorAll('[data-line]').forEach(b => b.addEventListener('click', () => {
+        const i = Number(b.getAttribute('data-line'));
+        if (i !== it.err) { b.classList.add('picked-wrong'); b.disabled = true; msg.className = 'pc-msg bad'; msg.textContent = X.wrong; return; }
+        mount.querySelectorAll('[data-line]').forEach(x => { x.disabled = true; });
+        b.classList.remove('picked-wrong'); b.classList.add('error');
+        msg.className = 'pc-msg ok'; msg.textContent = X.right;
+        mount.querySelector('[data-why]').innerHTML = `<div class="pc-solved" style="font-weight:400;color:var(--text);">${escapeHtml(tr(it.why, lang))}</div>`;
+        mount.querySelector('[data-nextwrap]').style.display = 'block';
+        const nb = mount.querySelector('[data-next]');
+        nb.textContent = idx + 1 < SPOT_ITEMS.length ? X.next : X.again;
+        nb.addEventListener('click', () => { idx = (idx + 1) % SPOT_ITEMS.length; show(); });
+      }));
+    }
+    show();
+  }
+
+  // Graded check. 26 multiple-choice questions; Lesson 54 (Charles's law) is
+  // q15-q26. Numbers deliberately differ from the paper Chapter 10 Quiz A/B.
+  const QUESTIONS = [
+    // ---- Lesson 50: proportional relationships & rain gauges ----
+    {
+      id: 'q1', type: 'mc',
+      prompt: { en: 'A straight-sided rain gauge holds 3 mL at 1 cm of rain, 6 mL at 2 cm, and 12 mL at 4 cm. How many centimeters of rain correspond to 21 mL?', es: 'Un pluviómetro de lados rectos contiene 3 mL con 1 cm de lluvia, 6 mL con 2 cm y 12 mL con 4 cm. ¿Cuántos centímetros de lluvia corresponden a 21 mL?' },
+      choices: [
+        { en: '5 cm', es: '5 cm' },
+        { en: '9 cm', es: '9 cm' },
+        { en: '7 cm', es: '7 cm' },
+        { en: '63 cm', es: '63 cm' }
+      ],
+      correct: 2,
+      explanation: { en: 'k = V ÷ h = 3 mL/cm, so h = V ÷ k = 21 ÷ 3 = 7 cm.', es: 'k = V ÷ h = 3 mL/cm, así que h = V ÷ k = 21 ÷ 3 = 7 cm.' }
+    },
+    {
+      id: 'q2', type: 'mc',
+      prompt: { en: 'Why do meteorologists report rainfall as a height instead of a volume?', es: '¿Por qué los meteorólogos reportan la lluvia como una altura en vez de un volumen?' },
+      choices: [
+        { en: 'The height of rain is the same in any gauge, but the volume collected depends on the size of the container', es: 'La altura de la lluvia es la misma en cualquier pluviómetro, pero el volumen recolectado depende del tamaño del recipiente' },
+        { en: 'Rain does not have a volume', es: 'La lluvia no tiene volumen' },
+        { en: 'Height is easier to calculate than mass', es: 'La altura es más fácil de calcular que la masa' },
+        { en: 'Volume changes with the temperature of the rain only', es: 'El volumen cambia solo con la temperatura de la lluvia' }
+      ],
+      correct: 0,
+      explanation: { en: 'If rainfall were reported as a volume, everyone would need an identical gauge. Height does not depend on the gauge\'s size or shape.', es: 'Si la lluvia se reportara como volumen, todos necesitarían un pluviómetro idéntico. La altura no depende del tamaño ni de la forma del pluviómetro.' }
+    },
+    {
+      id: 'q3', type: 'mc',
+      prompt: { en: 'A rain gauge has a base area of 4.0 cm². It contains rain 3.5 cm deep. What volume of water is in it? (1 cm³ = 1 mL)', es: 'Un pluviómetro tiene una base de 4.0 cm². Contiene lluvia de 3.5 cm de profundidad. ¿Qué volumen de agua hay? (1 cm³ = 1 mL)' },
+      choices: [
+        { en: '0.88 mL', es: '0.88 mL' },
+        { en: '7.5 mL', es: '7.5 mL' },
+        { en: '140 mL', es: '140 mL' },
+        { en: '14 mL', es: '14 mL' }
+      ],
+      correct: 3,
+      explanation: { en: 'Volume = base area × height = 4.0 cm² × 3.5 cm = 14 cm³ = 14 mL.', es: 'Volumen = área de la base × altura = 4.0 cm² × 3.5 cm = 14 cm³ = 14 mL.' }
+    },
+    // ---- Lesson 51: density & phase changes ----
+    {
+      id: 'q4', type: 'mc',
+      prompt: { en: 'What is the mass of 300 mL of snow if the density of the snow is 0.40 g/mL?', es: '¿Cuál es la masa de 300 mL de nieve si la densidad de la nieve es 0.40 g/mL?' },
+      choices: [
+        { en: '750 g', es: '750 g' }, { en: '120 g', es: '120 g' }, { en: '300 g', es: '300 g' }, { en: '0.0013 g', es: '0.0013 g' }
+      ],
+      correct: 1,
+      explanation: { en: 'm = D × V = 0.40 g/mL × 300 mL = 120 g.', es: 'm = D × V = 0.40 g/mL × 300 mL = 120 g.' }
+    },
+    {
+      id: 'q5', type: 'mc',
+      prompt: { en: 'You have equal masses of snow and liquid water. Which one takes up more volume, and why?', es: 'Tienes masas iguales de nieve y agua líquida. ¿Cuál ocupa más volumen, y por qué?' },
+      choices: [
+        { en: 'The snow, because it is less dense', es: 'La nieve, porque es menos densa' },
+        { en: 'The liquid water, because it is less dense', es: 'El agua líquida, porque es menos densa' },
+        { en: 'Neither — equal masses always have equal volumes', es: 'Ninguna — masas iguales siempre tienen volúmenes iguales' },
+        { en: 'The liquid water, because it has more mass', es: 'El agua líquida, porque tiene más masa' }
+      ],
+      correct: 0,
+      explanation: { en: 'V = m ÷ D. For the same mass, the substance with the smaller density (snow) has the larger volume.', es: 'V = m ÷ D. Para la misma masa, la sustancia con menor densidad (la nieve) tiene el mayor volumen.' }
+    },
+    {
+      id: 'q6', type: 'mc',
+      prompt: { en: 'A 100 g sample of liquid water freezes solid. Which statement is true?', es: 'Una muestra de 100 g de agua líquida se congela. ¿Qué enunciado es verdadero?' },
+      choices: [
+        { en: 'Mass stays 100 g, volume increases, density decreases', es: 'La masa sigue siendo 100 g, el volumen aumenta, la densidad disminuye' },
+        { en: 'Mass decreases, volume stays the same, density decreases', es: 'La masa disminuye, el volumen no cambia, la densidad disminuye' },
+        { en: 'Mass stays 100 g, volume decreases, density increases', es: 'La masa sigue siendo 100 g, el volumen disminuye, la densidad aumenta' },
+        { en: 'Mass increases, volume increases, density stays the same', es: 'La masa aumenta, el volumen aumenta, la densidad no cambia' }
+      ],
+      correct: 0,
+      explanation: { en: 'A phase change does not change the amount of matter (mass). Ice is less dense than liquid water, so the same mass takes up more volume.', es: 'Un cambio de fase no cambia la cantidad de materia (masa). El hielo es menos denso que el agua líquida, así que la misma masa ocupa más volumen.' }
+    },
+    // ---- Lesson 52: thermometers & scales ----
+    {
+      id: 'q7', type: 'mc',
+      prompt: { en: 'Convert 50 °C to °F. (F = 9/5(C) + 32)', es: 'Convierte 50 °C a °F. (F = 9/5(C) + 32)' },
+      choices: [
+        { en: '10 °F', es: '10 °F' },
+        { en: '82 °F', es: '82 °F' },
+        { en: '90 °F', es: '90 °F' },
+        { en: '122 °F', es: '122 °F' }
+      ],
+      correct: 3,
+      explanation: { en: 'F = 9/5(50) + 32 = 90 + 32 = 122 °F.', es: 'F = 9/5(50) + 32 = 90 + 32 = 122 °F.' }
+    },
+    {
+      id: 'q8', type: 'mc',
+      prompt: { en: 'Convert 68 °F to °C. (C = 5/9(F − 32))', es: 'Convierte 68 °F a °C. (C = 5/9(F − 32))' },
+      choices: [
+        { en: '20 °C', es: '20 °C' }, { en: '36 °C', es: '36 °C' }, { en: '154 °C', es: '154 °C' }, { en: '100 °C', es: '100 °C' }
+      ],
+      correct: 0,
+      explanation: { en: 'C = 5/9(68 − 32) = 5/9(36) = 20 °C.', es: 'C = 5/9(68 − 32) = 5/9(36) = 20 °C.' }
+    },
+    {
+      id: 'q9', type: 'mc',
+      prompt: { en: 'To create a temperature scale for a thermometer, what do you need at minimum?', es: 'Para crear una escala de temperatura para un termómetro, ¿qué necesitas como mínimo?' },
+      choices: [
+        { en: 'One fixed reference measurement', es: 'Una medición de referencia fija' },
+        { en: 'Two fixed reference measurements, such as the melting and boiling points of water', es: 'Dos mediciones de referencia fijas, como los puntos de fusión y ebullición del agua' },
+        { en: 'A mercury thermometer', es: 'Un termómetro de mercurio' },
+        { en: 'A measurement of the room temperature', es: 'Una medición de la temperatura ambiente' }
+      ],
+      correct: 1,
+      explanation: { en: 'You need at least two fixed points to set a scale. Once you have them, you can mark off degrees and read any temperature in between.', es: 'Necesitas al menos dos puntos fijos para establecer una escala. Con ellos puedes marcar grados y leer cualquier temperatura intermedia.' }
+    },
+    {
+      id: 'q10', type: 'mc',
+      prompt: { en: 'Which is the warmer temperature: 30 °C or 30 °F?', es: '¿Cuál es la temperatura más cálida: 30 °C o 30 °F?' },
+      choices: [
+        { en: '30 °F, because Fahrenheit degrees are bigger', es: '30 °F, porque los grados Fahrenheit son más grandes' },
+        { en: 'They are the same temperature', es: 'Son la misma temperatura' },
+        { en: '30 °C — it equals 86 °F, while 30 °F is below freezing', es: '30 °C — equivale a 86 °F, mientras que 30 °F está bajo el punto de congelación' },
+        { en: 'It cannot be compared', es: 'No se pueden comparar' }
+      ],
+      correct: 2,
+      explanation: { en: '30 °C = 9/5(30) + 32 = 86 °F. Meanwhile 30 °F is below water\'s 32 °F freezing point. The degree sizes differ between the scales.', es: '30 °C = 9/5(30) + 32 = 86 °F. Mientras que 30 °F está por debajo del punto de congelación del agua (32 °F). Los tamaños de grado son distintos en cada escala.' }
+    },
+    // ---- Lesson 53: Kelvin, absolute zero & kinetic theory ----
+    {
+      id: 'q11', type: 'mc',
+      prompt: { en: 'Convert −73 °C to kelvins.', es: 'Convierte −73 °C a kelvin.' },
+      choices: [
+        { en: '−346 K', es: '−346 K' }, { en: '200 K', es: '200 K' }, { en: '346 K', es: '346 K' }, { en: '−200 K', es: '−200 K' }
+      ],
+      correct: 1,
+      explanation: { en: 'K = °C + 273 = −73 + 273 = 200 K.', es: 'K = °C + 273 = −73 + 273 = 200 K.' }
+    },
+    {
+      id: 'q12', type: 'mc',
+      prompt: { en: 'The Kelvin scale assigns the value 0 to which temperature?', es: 'La escala Kelvin asigna el valor 0 a ¿qué temperatura?' },
+      choices: [
+        { en: 'The freezing point of water', es: 'El punto de congelación del agua' },
+        { en: 'The temperature at which a gas would theoretically have zero volume (−273 °C)', es: 'La temperatura a la que un gas tendría teóricamente volumen cero (−273 °C)' },
+        { en: 'The boiling point of water', es: 'El punto de ebullición del agua' },
+        { en: 'Room temperature', es: 'La temperatura ambiente' }
+      ],
+      correct: 1,
+      explanation: { en: 'Extending the volume-vs-temperature line of a gas back to zero volume gives −273 °C. That temperature is called absolute zero, or 0 K.', es: 'Al extender la línea de volumen contra temperatura de un gas hasta volumen cero se obtiene −273 °C. Esa temperatura se llama cero absoluto, o 0 K.' }
+    },
+    {
+      id: 'q13', type: 'mc',
+      prompt: { en: 'According to the kinetic theory, what happens to the average speed of gas particles as the temperature of the gas increases?', es: 'Según la teoría cinética, ¿qué le pasa a la rapidez promedio de las partículas de un gas cuando aumenta su temperatura?' },
+      choices: [
+        { en: 'It decreases', es: 'Disminuye' },
+        { en: 'It stays the same', es: 'Se mantiene igual' },
+        { en: 'All particles stop', es: 'Todas las partículas se detienen' },
+        { en: 'It increases', es: 'Aumenta' }
+      ],
+      correct: 3,
+      explanation: { en: 'Temperature is a measure of the average energy of motion. Hotter gas means faster particles on average.', es: 'La temperatura mide la energía de movimiento promedio. Gas más caliente significa partículas más rápidas en promedio.' }
+    },
+    {
+      id: 'q14', type: 'mc',
+      prompt: { en: 'Which statement does NOT describe gas particles in the kinetic theory?', es: '¿Cuál enunciado NO describe a las partículas de un gas en la teoría cinética?' },
+      choices: [
+        { en: 'They move constantly and randomly in straight lines', es: 'Se mueven constantemente y al azar en línea recta' },
+        { en: 'They change direction when they collide with each other or the container walls', es: 'Cambian de dirección cuando chocan entre sí o con las paredes del recipiente' },
+        { en: 'They all move at exactly the same speed', es: 'Todas se mueven exactamente a la misma rapidez' },
+        { en: 'They have a lot of empty space to move around in', es: 'Tienen mucho espacio vacío para moverse' }
+      ],
+      correct: 2,
+      explanation: { en: 'Gas particles do NOT all move at the same speed — there is a range of speeds, and the average speed depends on temperature.', es: 'Las partículas de un gas NO se mueven todas a la misma rapidez — hay un rango de rapideces, y la rapidez promedio depende de la temperatura.' }
+    },
+    // ---- Lesson 54: Charles's law (emphasis) ----
+    {
+      id: 'q15', type: 'mc',
+      prompt: { en: 'Which statement correctly describes Charles\'s law?', es: '¿Qué enunciado describe correctamente la ley de Charles?' },
+      choices: [
+        { en: 'For a gas sample at constant pressure, volume is directly proportional to Kelvin temperature', es: 'Para una muestra de gas a presión constante, el volumen es directamente proporcional a la temperatura Kelvin' },
+        { en: 'For a gas sample at constant pressure, volume is directly proportional to Celsius temperature', es: 'Para una muestra de gas a presión constante, el volumen es directamente proporcional a la temperatura Celsius' },
+        { en: 'For a gas sample, volume decreases as Kelvin temperature increases', es: 'Para una muestra de gas, el volumen disminuye cuando aumenta la temperatura Kelvin' },
+        { en: 'For a gas sample, volume does not depend on temperature', es: 'Para una muestra de gas, el volumen no depende de la temperatura' }
+      ],
+      correct: 0,
+      explanation: { en: 'Charles\'s law: V = kT, with T in kelvins, for a fixed amount of gas at constant pressure.', es: 'Ley de Charles: V = kT, con T en kelvin, para una cantidad fija de gas a presión constante.' }
+    },
+    {
+      id: 'q16', type: 'mc',
+      prompt: { en: 'Why must you convert temperatures to kelvins before using V = kT (or finding k = V ÷ T)?', es: '¿Por qué debes convertir las temperaturas a kelvin antes de usar V = kT (o de hallar k = V ÷ T)?' },
+      choices: [
+        { en: 'Volume is proportional to Kelvin temperature, but not to Celsius temperature', es: 'El volumen es proporcional a la temperatura Kelvin, pero no a la temperatura Celsius' },
+        { en: 'Kelvin numbers are always smaller and easier to use', es: 'Los números Kelvin siempre son más pequeños y fáciles de usar' },
+        { en: 'Celsius temperatures can only be used for liquids', es: 'Las temperaturas Celsius solo se pueden usar con líquidos' },
+        { en: 'Your teacher says so; there is no real reason', es: 'Tu maestro lo dice; no hay una razón real' }
+      ],
+      correct: 0,
+      explanation: { en: '0 °C is not zero volume, so V ÷ T in °C keeps changing and is not a constant k. In kelvins, zero really means zero volume, so k = V ÷ T stays constant.', es: '0 °C no es volumen cero, así que V ÷ T en °C sigue cambiando y no es una constante k. En kelvin, cero sí significa volumen cero, así que k = V ÷ T se mantiene constante.' }
+    },
+    {
+      id: 'q17', type: 'mc',
+      prompt: { en: 'What does a graph of gas volume versus Kelvin temperature look like?', es: '¿Cómo se ve una gráfica del volumen de un gas contra la temperatura Kelvin?' },
+      choices: [
+        { en: 'A curve that levels off', es: 'Una curva que se aplana' },
+        { en: 'A straight line that slopes down', es: 'Una línea recta que baja' },
+        { en: 'A horizontal line', es: 'Una línea horizontal' },
+        { en: 'A straight line through the origin (0, 0)', es: 'Una línea recta que pasa por el origen (0, 0)' }
+      ],
+      correct: 3,
+      explanation: { en: 'Because V is directly proportional to T (in kelvins), the graph is a straight line through the origin. Its slope is the proportionality constant k.', es: 'Como V es directamente proporcional a T (en kelvin), la gráfica es una línea recta que pasa por el origen. Su pendiente es la constante de proporcionalidad k.' }
+    },
+    {
+      id: 'q18', type: 'mc',
+      prompt: { en: 'A balloon is moved from a warm room into a freezer. Nothing else changes. What happens to the balloon\'s volume?', es: 'Un globo se pasa de una habitación cálida a un congelador. Nada más cambia. ¿Qué le pasa al volumen del globo?' },
+      choices: [
+        { en: 'It increases', es: 'Aumenta' },
+        { en: 'It stays the same', es: 'Se mantiene igual' },
+        { en: 'It decreases', es: 'Disminuye' },
+        { en: 'It becomes zero', es: 'Se vuelve cero' }
+      ],
+      correct: 2,
+      explanation: { en: 'Cooler gas has slower particles that push on the walls less, so the volume shrinks (V is proportional to T).', es: 'El gas más frío tiene partículas más lentas que empujan menos las paredes, así que el volumen se reduce (V es proporcional a T).' }
+    },
+    {
+      id: 'q19', type: 'mc',
+      prompt: { en: 'In the equation V = kT, what does the constant k tell you?', es: 'En la ecuación V = kT, ¿qué te dice la constante k?' },
+      choices: [
+        { en: 'How much the gas\'s volume changes for each kelvin; it depends on the amount of gas and the pressure', es: 'Cuánto cambia el volumen del gas por cada kelvin; depende de la cantidad de gas y de la presión' },
+        { en: 'The temperature at which the gas freezes', es: 'La temperatura a la que el gas se congela' },
+        { en: 'The color of the gas', es: 'El color del gas' },
+        { en: 'The same number for every gas sample', es: 'El mismo número para toda muestra de gas' }
+      ],
+      correct: 0,
+      explanation: { en: 'k = V ÷ T. A bigger sample of gas (or a different pressure) has a different k, so the line on the graph has a different slope.', es: 'k = V ÷ T. Una muestra más grande de gas (u otra presión) tiene un k distinto, así que la línea de la gráfica tiene otra pendiente.' }
+    },
+    {
+      id: 'q20', type: 'mc',
+      prompt: { en: 'Balloon A has k = 1.2 mL/K and balloon B has k = 1.8 mL/K. At the same temperature, which balloon is larger, and why?', es: 'El globo A tiene k = 1.2 mL/K y el globo B tiene k = 1.8 mL/K. A la misma temperatura, ¿cuál globo es mayor, y por qué?' },
+      choices: [
+        { en: 'Balloon A, because its k is smaller', es: 'El globo A, porque su k es menor' },
+        { en: 'Balloon B — V = kT, and it has more gas in it', es: 'El globo B — V = kT, y tiene más gas dentro' },
+        { en: 'They are the same size', es: 'Tienen el mismo tamaño' },
+        { en: 'It depends only on the color of the balloon', es: 'Depende solo del color del globo' }
+      ],
+      correct: 1,
+      explanation: { en: 'At the same T, V = kT is bigger when k is bigger. A bigger k comes from having more gas in the balloon.', es: 'A la misma T, V = kT es mayor cuando k es mayor. Un k mayor viene de tener más gas en el globo.' }
+    },
+    {
+      id: 'q21', type: 'mc',
+      prompt: { en: 'A gas takes up 850 mL at 10 °C. At constant pressure it is warmed to 40 °C. What is the new volume?', es: 'Un gas ocupa 850 mL a 10 °C. A presión constante se calienta a 40 °C. ¿Cuál es el nuevo volumen?' },
+      choices: [
+        { en: '3400 mL', es: '3400 mL' },
+        { en: '769 mL', es: '769 mL' },
+        { en: '939 mL', es: '939 mL' },
+        { en: '850 mL', es: '850 mL' }
+      ],
+      correct: 2,
+      explanation: { en: 'T₁ = 283 K, T₂ = 313 K. k = 850 ÷ 283 = 3.0 mL/K, so V₂ = 3.0 × 313 ≈ 939 mL. (3400 mL comes from using °C; 769 mL comes from using k upside down.)', es: 'T₁ = 283 K, T₂ = 313 K. k = 850 ÷ 283 = 3.0 mL/K, así que V₂ = 3.0 × 313 ≈ 939 mL. (3400 mL sale de usar °C; 769 mL sale de usar k al revés.)' }
+    },
+    {
+      id: 'q22', type: 'mc',
+      prompt: { en: 'A gas takes up 800 mL at 127 °C. It is cooled to −73 °C at constant pressure. What is the new volume?', es: 'Un gas ocupa 800 mL a 127 °C. Se enfría a −73 °C a presión constante. ¿Cuál es el nuevo volumen?' },
+      choices: [
+        { en: '1600 mL', es: '1600 mL' }, { en: '400 mL', es: '400 mL' }, { en: '800 mL', es: '800 mL' }, { en: '1400 mL', es: '1400 mL' }
+      ],
+      correct: 1,
+      explanation: { en: 'T₁ = 400 K, so k = 800 ÷ 400 = 2.0 mL/K. At T₂ = 200 K: V₂ = 2.0 × 200 = 400 mL.', es: 'T₁ = 400 K, así que k = 800 ÷ 400 = 2.0 mL/K. A T₂ = 200 K: V₂ = 2.0 × 200 = 400 mL.' }
+    },
+    {
+      id: 'q23', type: 'mc',
+      prompt: { en: 'A gas sample has a volume of 600 mL at 300 K. Using V = kT, what is k, and what is the volume at 350 K?', es: 'Una muestra de gas tiene un volumen de 600 mL a 300 K. Usando V = kT, ¿cuál es k, y cuál es el volumen a 350 K?' },
+      choices: [
+        { en: 'k = 0.50 mL/K; V = 175 mL', es: 'k = 0.50 mL/K; V = 175 mL' },
+        { en: 'k = 2.0 mL/K; V = 600 mL', es: 'k = 2.0 mL/K; V = 600 mL' },
+        { en: 'k = 300 mL/K; V = 105,000 mL', es: 'k = 300 mL/K; V = 105,000 mL' },
+        { en: 'k = 2.0 mL/K; V = 700 mL', es: 'k = 2.0 mL/K; V = 700 mL' }
+      ],
+      correct: 3,
+      explanation: { en: 'k = V ÷ T = 600 ÷ 300 = 2.0 mL/K. Then V = kT = 2.0 × 350 = 700 mL. (0.50 comes from dividing T by V.)', es: 'k = V ÷ T = 600 ÷ 300 = 2.0 mL/K. Luego V = kT = 2.0 × 350 = 700 mL. (0.50 sale de dividir T entre V.)' }
+    },
+    {
+      id: 'q24', type: 'mc',
+      prompt: { en: 'A gas is 500 mL at 250 K. What Kelvin temperature gives it a volume of 800 mL (constant pressure)?', es: 'Un gas ocupa 500 mL a 250 K. ¿Qué temperatura Kelvin le da un volumen de 800 mL (presión constante)?' },
+      choices: [
+        { en: '156 K', es: '156 K' },
+        { en: '253 K', es: '253 K' },
+        { en: '400 K', es: '400 K' },
+        { en: '128 K', es: '128 K' }
+      ],
+      correct: 2,
+      explanation: { en: 'k = 500 ÷ 250 = 2.0 mL/K. T₂ = V₂ ÷ k = 800 ÷ 2.0 = 400 K. A bigger volume needs a higher temperature (156 K comes from using k upside down).', es: 'k = 500 ÷ 250 = 2.0 mL/K. T₂ = V₂ ÷ k = 800 ÷ 2.0 = 400 K. Un volumen mayor necesita una temperatura más alta (156 K sale de usar k al revés).' }
+    },
+    {
+      id: 'q25', type: 'mc',
+      prompt: { en: 'A student heats a gas from 20 °C to 40 °C and says, "40 is double 20, so the volume doubles." What is the mistake?', es: 'Un estudiante calienta un gas de 20 °C a 40 °C y dice: "40 es el doble de 20, así que el volumen se duplica". ¿Cuál es el error?' },
+      choices: [
+        { en: 'The student forgot to convert to kelvins; 293 K → 313 K is only about a 7% increase', es: 'El estudiante olvidó convertir a kelvin; 293 K → 313 K es solo un aumento de cerca del 7%' },
+        { en: 'Gases do not change volume when heated', es: 'Los gases no cambian de volumen al calentarse' },
+        { en: 'The volume should decrease when a gas is heated', es: 'El volumen debería disminuir cuando se calienta un gas' },
+        { en: 'The student should have subtracted 273 instead', es: 'El estudiante debió restar 273 en lugar de eso' }
+      ],
+      correct: 0,
+      explanation: { en: 'Charles\'s law needs kelvins: 313 ÷ 293 ≈ 1.07, so the volume grows only about 7%, not 100%.', es: 'La ley de Charles necesita kelvin: 313 ÷ 293 ≈ 1.07, así que el volumen crece solo cerca del 7%, no el 100%.' }
+    },
+    {
+      id: 'q26', type: 'mc',
+      prompt: { en: 'In a lava lamp, the wax is heated by the bulb and rises through the water. Which explanation is best?', es: 'En una lámpara de lava, la cera se calienta con la bombilla y sube por el agua. ¿Cuál es la mejor explicación?' },
+      choices: [
+        { en: 'Heated wax expands, so its density drops and it floats up; near the top it cools, its density rises, and it sinks', es: 'La cera calentada se expande, así que su densidad baja y flota hacia arriba; cerca de la parte superior se enfría, su densidad sube y se hunde' },
+        { en: 'Heated wax gains mass, so it rises', es: 'La cera calentada gana masa, así que sube' },
+        { en: 'Heated wax becomes denser than water, so it rises', es: 'La cera calentada se vuelve más densa que el agua, así que sube' },
+        { en: 'The bulb pushes the wax upward with its light', es: 'La bombilla empuja la cera hacia arriba con su luz' }
+      ],
+      correct: 0,
+      explanation: { en: 'Same mass, bigger volume → lower density. Less dense material rises above denser material — this is also why warm air rises above cooler air.', es: 'La misma masa, mayor volumen → menor densidad. El material menos denso sube sobre el más denso — por eso también el aire caliente sube sobre el aire más frío.' }
+    }
+  ];
+
+  const STATIC_SECTIONS = [
+    // ---------------------------------------------------------------- 0
+    {
+      title: { en: 'Before You Begin', es: 'Antes de Empezar' },
+      time: { en: '2 min', es: '2 min' },
+      bodyHtml: {
+        en: `
+        <p>This review covers <strong>Chapter 10: Physically Changing Matter</strong> (Lessons 50–54): rain gauges and proportional relationships, density and phase changes, temperature scales, absolute zero, and <strong>Charles\'s law</strong>. It is built to get you ready for the <strong>Chapter 10 Quiz A/B</strong>.</p>
+        <div class="note-box">
+          <span class="note-icon">⭐</span>
+          <div class="note-text"><strong>Lesson 54 (Charles\'s law) is the biggest skill on the quiz</strong>, so it gets the most practice here: a simulator, a step-by-step solver, a spot-the-mistake tool, and about half of the graded questions.</div>
+        </div>
+        <p><strong>How this works:</strong></p>
+        <ul>
+          <li>Click a section header to open it. Try each interactive tool <em>before</em> reading the explanation.</li>
+          <li>Work through each practice problem yourself before clicking <em>Reveal Answer</em>. A calculator is fine.</li>
+          <li>Click <strong>Mark Complete</strong> at the bottom of each section to move to the next.</li>
+          <li>The last section is a <strong>graded Check for Understanding</strong> — it saves your score and gives you a completion code to show your teacher.</li>
+        </ul>
+        <p><strong>By the end of this review, you should be able to:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Identify a proportional relationship, and use k = V ÷ h to predict rainfall volumes (50.1–50.3)</li>
+          <li><span class="obj-check">◎</span> Use D = m ÷ V and m = D × V, and explain how phase changes affect volume and density (51.1–51.3)</li>
+          <li><span class="obj-check">◎</span> Convert between °F, °C, and K, and explain how a thermometer works (52.1–52.3)</li>
+          <li><span class="obj-check">◎</span> Explain absolute zero and describe how gas particles move (53.1–53.3)</li>
+          <li><span class="obj-check">◎</span> <strong>Explain Charles\'s law and use it to solve gas problems — convert to kelvins, find the proportionality constant k = V ÷ T, use V = kT (or T = V ÷ k), and check that your answer makes sense (54.1–54.2)</strong></li>
+        </ul>`,
+        es: `
+        <p>Este repaso cubre el <strong>Capítulo 10: Cambios Físicos de la Materia</strong> (Lecciones 50–54): pluviómetros y relaciones proporcionales, densidad y cambios de fase, escalas de temperatura, cero absoluto y la <strong>ley de Charles</strong>. Está diseñado para prepararte para el <strong>Quiz A/B del Capítulo 10</strong>.</p>
+        <div class="note-box">
+          <span class="note-icon">⭐</span>
+          <div class="note-text"><strong>La Lección 54 (ley de Charles) es la destreza más importante del quiz</strong>, así que aquí recibe la mayor práctica: un simulador, un solucionador paso a paso, una herramienta para encontrar errores y cerca de la mitad de las preguntas calificadas.</div>
+        </div>
+        <p><strong>Cómo funciona esto:</strong></p>
+        <ul>
+          <li>Haz clic en el encabezado de una sección para abrirla. Prueba cada herramienta interactiva <em>antes</em> de leer la explicación.</li>
+          <li>Resuelve cada problema de práctica tú mismo antes de hacer clic en <em>Mostrar Respuesta</em>. Puedes usar calculadora.</li>
+          <li>Haz clic en <strong>Marcar como Completo</strong> al final de cada sección para pasar a la siguiente.</li>
+          <li>La última sección es una <strong>Comprobación de Comprensión calificada</strong> — guarda tu puntaje y te da un código de finalización para mostrarle a tu maestro.</li>
+        </ul>
+        <p><strong>Al terminar este repaso, deberías poder:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Identificar una relación proporcional, y usar k = V ÷ h para predecir volúmenes de lluvia (50.1–50.3)</li>
+          <li><span class="obj-check">◎</span> Usar D = m ÷ V y m = D × V, y explicar cómo los cambios de fase afectan el volumen y la densidad (51.1–51.3)</li>
+          <li><span class="obj-check">◎</span> Convertir entre °F, °C y K, y explicar cómo funciona un termómetro (52.1–52.3)</li>
+          <li><span class="obj-check">◎</span> Explicar el cero absoluto y describir cómo se mueven las partículas de un gas (53.1–53.3)</li>
+          <li><span class="obj-check">◎</span> <strong>Explicar la ley de Charles y usarla para resolver problemas de gases — convertir a kelvin, encontrar la constante de proporcionalidad k = V ÷ T, usar V = kT (o T = V ÷ k), y verificar que tu respuesta tenga sentido (54.1–54.2)</strong></li>
+        </ul>`
+      }
+    },
+    // ---------------------------------------------------------------- 1 (L50)
+    {
+      title: { en: 'Rain Gauges & Proportional Relationships', es: 'Pluviómetros y Relaciones Proporcionales' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
+        <h2>Why Rainfall Is Measured as a Height</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Proportional</strong>: two variables are directly proportional when you can multiply one by a constant to get the other. For a rain gauge, <strong>V = k × h</strong> (volume = proportionality constant × height).</p>
+        </div>
+        <p>Pour water into a gauge to different heights and the volume goes up in a steady, predictable way. Try it — switch gauges and notice what stays the same and what changes.</p>
+        <div id="pc-gauge-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Key Ideas</div>
+          <p>The graph of two proportional variables is a <strong>straight line through the origin (0, 0)</strong>. Find <em>k</em> from one data point (k = V ÷ h), then multiply by any new height to predict the volume. The <strong>height</strong> of rain does not depend on the gauge, but the <strong>volume</strong> collected does — so rainfall is reported as a height.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Worked example: 6 mL at 2 cm → k = 6 ÷ 2 = 3 mL/cm. At 5 cm: V = 3 × 5 = 15 mL. On your guided notes, write: <em>"Proportional: multiply one variable by a constant (k) to get the other. The graph is a straight line through (0, 0)."</em></div>
+        </div>
+        ${practiceProblem('en', 'rg1', 'A gauge holds 10 mL of rain at a height of 2 cm. Find k, then find the volume at 7 cm.', 'basic', 'k = V ÷ h. Then V = k × h for the new height.', 'k = 10 ÷ 2 = 5 mL/cm. At 7 cm: V = 5 × 7 = 35 mL.')}
+        ${practiceProblem('en', 'rg2', 'A rain gauge has a base area of 3.0 cm². How many mL of water are in it when the rain is 4.5 cm deep? (1 cm³ = 1 mL)', 'medium', 'Volume = base area × height.', 'V = 3.0 cm² × 4.5 cm = 13.5 cm³ = 13.5 mL.')}
+        ${practiceProblem('en', 'rg3', 'In the same storm, gauge A (base 2.0 cm²) collects 9 mL and gauge B (base 6.0 cm²) collects 27 mL. Which gauge measured more rainfall?', 'challenge', 'Compare the heights, not the volumes: h = V ÷ base area.', 'Neither — both measured the same rainfall. Gauge A: 9 ÷ 2.0 = 4.5 cm. Gauge B: 27 ÷ 6.0 = 4.5 cm. B collected more volume only because its base is wider.')}`,
+        es: `
+        <h2>Por Qué la Lluvia se Mide como una Altura</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Proporcional</strong>: dos variables son directamente proporcionales cuando puedes multiplicar una por una constante para obtener la otra. En un pluviómetro, <strong>V = k × h</strong> (volumen = constante de proporcionalidad × altura).</p>
+        </div>
+        <p>Vierte agua en un pluviómetro a distintas alturas y el volumen sube de forma constante y predecible. Pruébalo — cambia de pluviómetro y fíjate qué se mantiene igual y qué cambia.</p>
+        <div id="pc-gauge-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Ideas Clave</div>
+          <p>La gráfica de dos variables proporcionales es una <strong>línea recta que pasa por el origen (0, 0)</strong>. Encuentra <em>k</em> con un solo dato (k = V ÷ h), y luego multiplica por cualquier altura nueva para predecir el volumen. La <strong>altura</strong> de la lluvia no depende del pluviómetro, pero el <strong>volumen</strong> recolectado sí — por eso la lluvia se reporta como una altura.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Ejemplo resuelto: 6 mL a 2 cm → k = 6 ÷ 2 = 3 mL/cm. A 5 cm: V = 3 × 5 = 15 mL. En tus apuntes guiados, escribe: <em>"Proporcional: multiplica una variable por una constante (k) para obtener la otra. La gráfica es una línea recta que pasa por (0, 0)."</em></div>
+        </div>
+        ${practiceProblem('es', 'rg1', 'Un pluviómetro contiene 10 mL de lluvia a una altura de 2 cm. Encuentra k, y luego el volumen a 7 cm.', 'basic', 'k = V ÷ h. Luego V = k × h para la nueva altura.', 'k = 10 ÷ 2 = 5 mL/cm. A 7 cm: V = 5 × 7 = 35 mL.')}
+        ${practiceProblem('es', 'rg2', 'Un pluviómetro tiene una base de 3.0 cm². ¿Cuántos mL de agua contiene cuando la lluvia tiene 4.5 cm de profundidad? (1 cm³ = 1 mL)', 'medium', 'Volumen = área de la base × altura.', 'V = 3.0 cm² × 4.5 cm = 13.5 cm³ = 13.5 mL.')}
+        ${practiceProblem('es', 'rg3', 'En la misma tormenta, el pluviómetro A (base de 2.0 cm²) recolecta 9 mL y el pluviómetro B (base de 6.0 cm²) recolecta 27 mL. ¿Cuál midió más lluvia?', 'challenge', 'Compara las alturas, no los volúmenes: h = V ÷ área de la base.', 'Ninguno — ambos midieron la misma lluvia. Pluviómetro A: 9 ÷ 2.0 = 4.5 cm. Pluviómetro B: 27 ÷ 6.0 = 4.5 cm. B recolectó más volumen solo porque su base es más ancha.')}`
+      }
+    },
+    // ---------------------------------------------------------------- 2 (L51)
+    {
+      title: { en: 'Density, Mass & Phase Changes', es: 'Densidad, Masa y Cambios de Fase' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
+        <h2>Snow, Ice, and Liquid Water</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definition</div>
+          <p><strong>Density</strong>: the mass of a substance per unit of volume. <strong>D = m ÷ V</strong>, which can be rearranged to <strong>m = D × V</strong> or <strong>V = m ÷ D</strong>. Liquid water is about 1.0 g/mL.</p>
+        </div>
+        <p>When water changes phase, the amount of matter (mass) stays the same, but the volume — and therefore the density — changes. Compare snow, ice, and liquid water below, first with equal masses, then with equal volumes.</p>
+        <div id="pc-phase-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Key Ideas</div>
+          <p>The densities of snow and ice are <em>less</em> than liquid water, so the same mass of snow or ice takes up <em>more</em> volume. When a phase changes: <strong>mass stays the same</strong>; volume and density change in opposite directions. Scientists measure snowpack by depth, then use density to find how much water it will make.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Worked example: 24 mL of snow with D = 0.5 g/mL → m = 0.5 × 24 = 12 g. Melted: 12 g of water = 12 mL. On your guided notes, write: <em>"D = m ÷ V, m = D × V. A phase change keeps mass the same but changes volume and density."</em></div>
+        </div>
+        ${practiceProblem('en', 'ph1', 'What is the mass of 40 mL of liquid water?', 'basic', 'Liquid water has a density of about 1.0 g/mL. Use m = D × V.', 'm = 1.0 g/mL × 40 mL = 40 g.')}
+        ${practiceProblem('en', 'ph2', 'A block of ice has a volume of 60 mL (D = 0.92 g/mL). What is its mass, and what volume of liquid water will it make when it melts?', 'medium', 'Find the mass with m = D × V. The mass does not change when it melts; use V = m ÷ D with D = 1.0 g/mL.', 'm = 0.92 × 60 = 55.2 g. Melted: V = 55.2 g ÷ 1.0 g/mL = 55.2 mL — less than the original 60 mL, because liquid water is denser than ice.')}
+        ${practiceProblem('en', 'ph3', 'A sealed container holds 100 g of liquid water, and it freezes solid. Does the mass, volume, and density go up, down, or stay the same?', 'challenge', 'Think about what a phase change does to the amount of matter, and use the density of ice vs. water.', 'Mass stays the same (100 g). Volume goes up (ice takes more space). Density goes down (the same mass spread over more volume).')}`,
+        es: `
+        <h2>Nieve, Hielo y Agua Líquida</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definición</div>
+          <p><strong>Densidad</strong>: la masa de una sustancia por unidad de volumen. <strong>D = m ÷ V</strong>, que se puede reordenar como <strong>m = D × V</strong> o <strong>V = m ÷ D</strong>. El agua líquida es de cerca de 1.0 g/mL.</p>
+        </div>
+        <p>Cuando el agua cambia de fase, la cantidad de materia (masa) se mantiene, pero el volumen — y por lo tanto la densidad — cambia. Compara abajo la nieve, el hielo y el agua líquida, primero con masas iguales y luego con volúmenes iguales.</p>
+        <div id="pc-phase-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Ideas Clave</div>
+          <p>Las densidades de la nieve y del hielo son <em>menores</em> que la del agua líquida, así que la misma masa de nieve o hielo ocupa <em>más</em> volumen. En un cambio de fase: <strong>la masa se mantiene</strong>; el volumen y la densidad cambian en direcciones opuestas. Los científicos miden la nieve acumulada por su profundidad, y luego usan la densidad para saber cuánta agua producirá.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Ejemplo resuelto: 24 mL de nieve con D = 0.5 g/mL → m = 0.5 × 24 = 12 g. Derretida: 12 g de agua = 12 mL. En tus apuntes guiados, escribe: <em>"D = m ÷ V, m = D × V. Un cambio de fase mantiene la masa pero cambia el volumen y la densidad."</em></div>
+        </div>
+        ${practiceProblem('es', 'ph1', '¿Cuál es la masa de 40 mL de agua líquida?', 'basic', 'El agua líquida tiene una densidad de cerca de 1.0 g/mL. Usa m = D × V.', 'm = 1.0 g/mL × 40 mL = 40 g.')}
+        ${practiceProblem('es', 'ph2', 'Un bloque de hielo tiene un volumen de 60 mL (D = 0.92 g/mL). ¿Cuál es su masa, y qué volumen de agua líquida producirá al derretirse?', 'medium', 'Encuentra la masa con m = D × V. La masa no cambia al derretirse; usa V = m ÷ D con D = 1.0 g/mL.', 'm = 0.92 × 60 = 55.2 g. Derretido: V = 55.2 g ÷ 1.0 g/mL = 55.2 mL — menos que los 60 mL originales, porque el agua líquida es más densa que el hielo.')}
+        ${practiceProblem('es', 'ph3', 'Un recipiente sellado contiene 100 g de agua líquida, y se congela. ¿La masa, el volumen y la densidad suben, bajan o se mantienen igual?', 'challenge', 'Piensa en qué hace un cambio de fase a la cantidad de materia, y usa la densidad del hielo frente a la del agua.', 'La masa se mantiene (100 g). El volumen sube (el hielo ocupa más espacio). La densidad baja (la misma masa repartida en más volumen).')}`
+      }
+    },
+    // ---------------------------------------------------------------- 3 (L52)
+    {
+      title: { en: 'Thermometers & Temperature Scales', es: 'Termómetros y Escalas de Temperatura' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
+        <h2>How a Thermometer Works</h2>
+        <p>The volume of matter changes with temperature: almost everything <strong>expands when heated</strong> and <strong>contracts when cooled</strong>. A liquid thermometer uses that change in a liquid\'s volume to show temperature. To set a scale you need <strong>at least two fixed measurements</strong>, such as the <strong>melting point</strong> and <strong>boiling point</strong> of water — then you can mark off degrees and read any temperature in between.</p>
+        <div class="concept-box">
+          <div class="concept-label">Conversion Formulas</div>
+          <p><strong>F = 9/5(C) + 32</strong> and <strong>C = 5/9(F − 32)</strong>. The scales were created by Daniel Fahrenheit (1724) and Anders Celsius (1747). A <em>degree</em> is a different size on each scale, but both measure the same thing: temperature.</p>
+        </div>
+        <p>Try the converter: type a temperature, choose its scale, and watch the working. Click the landmark buttons to see where key temperatures sit on each scale.</p>
+        <div id="pc-temp-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Worked example: 20 °C → °F: F = 9/5(20) + 32 = 36 + 32 = 68 °F. On your guided notes, write both conversion formulas and one example of each.</div>
+        </div>
+        ${practiceProblem('en', 'ts1', 'Convert 25 °C to °F.', 'basic', 'F = 9/5(C) + 32.', 'F = 9/5(25) + 32 = 45 + 32 = 77 °F.')}
+        ${practiceProblem('en', 'ts2', 'Convert 50 °F to °C.', 'medium', 'Subtract 32 first, then multiply by 5/9: C = 5/9(F − 32).', 'C = 5/9(50 − 32) = 5/9(18) = 10 °C.')}
+        ${practiceProblem('en', 'ts3', 'Which is warmer, 30 °C or 30 °F? Show your reasoning.', 'challenge', 'Convert one to the other scale so you can compare them directly.', '30 °C = 9/5(30) + 32 = 86 °F. So 30 °C is warmer (86 °F). 30 °F is below water\'s 32 °F freezing point.')}`,
+        es: `
+        <h2>Cómo Funciona un Termómetro</h2>
+        <p>El volumen de la materia cambia con la temperatura: casi todo <strong>se expande al calentarse</strong> y <strong>se contrae al enfriarse</strong>. Un termómetro de líquido usa ese cambio de volumen para mostrar la temperatura. Para establecer una escala necesitas <strong>al menos dos mediciones fijas</strong>, como el <strong>punto de fusión</strong> y el <strong>punto de ebullición</strong> del agua — así puedes marcar grados y leer cualquier temperatura intermedia.</p>
+        <div class="concept-box">
+          <div class="concept-label">Fórmulas de Conversión</div>
+          <p><strong>F = 9/5(C) + 32</strong> y <strong>C = 5/9(F − 32)</strong>. Las escalas fueron creadas por Daniel Fahrenheit (1724) y Anders Celsius (1747). Un <em>grado</em> tiene un tamaño distinto en cada escala, pero ambas miden lo mismo: la temperatura.</p>
+        </div>
+        <p>Prueba el convertidor: escribe una temperatura, elige su escala y observa el procedimiento. Haz clic en los botones de referencia para ver dónde están las temperaturas clave en cada escala.</p>
+        <div id="pc-temp-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Ejemplo resuelto: 20 °C → °F: F = 9/5(20) + 32 = 36 + 32 = 68 °F. En tus apuntes guiados, escribe ambas fórmulas de conversión y un ejemplo de cada una.</div>
+        </div>
+        ${practiceProblem('es', 'ts1', 'Convierte 25 °C a °F.', 'basic', 'F = 9/5(C) + 32.', 'F = 9/5(25) + 32 = 45 + 32 = 77 °F.')}
+        ${practiceProblem('es', 'ts2', 'Convierte 50 °F a °C.', 'medium', 'Resta 32 primero, luego multiplica por 5/9: C = 5/9(F − 32).', 'C = 5/9(50 − 32) = 5/9(18) = 10 °C.')}
+        ${practiceProblem('es', 'ts3', '¿Cuál es más cálido, 30 °C o 30 °F? Muestra tu razonamiento.', 'challenge', 'Convierte una a la otra escala para poder compararlas directamente.', '30 °C = 9/5(30) + 32 = 86 °F. Así que 30 °C es más cálido (86 °F). 30 °F está por debajo del punto de congelación del agua (32 °F).')}`
+      }
+    },
+    // ---------------------------------------------------------------- 4 (L53)
+    {
+      title: { en: 'Kelvin, Absolute Zero & Gas Particles', es: 'Kelvin, Cero Absoluto y Partículas de Gas' },
+      time: { en: '9 min', es: '9 min' },
+      bodyHtml: {
+        en: `
+        <h2>How Cold Can It Get?</h2>
+        <p>Plot the volume of a gas at different temperatures and you get a straight line. Extend that line back and the volume would theoretically reach <strong>zero at −273 °C</strong>. The <strong>Kelvin scale</strong> starts counting from that point.</p>
+        <div class="concept-box">
+          <div class="concept-label">Kelvin &amp; Absolute Zero</div>
+          <p><strong>K = °C + 273</strong> and <strong>°C = K − 273</strong>. A temperature of <strong>0 K (−273 °C)</strong> is called <strong>absolute zero</strong>, the lowest temperature possible. At absolute zero, all particle motion would stop.</p>
+        </div>
+        <p>The <strong>kinetic theory of gases</strong> explains why: gas particles are constantly moving, randomly, in straight lines, at <em>different</em> speeds, with lots of space between them, and they change direction when they collide with each other or the container walls. <strong>Temperature measures the average energy of motion.</strong> Drag the slider to see it.</p>
+        <div id="pc-sim-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Worked example: 25 °C → K: K = 25 + 273 = 298 K. On your guided notes, write: <em>"K = °C + 273. 0 K is absolute zero. Higher temperature = faster average particle speed."</em></div>
+        </div>
+        ${practiceProblem('en', 'kt1', 'Convert −73 °C to kelvins.', 'basic', 'K = °C + 273.', 'K = −73 + 273 = 200 K.')}
+        ${practiceProblem('en', 'kt2', 'A gas is at 350 K. What is that temperature in °C?', 'medium', '°C = K − 273.', '°C = 350 − 273 = 77 °C.')}
+        ${practiceProblem('en', 'kt3', 'Use the motion of gas particles to explain why a balloon expands when it is heated.', 'challenge', 'What happens to the speed of the particles when the gas is heated, and what does that do to the walls of a flexible container?', 'When the gas is heated, its particles move faster on average. They hit the walls harder and more often, pushing the flexible balloon walls outward until the volume is larger.')}`,
+        es: `
+        <h2>¿Qué Tan Frío Puede Llegar a Estar?</h2>
+        <p>Si graficas el volumen de un gas a distintas temperaturas obtienes una línea recta. Al extender esa línea hacia atrás, el volumen llegaría teóricamente a <strong>cero a −273 °C</strong>. La <strong>escala Kelvin</strong> empieza a contar desde ese punto.</p>
+        <div class="concept-box">
+          <div class="concept-label">Kelvin y Cero Absoluto</div>
+          <p><strong>K = °C + 273</strong> y <strong>°C = K − 273</strong>. Una temperatura de <strong>0 K (−273 °C)</strong> se llama <strong>cero absoluto</strong>, la temperatura más baja posible. En el cero absoluto, todo movimiento de las partículas se detendría.</p>
+        </div>
+        <p>La <strong>teoría cinética de los gases</strong> lo explica: las partículas de un gas se mueven constantemente, al azar, en línea recta, a rapideces <em>distintas</em>, con mucho espacio entre ellas, y cambian de dirección cuando chocan entre sí o con las paredes del recipiente. <strong>La temperatura mide la energía de movimiento promedio.</strong> Arrastra el control deslizante para verlo.</p>
+        <div id="pc-sim-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Ejemplo resuelto: 25 °C → K: K = 25 + 273 = 298 K. En tus apuntes guiados, escribe: <em>"K = °C + 273. 0 K es el cero absoluto. Mayor temperatura = mayor rapidez promedio de las partículas."</em></div>
+        </div>
+        ${practiceProblem('es', 'kt1', 'Convierte −73 °C a kelvin.', 'basic', 'K = °C + 273.', 'K = −73 + 273 = 200 K.')}
+        ${practiceProblem('es', 'kt2', 'Un gas está a 350 K. ¿Cuál es esa temperatura en °C?', 'medium', '°C = K − 273.', '°C = 350 − 273 = 77 °C.')}
+        ${practiceProblem('es', 'kt3', 'Usa el movimiento de las partículas de un gas para explicar por qué un globo se expande cuando se calienta.', 'challenge', '¿Qué pasa con la rapidez de las partículas cuando se calienta el gas, y qué le hace eso a las paredes de un recipiente flexible?', 'Cuando se calienta el gas, sus partículas se mueven más rápido en promedio. Golpean las paredes con más fuerza y más seguido, empujando las paredes flexibles del globo hacia afuera hasta que el volumen es mayor.')}`
+      }
+    },
+    // ---------------------------------------------------------------- 5 (L54 concept)
+    {
+      title: { en: 'Charles\'s Law: Volume & Temperature', es: 'Ley de Charles: Volumen y Temperatura' },
+      time: { en: '10 min', es: '10 min' },
+      bodyHtml: {
+        en: `
+        <span class="pc-focus-badge">${escapeHtml(t('focusBadge', 'en'))}</span>
+        <h2>How Can You Predict the Volume of a Gas?</h2>
+        <div class="concept-box">
+          <div class="concept-label">Charles\'s Law</div>
+          <p>For a given sample of gas at a <strong>constant pressure</strong>, the <strong>volume is directly proportional to its Kelvin temperature</strong>: <strong>V = kT</strong>. The <strong>proportionality constant k</strong> (k = V ÷ T) tells how much the volume changes per kelvin; it depends on the <strong>amount of gas</strong> and the <strong>pressure</strong>.</p>
+        </div>
+        <p>Heat a balloon and watch the point move along the graph. Then switch the graph to °C to see why Charles\'s law only works with kelvins.</p>
+        <div id="pc-balloon-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Using k, Like in Class</div>
+          <p><strong>Step 1:</strong> convert temperatures to kelvins (K = °C + 273). <strong>Step 2:</strong> find <em>k</em> from the starting data: <strong>k = V ÷ T</strong>. <strong>Step 3:</strong> to find a new volume use <strong>V = k × T</strong>; to find a new temperature use <strong>T = V ÷ k</strong>. Example: 300 mL at 300 K → k = 300 ÷ 300 = 1.0 mL/K. At 360 K: V = 1.0 × 360 = 360 mL. (Round k to one decimal place, as we did in class.)</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Why Hot Air Rises</div>
+          <p>As temperature increases, the same amount of gas takes up more volume, so its <strong>density decreases</strong>. Warmer gas is less dense than cooler gas, so it rises above it — that is why hot air rises, and why the hot wax in a lava lamp floats upward.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, write: <em>"Charles\'s law: at constant pressure, V is directly proportional to Kelvin temperature. V = kT, so k = V ÷ T. The graph of V vs. T(K) is a straight line through (0, 0). k depends on the amount of gas and the pressure."</em></div>
+        </div>
+        ${practiceProblem('en', 'cl1', 'True or False: if the Kelvin temperature of a gas doubles (pressure and amount of gas stay the same), its volume doubles.', 'basic', 'Volume is directly proportional to Kelvin temperature.', 'True — V = kT, so doubling T (in kelvins) doubles V.')}
+        ${practiceProblem('en', 'cl2', 'A gas sample has k = 2.5 mL/K. What is its volume at 200 K?', 'medium', 'Use V = kT.', 'V = 2.5 mL/K × 200 K = 500 mL.')}
+        ${practiceProblem('en', 'cl3', 'Balloon A has k = 1.4 mL/K and balloon B has k = 2.1 mL/K. At the same temperature, which is bigger, and what does that tell you about the gas inside?', 'challenge', 'V = kT, so compare the k values.', 'Balloon B is bigger, since V = kT and B has the larger k. A larger k means B holds more gas (k depends on the amount of gas and the pressure).')}
+        ${practiceProblem('en', 'cl4', 'Explain why the wax in a lava lamp rises when the bulb heats it.', 'challenge', 'Think about what heating does to volume, and what that does to density.', 'Heated wax expands, so the same mass takes up more volume and its density drops. It becomes less dense than the surrounding water, so it floats upward. Near the top it cools, its density rises, and it sinks again.')}`,
+        es: `
+        <span class="pc-focus-badge">${escapeHtml(t('focusBadge', 'es'))}</span>
+        <h2>¿Cómo Puedes Predecir el Volumen de un Gas?</h2>
+        <div class="concept-box">
+          <div class="concept-label">Ley de Charles</div>
+          <p>Para una muestra dada de gas a <strong>presión constante</strong>, el <strong>volumen es directamente proporcional a su temperatura Kelvin</strong>: <strong>V = kT</strong>. La <strong>constante de proporcionalidad k</strong> (k = V ÷ T) indica cuánto cambia el volumen por cada kelvin; depende de la <strong>cantidad de gas</strong> y de la <strong>presión</strong>.</p>
+        </div>
+        <p>Calienta un globo y observa cómo se mueve el punto en la gráfica. Luego cambia la gráfica a °C para ver por qué la ley de Charles solo funciona con kelvin.</p>
+        <div id="pc-balloon-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Usando k, Como en Clase</div>
+          <p><strong>Paso 1:</strong> convierte las temperaturas a kelvin (K = °C + 273). <strong>Paso 2:</strong> encuentra <em>k</em> con los datos iniciales: <strong>k = V ÷ T</strong>. <strong>Paso 3:</strong> para hallar un nuevo volumen usa <strong>V = k × T</strong>; para hallar una nueva temperatura usa <strong>T = V ÷ k</strong>. Ejemplo: 300 mL a 300 K → k = 300 ÷ 300 = 1.0 mL/K. A 360 K: V = 1.0 × 360 = 360 mL. (Redondea k a un decimal, como hicimos en clase.)</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Por Qué Sube el Aire Caliente</div>
+          <p>Cuando aumenta la temperatura, la misma cantidad de gas ocupa más volumen, así que su <strong>densidad disminuye</strong>. El gas más caliente es menos denso que el más frío, así que sube sobre él — por eso el aire caliente sube, y por eso la cera caliente de una lámpara de lava flota hacia arriba.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, escribe: <em>"Ley de Charles: a presión constante, V es directamente proporcional a la temperatura Kelvin. V = kT, así que k = V ÷ T. La gráfica de V contra T(K) es una línea recta que pasa por (0, 0). k depende de la cantidad de gas y de la presión."</em></div>
+        </div>
+        ${practiceProblem('es', 'cl1', 'Verdadero o Falso: si la temperatura Kelvin de un gas se duplica (la presión y la cantidad de gas no cambian), su volumen se duplica.', 'basic', 'El volumen es directamente proporcional a la temperatura Kelvin.', 'Verdadero — V = kT, así que duplicar T (en kelvin) duplica V.')}
+        ${practiceProblem('es', 'cl2', 'Una muestra de gas tiene k = 2.5 mL/K. ¿Cuál es su volumen a 200 K?', 'medium', 'Usa V = kT.', 'V = 2.5 mL/K × 200 K = 500 mL.')}
+        ${practiceProblem('es', 'cl3', 'El globo A tiene k = 1.4 mL/K y el globo B tiene k = 2.1 mL/K. A la misma temperatura, ¿cuál es mayor, y qué te dice eso del gas que contiene?', 'challenge', 'V = kT, así que compara los valores de k.', 'El globo B es mayor, ya que V = kT y B tiene el k más grande. Un k mayor significa que B contiene más gas (k depende de la cantidad de gas y de la presión).')}
+        ${practiceProblem('es', 'cl4', 'Explica por qué la cera de una lámpara de lava sube cuando la bombilla la calienta.', 'challenge', 'Piensa en qué hace el calor al volumen, y qué le hace eso a la densidad.', 'La cera calentada se expande, así que la misma masa ocupa más volumen y su densidad baja. Se vuelve menos densa que el agua que la rodea, así que flota hacia arriba. Cerca de la parte superior se enfría, su densidad sube y se hunde otra vez.')}`
+      }
+    },
+    // ---------------------------------------------------------------- 6 (L54 solving)
+    {
+      title: { en: 'Solving Charles\'s Law Problems', es: 'Resolviendo Problemas de la Ley de Charles' },
+      time: { en: '12 min', es: '12 min' },
+      bodyHtml: {
+        en: `
+        <span class="pc-focus-badge">${escapeHtml(t('focusBadge', 'en'))}</span>
+        <h2>The Recipe: Find k, Then Use It</h2>
+        <div class="concept-box">
+          <div class="concept-label">Always Do This</div>
+          <p><strong>1. Convert</strong> every temperature to kelvins (K = °C + 273). <strong>2. Find k</strong> from the starting volume and temperature: <strong>k = V₁ ÷ T₁</strong> (keep the unit, like mL/K). <strong>3. Use k:</strong> <strong>V₂ = k × T₂</strong> to find a volume, or <strong>T₂ = V₂ ÷ k</strong> to find a temperature. <strong>4. Check:</strong> heating should make the volume bigger, cooling smaller. If the problem asks for °C, convert back (°C = K − 273).</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Worked Example</div>
+          <p>560 mL of gas at 7 °C is heated to 77 °C. <strong>1.</strong> T₁ = 7 + 273 = 280 K, T₂ = 77 + 273 = 350 K. <strong>2.</strong> k = V₁ ÷ T₁ = 560 ÷ 280 = 2.0 mL/K. <strong>3.</strong> V₂ = k × T₂ = 2.0 × 350 = 700 mL. <strong>4.</strong> Check: heated → bigger. ✓</p>
+        </div>
+        <p>Now you try. Problem 1 is guided: the steps unlock one at a time and the hints are shown. In Problems 2–5 you are on your own (hints are one click away), and the solver will tell you when you fall into a classic trap.</p>
+        <div id="pc-solver-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">On your guided notes, copy the recipe and the worked example above. Underline the step students most often forget: <strong>convert to kelvins</strong>.</div>
+        </div>
+        ${practiceProblem('en', 'cs1', 'A gas takes up 500 mL at 250 K. It is heated to 350 K at constant pressure. Find k, then the new volume.', 'medium', 'The temperatures are already in kelvins. k = V₁ ÷ T₁, then V₂ = k × T₂.', 'k = 500 ÷ 250 = 2.0 mL/K. V₂ = 2.0 × 350 = 700 mL.')}
+        ${practiceProblem('en', 'cs2', 'A syringe holds 90.0 mL of air at 27 °C. It is placed in ice water at 0 °C. What is its new volume?', 'challenge', 'Convert both temperatures to kelvins first. Find k from the starting data, then multiply by the new kelvin temperature. Check that cooling makes the volume smaller.', 'T₁ = 300 K, T₂ = 273 K. k = 90.0 ÷ 300 = 0.30 mL/K. V₂ = 0.30 × 273 = 81.9 mL.')}
+        ${practiceProblem('en', 'cs3', 'A gas is 300 mL at 300 K. To what Kelvin temperature must it be heated for its volume to be 450 mL?', 'challenge', 'Find k first, then rearrange V = kT to T = V ÷ k.', 'k = 300 ÷ 300 = 1.0 mL/K. T₂ = V₂ ÷ k = 450 ÷ 1.0 = 450 K.')}`,
+        es: `
+        <span class="pc-focus-badge">${escapeHtml(t('focusBadge', 'es'))}</span>
+        <h2>La Receta: Encuentra k y Luego Úsala</h2>
+        <div class="concept-box">
+          <div class="concept-label">Haz Siempre Esto</div>
+          <p><strong>1. Convierte</strong> todas las temperaturas a kelvin (K = °C + 273). <strong>2. Encuentra k</strong> con el volumen y la temperatura iniciales: <strong>k = V₁ ÷ T₁</strong> (conserva la unidad, como mL/K). <strong>3. Usa k:</strong> <strong>V₂ = k × T₂</strong> para hallar un volumen, o <strong>T₂ = V₂ ÷ k</strong> para hallar una temperatura. <strong>4. Verifica:</strong> calentar debe aumentar el volumen, enfriar debe reducirlo. Si el problema pide °C, convierte de nuevo (°C = K − 273).</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Ejemplo Resuelto</div>
+          <p>560 mL de gas a 7 °C se calientan a 77 °C. <strong>1.</strong> T₁ = 7 + 273 = 280 K, T₂ = 77 + 273 = 350 K. <strong>2.</strong> k = V₁ ÷ T₁ = 560 ÷ 280 = 2.0 mL/K. <strong>3.</strong> V₂ = k × T₂ = 2.0 × 350 = 700 mL. <strong>4.</strong> Verificación: calentado → mayor. ✓</p>
+        </div>
+        <p>Ahora inténtalo tú. El Problema 1 es guiado: los pasos se desbloquean uno a la vez y se muestran las pistas. En los Problemas 2–5 trabajas por tu cuenta (las pistas están a un clic), y el solucionador te avisará cuando caigas en una trampa clásica.</p>
+        <div id="pc-solver-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">En tus apuntes guiados, copia la receta y el ejemplo resuelto de arriba. Subraya el paso que los estudiantes más olvidan: <strong>convertir a kelvin</strong>.</div>
+        </div>
+        ${practiceProblem('es', 'cs1', 'Un gas ocupa 500 mL a 250 K. Se calienta a 350 K a presión constante. Encuentra k y luego el nuevo volumen.', 'medium', 'Las temperaturas ya están en kelvin. k = V₁ ÷ T₁, luego V₂ = k × T₂.', 'k = 500 ÷ 250 = 2.0 mL/K. V₂ = 2.0 × 350 = 700 mL.')}
+        ${practiceProblem('es', 'cs2', 'Una jeringa contiene 90.0 mL de aire a 27 °C. Se coloca en agua con hielo a 0 °C. ¿Cuál es su nuevo volumen?', 'challenge', 'Convierte primero ambas temperaturas a kelvin. Encuentra k con los datos iniciales y luego multiplica por la nueva temperatura en kelvin. Verifica que enfriar haga el volumen menor.', 'T₁ = 300 K, T₂ = 273 K. k = 90.0 ÷ 300 = 0.30 mL/K. V₂ = 0.30 × 273 = 81.9 mL.')}
+        ${practiceProblem('es', 'cs3', 'Un gas ocupa 300 mL a 300 K. ¿A qué temperatura Kelvin debe calentarse para que su volumen sea 450 mL?', 'challenge', 'Encuentra k primero, y luego despeja V = kT para obtener T = V ÷ k.', 'k = 300 ÷ 300 = 1.0 mL/K. T₂ = V₂ ÷ k = 450 ÷ 1.0 = 450 K.')}`
+      }
+    },
+    // ---------------------------------------------------------------- 7 (L54 mistakes)
+    {
+      title: { en: 'Charles\'s Law: Spot the Mistake', es: 'Ley de Charles: Encuentra el Error' },
+      time: { en: '8 min', es: '8 min' },
+      bodyHtml: {
+        en: `
+        <span class="pc-focus-badge">${escapeHtml(t('focusBadge', 'en'))}</span>
+        <h2>The Four Classic Errors</h2>
+        <ul>
+          <li><strong>Forgetting kelvins</strong> — using °C to find k or to calculate.</li>
+          <li><strong>Using k the wrong way</strong> — V = k × T (multiply), and T = V ÷ k (divide).</li>
+          <li><strong>Subtracting 273</strong> when converting °C to K (you <em>add</em>).</li>
+          <li><strong>Forgetting the last step</strong> — leaving the answer in K when the question asks for °C.</li>
+        </ul>
+        <p>Each worked solution below has exactly one line with a mistake. Click it, then read why.</p>
+        <div id="pc-spot-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 The Reasonableness Check</div>
+          <p>Before you finish, ask: <strong>did the gas get hotter or colder?</strong> Hotter → the volume must be <em>larger</em>. Colder → <em>smaller</em>. And remember the volume only scales with the <em>Kelvin</em> temperature — a 20 °C jump near room temperature is only a few percent change in kelvins.</p>
+        </div>
+        ${practiceProblem('en', 'sm1', 'A student cools a gas from 80 °C to 20 °C and calculates a larger volume than the starting volume. What must have gone wrong?', 'medium', 'Which way should the volume move when a gas is cooled? Think about how k and T₂ were used.', 'Cooling should make the volume SMALLER, so the answer is unreasonable. Most likely the student used k the wrong way (divided instead of multiplying: V = k × T) or used °C instead of kelvins. Correct: T₂ is smaller than T₁ (293 K vs. 353 K), so V₂ = k × T₂ is smaller.')}
+        ${practiceProblem('en', 'sm2', 'Without calculating exactly: 600 mL of gas at 27 °C is heated to 127 °C. Will the new volume be more than double, exactly double, or less than double? Then find it using k.', 'challenge', 'Convert to kelvins before you compare. Doubling the Celsius number does not double the Kelvin temperature.', 'T₁ = 300 K, T₂ = 400 K, so T only grows by a factor of 400 ÷ 300 ≈ 1.33 — less than double. k = 600 ÷ 300 = 2.0 mL/K, V₂ = 2.0 × 400 = 800 mL.')}`,
+        es: `
+        <span class="pc-focus-badge">${escapeHtml(t('focusBadge', 'es'))}</span>
+        <h2>Los Cuatro Errores Clásicos</h2>
+        <ul>
+          <li><strong>Olvidar los kelvin</strong> — usar °C para hallar k o para calcular.</li>
+          <li><strong>Usar k al revés</strong> — V = k × T (se multiplica), y T = V ÷ k (se divide).</li>
+          <li><strong>Restar 273</strong> al convertir de °C a K (se <em>suma</em>).</li>
+          <li><strong>Olvidar el último paso</strong> — dejar la respuesta en K cuando la pregunta pide °C.</li>
+        </ul>
+        <p>Cada solución resuelta de abajo tiene exactamente una línea con un error. Haz clic en ella y luego lee por qué.</p>
+        <div id="pc-spot-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 La Verificación de Sentido Común</div>
+          <p>Antes de terminar, pregúntate: <strong>¿el gas se calentó o se enfrió?</strong> Más caliente → el volumen debe ser <em>mayor</em>. Más frío → <em>menor</em>. Y recuerda que el volumen solo se escala con la temperatura <em>Kelvin</em> — un salto de 20 °C cerca de la temperatura ambiente es solo un cambio de unos pocos por ciento en kelvin.</p>
+        </div>
+        ${practiceProblem('es', 'sm1', 'Un estudiante enfría un gas de 80 °C a 20 °C y calcula un volumen mayor que el volumen inicial. ¿Qué debió salir mal?', 'medium', '¿Hacia dónde debe moverse el volumen cuando se enfría un gas? Piensa en cómo se usaron k y T₂.', 'Enfriar debe hacer el volumen MENOR, así que la respuesta no es razonable. Lo más probable es que el estudiante usó k al revés (dividió en vez de multiplicar: V = k × T) o usó °C en vez de kelvin. Correcto: T₂ es menor que T₁ (293 K frente a 353 K), así que V₂ = k × T₂ es menor.')}
+        ${practiceProblem('es', 'sm2', 'Sin calcular exactamente: 600 mL de gas a 27 °C se calientan a 127 °C. ¿El nuevo volumen será más del doble, exactamente el doble, o menos del doble? Luego encuéntralo usando k.', 'challenge', 'Convierte a kelvin antes de comparar. Duplicar el número en Celsius no duplica la temperatura Kelvin.', 'T₁ = 300 K, T₂ = 400 K, así que T solo crece por un factor de 400 ÷ 300 ≈ 1.33 — menos del doble. k = 600 ÷ 300 = 2.0 mL/K, V₂ = 2.0 × 400 = 800 mL.')}`
+      }
+    }
+  ];
+
+  function render(host, ctx) {
+    ensureStylesInjected();
+    const lang = getLang();
+
+    const sectionsHtml = STATIC_SECTIONS.map((sec, i) => `
+      <div class="section-card" id="pc-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
+          <span class="section-title">${escapeHtml(tr(sec.title, lang))}</span>
+          <span class="section-time">${escapeHtml(tr(sec.time, lang))}</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          ${tr(sec.bodyHtml, lang)}
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">${escapeHtml(t('markSectionComplete', lang))}</button>
+        </div>
+      </div>
+    `).join('');
+
+    host.innerHTML = `
+      <div class="pc-lesson">
+        <div class="pc-header">
+          <div class="pc-lang-toggle" role="group" aria-label="${escapeHtml(t('langToggleAria', lang))}">
+            <button type="button" class="pc-lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="pc-lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="pc-header-label">${escapeHtml(t('headerLabel', lang))}</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="pc-header-meta">${escapeHtml(t('headerMeta', lang))}</div>
+        </div>
+        <div class="pc-progress-wrap">
+          <span class="pc-progress-label">${escapeHtml(t('progress', lang))}</span>
+          <div class="pc-progress-track"><div class="pc-progress-fill" id="pc-progress-fill"></div></div>
+          <span class="pc-progress-count" id="pc-progress-count">${escapeHtml(t('sectionCount', lang, 0, SECTION_COUNT))}</span>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="pc-sec-${SECTION_COUNT - 1}" data-section="${SECTION_COUNT - 1}">
+            <div class="section-header" data-toggle="${SECTION_COUNT - 1}">
+              <span class="section-num">✓</span>
+              <span class="section-title">${escapeHtml(t('checkForUnderstanding', lang))}</span>
+              <span class="section-time">${escapeHtml(t('quizTimeGraded', lang))}</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">${t('quizNote', lang)}</div>
+              <div id="pc-quiz-mount"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    `;
+
+    const root = host.querySelector('.pc-lesson');
+    const quizIndex = SECTION_COUNT - 1;
+    const completed = new Array(SECTION_COUNT).fill(false);
+
+    function updateProgress() {
+      const done = completed.filter(Boolean).length;
+      const pct = Math.round((done / SECTION_COUNT) * 100);
+      root.querySelector('#pc-progress-fill').style.width = pct + '%';
+      root.querySelector('#pc-progress-count').textContent = t('sectionCount', lang, done, SECTION_COUNT);
+    }
+
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#pc-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function toggleSection(i) {
+      const card = root.querySelector(`#pc-sec-${i}`);
+      const body = card.querySelector('.section-body');
+      const header = card.querySelector('.section-header');
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      header.classList.toggle('open', !isOpen);
+    }
+
+    root.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', () => toggleSection(Number(el.getAttribute('data-toggle'))));
+    });
+
+    root.querySelectorAll('[data-mark-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-mark-done'));
+        if (completed[i]) return;
+        completed[i] = true;
+        root.querySelector(`#pc-sec-${i}`).classList.add('done');
+        btn.textContent = t('sectionComplete', lang);
+        btn.disabled = true;
+        updateProgress();
+        setTimeout(() => openSection(i + 1, true), 250);
+      });
+    });
+
+    root.querySelectorAll('[data-hint-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-hint-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? t('hintHide', lang) : t('hintShow', lang);
+      });
+    });
+    root.querySelectorAll('[data-answer-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-answer-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? t('hideAnswer', lang) : t('revealAnswer', lang);
+      });
+    });
+
+    root.querySelectorAll('[data-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newLang = btn.getAttribute('data-lang');
+        if (newLang === lang) return;
+        setLang(newLang);
+        render(host, ctx); // full re-render; progress lives in ctx.getProgress(), untouched by language
+      });
+    });
+
+    // Interactive widgets -- ungraded, session-only state.
+    const mountMap = [
+      ['#pc-gauge-mount', renderGaugeWidget], ['#pc-phase-mount', renderPhaseWidget],
+      ['#pc-temp-mount', renderTempConverter], ['#pc-sim-mount', renderParticleSim],
+      ['#pc-balloon-mount', renderBalloonWidget], ['#pc-solver-mount', renderCharlesSolver],
+      ['#pc-spot-mount', renderSpotMistake]
+    ];
+    mountMap.forEach(([sel, fn]) => { const m = root.querySelector(sel); if (m) fn(m, lang); });
+
+    // Quiz (final section) — graded, saved via ctx.saveProgress.
+    const quizMount = root.querySelector('#pc-quiz-mount');
+    renderQuiz(quizMount, ctx);
+
+    const progress = ctx.getProgress();
+    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
+      if (progress.status === 'completed') completed[quizIndex] = true;
+      openSection(quizIndex, false);
+    } else {
+      openSection(0, false);
+    }
+    updateProgress();
+  }
+
+  function renderQuiz(mount, ctx) {
+    const progress = ctx.getProgress();
+    if (progress && progress.status === 'completed') {
+      renderQuizSummary(mount, ctx);
+      return;
+    }
+    const answers = (progress && progress.answers) || [];
+    const index = answers.length;
+    if (index >= QUESTIONS.length) {
+      finishQuiz(mount, ctx, answers);
+      return;
+    }
+    renderQuizQuestion(mount, ctx, answers, index);
+  }
+
+  function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const lang = getLang();
+    const q = QUESTIONS[index];
+    const pct = Math.round((index / QUESTIONS.length) * 100);
+    mount.innerHTML = `
+      <div class="quiz-question-count">${escapeHtml(t('questionCount', lang, index + 1, QUESTIONS.length))}</div>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <p class="quiz-prompt">${escapeHtml(tr(q.prompt, lang))}</p>
+      <div id="pc-answer-area"></div>
+      <div id="pc-feedback-area"></div>
+      <button type="button" class="pc-next-btn" id="pc-next-btn" style="display:none;">${escapeHtml(t('nextQuestion', lang))}</button>
+    `;
+
+    const answerArea = mount.querySelector('#pc-answer-area');
+    const feedbackArea = mount.querySelector('#pc-feedback-area');
+    const nextBtn = mount.querySelector('#pc-next-btn');
+    let submitted = false;
+
+    answerArea.innerHTML = q.choices.map((choice, i) => `
+      <button type="button" class="pc-choice" data-choice="${i}">${escapeHtml(tr(choice, lang))}</button>
+    `).join('');
+
+    function submit(response, btnEl) {
+      if (submitted) return;
+      submitted = true;
+
+      const correct = response === q.correct;
+      answerArea.querySelectorAll('.pc-choice').forEach(el => {
+        el.disabled = true;
+        const val = Number(el.getAttribute('data-choice'));
+        if (val === q.correct) el.classList.add('selected-correct');
+        else if (el === btnEl) el.classList.add('selected-incorrect');
+      });
+
+      feedbackArea.innerHTML = `
+        <div class="pc-feedback ${correct ? 'correct' : 'incorrect'}">
+          ${correct ? escapeHtml(t('correctPrefix', lang)) : escapeHtml(t('incorrectPrefix', lang))} ${escapeHtml(tr(q.explanation, lang))}
+        </div>
+      `;
+      nextBtn.style.display = 'inline-block';
+
+      const answers = answersSoFar.concat([{ questionId: q.id, response, correct }]);
+      const record = {
+        status: 'in_progress',
+        score: answers.filter(a => a.correct).length,
+        totalQuestions: QUESTIONS.length,
+        answers
+      };
+      ctx.saveProgress(record);
+    }
+
+    answerArea.querySelectorAll('.pc-choice').forEach(btn => {
+      btn.addEventListener('click', () => submit(Number(btn.getAttribute('data-choice')), btn));
+    });
+
+    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
+  }
+
+  async function finishQuiz(mount, ctx, answers) {
+    const record = {
+      status: 'completed',
+      score: answers.filter(a => a.correct).length,
+      totalQuestions: QUESTIONS.length,
+      answers
+    };
+    await ctx.saveProgress(record);
+    renderQuizSummary(mount, ctx);
+  }
+
+  function renderQuizSummary(mount, ctx) {
+    const lang = getLang();
+    const progress = ctx.getProgress();
+    const score = progress ? progress.score : 0;
+    const code = progress && progress.code ? progress.code : '';
+    const total = QUESTIONS.length;
+    mount.innerHTML = `
+      <div class="pc-summary">
+        <div class="pc-score">${score} / ${total}</div>
+        ${code
+          ? `<p class="pc-code-label">${escapeHtml(t('completionCode', lang))}</p><div class="pc-code">${escapeHtml(code)}</div>`
+          : `<p><button type="button" class="pc-retake-btn" id="pc-show-code-btn">${escapeHtml(t('showMyCode', lang))}</button></p>`}
+        <p>${escapeHtml(t('summaryText', lang))}</p>
+        <button type="button" class="pc-retake-btn" id="pc-retake-btn">${escapeHtml(t('retakeQuiz', lang))}</button>
+      </div>
+    `;
+    // Quizzes finished before completion codes existed have none; saving the
+    // already-completed record again makes Storage.saveProgress mint one.
+    const showCodeBtn = mount.querySelector('#pc-show-code-btn');
+    if (showCodeBtn) {
+      showCodeBtn.addEventListener('click', async () => {
+        showCodeBtn.disabled = true;
+        await ctx.saveProgress(Object.assign({}, progress));
+        renderQuizSummary(mount, ctx);
+      });
+    }
+    mount.querySelector('#pc-retake-btn').addEventListener('click', async () => {
+      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: total, answers: [] });
+      renderQuiz(mount, ctx);
+    });
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['physical-changes-review'] = { render };
+})();
+
+</script>

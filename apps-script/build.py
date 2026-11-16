@@ -46,6 +46,7 @@ JS_FILES = [
     ('CrossMultiplyDensityJs.html', 'js/activities/cross-multiply-density.js'),
     ('MiniMathReviewJs.html', 'js/activities/mini-math-review.js'),
     ('ThermometerLabJs.html', 'js/activities/thermometer-lab.js'),
+    ('PhysicalChangesReviewJs.html', 'js/activities/physical-changes-review.js'),
     ('AppJs.html', 'js/app.js'),
 ]
 
@@ -89,6 +90,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <?!= include('CrossMultiplyDensityJs'); ?>
   <?!= include('MiniMathReviewJs'); ?>
   <?!= include('ThermometerLabJs'); ?>
+  <?!= include('PhysicalChangesReviewJs'); ?>
   <?!= include('AppJs'); ?>
 </body>
 </html>
