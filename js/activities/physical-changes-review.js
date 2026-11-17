@@ -347,7 +347,7 @@
   function gaugeSvg(area, h) {
     const px = 15, H = 10 * px, w = Math.round(26 * Math.sqrt(area));
     const x0 = 110 - w / 2, yTop = 14, yBot = yTop + H, fillH = h * px;
-    let s = `<svg viewBox="0 0 220 200" class="pc-svg" width="220" xmlns="http://www.w3.org/2000/svg" role="img">`;
+    let s = `<svg viewBox="0 0 220 200" class="pc-svg" width="220" role="img">`;
     s += `<rect x="${x0}" y="${yBot - fillH}" width="${w}" height="${fillH}" fill="#2ec4b6" opacity="0.75"/>`;
     s += `<rect x="${x0}" y="${yTop}" width="${w}" height="${H}" rx="3" fill="none" stroke="#253a52" stroke-width="2"/>`;
     for (let c = 0; c <= 10; c++) {
@@ -513,7 +513,7 @@
     const lo = -50, hi = 150, y0 = 190, y1 = 12;
     const clamp = Math.max(lo, Math.min(hi, c));
     const yOf = (v) => y0 - (v - lo) / (hi - lo) * (y0 - y1);
-    let s = `<svg viewBox="0 0 150 210" class="pc-svg" width="120" role="img" xmlns="http://www.w3.org/2000/svg">`;
+    let s = `<svg viewBox="0 0 150 210" class="pc-svg" width="120" role="img">`;
     s += `<rect x="30" y="${y1}" width="14" height="${y0 - y1 + 6}" rx="7" fill="#fff" stroke="#253a52" stroke-width="2"/>`;
     s += `<circle cx="37" cy="${y0 + 6}" r="12" fill="#e8384f" stroke="#253a52" stroke-width="2"/>`;
     s += `<rect x="33" y="${yOf(clamp)}" width="8" height="${y0 + 6 - yOf(clamp)}" fill="#e8384f"/>`;
@@ -714,7 +714,7 @@
       const sx = (v) => ml + (v - x0) / (x1 - x0) * pw;
       const sy = (v) => mt + ph - v / y1 * ph;
       const xv = (tk) => axis === 0 ? tk : tk - 273;
-      let s = `<svg viewBox="0 0 ${Wd} ${Ht}" class="pc-svg" width="330" role="img" xmlns="http://www.w3.org/2000/svg">`;
+      let s = `<svg viewBox="0 0 ${Wd} ${Ht}" class="pc-svg" width="330" role="img">`;
       const font = `font-family="JetBrains Mono, monospace" font-size="9.5" fill="#5a6475"`;
       const xt = axis === 0 ? [0, 100, 200, 300, 400, 500, 600] : [-300, -200, -100, 0, 100, 200, 300];
       xt.forEach(v => { s += `<line x1="${sx(v)}" y1="${mt}" x2="${sx(v)}" y2="${mt + ph}" stroke="#e5e0d6"/><text x="${sx(v)}" y="${mt + ph + 13}" text-anchor="middle" ${font}>${v}</text>`; });
@@ -737,7 +737,7 @@
     }
     function balloonSvg(v) {
       const r = 16 + 44 * Math.sqrt(v / 1300);
-      return `<svg viewBox="0 0 150 150" class="pc-svg" width="150" role="img" xmlns="http://www.w3.org/2000/svg"><line x1="75" y1="${75 + r}" x2="75" y2="145" stroke="#5a6475" stroke-width="2"/><circle cx="75" cy="75" r="${r}" fill="${T > 285 ? '#f4a261' : '#7fb8e6'}" stroke="#253a52" stroke-width="2.5"/><text x="75" y="${79}" text-anchor="middle" font-size="12" font-weight="700" fill="#0d1b2a" font-family="JetBrains Mono, monospace">${fmt(v, 0)} mL</text></svg>`;
+      return `<svg viewBox="0 0 150 150" class="pc-svg" width="150" role="img"><line x1="75" y1="${75 + r}" x2="75" y2="145" stroke="#5a6475" stroke-width="2"/><circle cx="75" cy="75" r="${r}" fill="${T > 285 ? '#f4a261' : '#7fb8e6'}" stroke="#253a52" stroke-width="2.5"/><text x="75" y="${79}" text-anchor="middle" font-size="12" font-weight="700" fill="#0d1b2a" font-family="JetBrains Mono, monospace">${fmt(v, 0)} mL</text></svg>`;
     }
     function redraw() {
       const k = BAL_K[si], v = k * T, c = T - 273;
