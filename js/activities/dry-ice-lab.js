@@ -1,0 +1,966 @@
+// "Lesson 56: It's Sublime — Gas Density" virtual lab (registered as CONTENT activity id
+// 'dry-ice-lab'). Replaces only the hands-on PROCEDURE of the lab (dry ice is hard to get and
+// hard to handle safely). Students answer the worksheet questions on paper.
+//
+//   Part 1 (observations): put a piece of dry ice or a piece of water ice on the bench, in water,
+//   or in vegetable oil and watch it. Six combinations. The scene shows what happens (melting
+//   into a puddle, fog spilling over the rim, clear bubbles in oil, meltwater beading under oil)
+//   but never writes the observation for them: they record it on the worksheet. A combination
+//   counts as observed after it has been watched for a few seconds.
+//
+//   Part 2 (gas density, the "Dry Ice Setup" procedure): squeeze the air out of the bag, weigh
+//   the cup of dry ice, pour it in and twist-tie the bag, weigh the empty cup, wait for the
+//   solid to sublime, then press the bag into the measurement box and measure length, width and
+//   height. Students then type the mass of dry ice, the three measurements, the volume and the
+//   density, and each entry is checked against their own numbers.
+//   Built-in sources of error, like the real lab: the dry ice keeps subliming on the balance and
+//   a little gas escapes before the bag is tied, and the bag never quite fills the box corners,
+//   so the measured density comes out a bit above the true ~0.0018 g/mL.
+//
+// Not graded: no score. "Completed" once all six observations are made and every Part 2 entry
+// checks out; it then shows a completion code.
+//
+// Persistence: the lab's data lives in answers[0] ({questionId:'_lab', state}). state.env holds
+// that student's sample (cup mass, dry ice mass, losses) so resumed data stays consistent.
+//
+// Supports the shared EN/ES toggle (LANG_KEY).
+(function () {
+  const STYLE_ID = 'di-lesson-styles';
+  const FONT_LINK_ID = 'el-lesson-fonts'; // shared Google Fonts <link>, same family as every other lesson
+  const LANG_KEY = 'ionicstorm_lang_v1';  // shared literal: keeps language in sync across activities
+  const NS = 'http:' + '/' + '/www.w3.org/2000/svg';
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function getLang() {
+    try { return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'; } catch (e) { return 'en'; }
+  }
+  function setLang(lang) {
+    try { localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en'); } catch (e) { /* ignore */ }
+  }
+  function T(lang) { return (en, es) => (lang === 'es' && es != null) ? es : en; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function svgEl(tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function num(v) {
+    if (v == null) return null;
+    const s = String(v).trim().replace(',', '.');
+    if (s === '') return null;
+    const n = Number(s);
+    return isFinite(n) ? n : null;
+  }
+
+  // ---------------------------------------------------------------- lab model
+  const SAMPLES = ['dry', 'ice'];
+  const PLACES = ['bench', 'water', 'oil'];
+  const OBS_IDS = [];
+  SAMPLES.forEach(s => PLACES.forEach(p => OBS_IDS.push(s + '-' + p)));
+  const WATCH_S = 5;               // seconds of watching before a combination counts as observed
+  const BOX_L = 20.0, BOX_W = 15.0, BOX_H = 20.0; // measurement box (cm)
+  const SUB_S = 45;                // real seconds for the dry ice to sublime at normal speed
+  const DRIFT = 0.007;             // g/s the dry ice loses while it sits on the balance
+  const BAG_MAX = 6000;            // mL that draws the bag "full"
+  const DATA_IDS = ['mass', 'L', 'W', 'H', 'Vcm', 'V', 'D'];
+
+  function newEnv() {
+    return { cup: rnd(3.1, 4.3), ice: rnd(5.5, 9.5), leak: rnd(0.02, 0.05), fill: rnd(0.9, 0.96), T: rnd(20.5, 23.5) };
+  }
+  function newBag(env) { return { stage: 'start', ice: env.ice, massIn: null, sub: 0, cupOn: false, rec: {} }; }
+  function newInputs() { return { mass: '', L: '', W: '', H: '', Vcm: '', V: '', D: '' }; }
+  function newState() { const env = newEnv(); return { env, obs: {}, tab: 1, b: newBag(env), inp: newInputs() }; }
+  function loadState(progress) {
+    const a = progress && progress.answers && progress.answers[0];
+    const s = a && a.questionId === '_lab' && a.state;
+    if (!s || !s.env || typeof s.env.cup !== 'number' || !s.b) return newState();
+    return {
+      env: s.env, obs: s.obs || {}, tab: s.tab === 2 ? 2 : 1,
+      b: Object.assign(newBag(s.env), s.b, { rec: Object.assign({}, s.b.rec || {}) }),
+      inp: Object.assign(newInputs(), s.inp || {})
+    };
+  }
+  function gasDensity(env) { return 44.01 / (0.08206 * (env.T + 273.15)) / 1000; } // g/mL
+  function gasVolume(S) { return S.b.massIn == null ? 0 : S.b.massIn / gasDensity(S.env); }
+  function boxHeight(S) { return gasVolume(S) * S.env.fill / (BOX_L * BOX_W); }
+
+  // ---------------------------------------------------------------- styles
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.di-lesson {
+  --navy: #0d1b2a; --navy-mid: #1b2d42; --navy-light: #253a52;
+  --teal: #2ec4b6; --teal-dim: #1a8c83; --amber: #f4a261;
+  --cream: #f7f3ec; --cream-dark: #ede8df;
+  --text: #1a1a2e; --text-muted: #5a6475;
+  --glass: #5f7f88; --glassfill: rgba(120,170,185,0.14);
+  --water: rgba(70,150,215,0.28); --oil: rgba(226,172,40,0.45);
+  --scene: #e6edf1; --benchtop: #c9b79c; --plate: #4f5d68; --rubber: #2a3238;
+  --dry: #f3f6f8; --dryline: #9fb0ba; --ice: rgba(196,228,248,0.85); --iceline: #6fa3c4;
+  --bag: rgba(70,84,96,0.16); --bagline: #55636e; --cupc: #fbfaf6; --card: #d9b98a; --cardline: #a07d4c;
+  --ruler: #f5e7b0; --redmark: #c0392b;
+  --ok: #14715f; --wait: #9a5a06; --bad: #a33a2a;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text); font-size: 17px; line-height: 1.6;
+  background: var(--cream); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.di-lesson * { box-sizing: border-box; }
+.di-lesson .di-off { display: none !important; }
+.di-lesson .di-header { background: var(--navy); color: var(--cream); padding: 2rem 1.75rem 1.6rem; position: relative; overflow: hidden; }
+.di-lesson .di-header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; border: 32px solid rgba(46,196,182,0.12); }
+.di-lesson .di-lang-toggle { position: absolute; top: 1.75rem; right: 1.75rem; z-index: 2; display: flex; gap: 0.3rem; }
+.di-lesson .di-lang-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.3rem 0.6rem; border-radius: 6px; background: transparent; border: 1px solid rgba(247,243,236,0.35); color: rgba(247,243,236,0.65); cursor: pointer; }
+.di-lesson .di-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.di-lesson .di-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
+.di-lesson .di-header-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem; position: relative; padding-right: 6rem; }
+.di-lesson .di-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; line-height: 1.2; margin: 0 0 0.4rem; position: relative; }
+.di-lesson .di-header-meta { font-size: 0.82rem; color: rgba(247,243,236,0.65); font-family: 'JetBrains Mono', monospace; position: relative; }
+.di-lesson .di-main { padding: 1.5rem 1.25rem 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+.di-lesson .di-purpose { margin: 0; color: var(--text-muted); }
+.di-lesson .di-safety { margin: 0; font-size: 0.9rem; border-left: 4px solid var(--amber); background: white; padding: 0.55rem 0.8rem; border-radius: 0 8px 8px 0; }
+.di-lesson .di-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.di-lesson .di-tab { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.6rem 1rem; border-radius: 999px; border: 1.5px solid var(--navy-light); background: white; color: var(--navy); cursor: pointer; }
+.di-lesson .di-tab.active { background: var(--navy); color: white; }
+.di-lesson .di-lab { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+@media (max-width: 720px) { .di-lesson .di-lab { grid-template-columns: minmax(0, 1fr); } }
+.di-lesson .di-bench { background: white; border: 1px solid var(--cream-dark); border-radius: 12px; padding: 0.6rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.di-lesson .di-bench svg { display: block; width: 100%; height: auto; margin: 0 auto; }
+.di-lesson .di-status { font-weight: 600; font-size: 0.92rem; line-height: 1.35; text-align: center; padding: 0.5rem 0.6rem; border-radius: 8px; background: var(--cream); min-height: 3.2rem; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.di-lesson .di-status.ok { color: var(--ok); }
+.di-lesson .di-status.wait { color: var(--wait); }
+.di-lesson .di-side { display: flex; flex-direction: column; gap: 1.1rem; min-width: 0; }
+.di-lesson .di-block { display: flex; flex-direction: column; gap: 0.55rem; }
+.di-lesson h2 { font-family: 'Playfair Display', serif; font-size: 1.3rem; line-height: 1.25; margin: 0; }
+.di-lesson h3 { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal-dim); margin: 0; }
+.di-lesson ol.di-steps { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.97rem; }
+.di-lesson ol.di-steps li.now { font-weight: 600; }
+.di-lesson ol.di-steps li.done { color: var(--text-muted); }
+.di-lesson .di-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; }
+.di-lesson .di-choice { text-align: left; font-family: inherit; font-size: 0.95rem; font-weight: 600; padding: 0.55rem 0.7rem; border-radius: 10px; border: 1.5px solid var(--cream-dark); background: white; color: var(--text); cursor: pointer; display: flex; flex-direction: column; gap: 0.1rem; line-height: 1.3; }
+.di-lesson .di-choice small { font-weight: 400; font-size: 0.8rem; color: var(--text-muted); }
+.di-lesson .di-choice.active { border-color: var(--teal-dim); background: #e8f8f5; }
+.di-lesson .di-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.di-lesson .di-btn { font-family: 'JetBrains Mono', monospace; cursor: pointer; border: 1.5px solid var(--navy); background: var(--navy); color: white; border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.di-lesson .di-btn:hover:not(:disabled) { background: var(--navy-light); }
+.di-lesson .di-btn:disabled { background: var(--cream-dark); border-color: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.di-lesson .di-btn.secondary { background: white; color: var(--navy); border-color: var(--navy-light); }
+.di-lesson .di-btn.secondary:hover:not(:disabled) { background: var(--cream); }
+.di-lesson .di-btn.small { padding: 0.3rem 0.6rem; font-size: 0.62rem; }
+.di-lesson button:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+.di-lesson .di-checks { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 0.3rem; font-size: 0.85rem; align-items: center; }
+.di-lesson .di-checks .hd { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); text-align: center; }
+.di-lesson .di-checks .rh { font-weight: 600; padding-right: 0.3rem; }
+.di-lesson .di-checks .cell { text-align: center; border-radius: 8px; padding: 0.3rem; background: white; border: 1px solid var(--cream-dark); font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-muted); }
+.di-lesson .di-checks .cell.yes { background: #e8f8f5; border-color: var(--teal-dim); color: var(--ok); }
+.di-lesson .di-checks .cell.now { border-color: var(--wait); color: var(--wait); }
+.di-lesson .di-probe { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.di-lesson .di-tablebox { overflow-x: auto; border: 1px solid var(--cream-dark); border-radius: 10px; background: white; }
+.di-lesson table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+.di-lesson th, .di-lesson td { padding: 0.45rem 0.6rem; text-align: left; border-bottom: 1px solid var(--cream-dark); vertical-align: middle; }
+.di-lesson th { font-family: 'JetBrains Mono', monospace; font-size: 0.64rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.di-lesson tr:last-child td { border-bottom: 0; }
+.di-lesson td.num { font-family: 'JetBrains Mono', monospace; font-weight: 600; white-space: nowrap; }
+.di-lesson td.empty { color: var(--text-muted); }
+.di-lesson td input { width: 7.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.92rem; padding: 0.35rem 0.45rem; border: 1.5px solid var(--navy-light); border-radius: 8px; background: white; color: var(--text); color-scheme: light; }
+.di-lesson td input:focus { outline: 3px solid var(--teal); outline-offset: 1px; }
+.di-lesson td input:disabled { background: var(--cream); border-color: var(--cream-dark); }
+.di-lesson td input.ok { border-color: var(--teal-dim); background: #e8f8f5; }
+.di-lesson td input.bad { border-color: var(--bad); }
+.di-lesson .di-fb { display: block; font-size: 0.8rem; line-height: 1.3; margin-top: 0.2rem; color: var(--text-muted); }
+.di-lesson .di-fb.ok { color: var(--ok); font-weight: 600; }
+.di-lesson .di-fb.bad { color: var(--bad); }
+.di-lesson .di-unit { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-muted); margin-left: 0.25rem; }
+.di-lesson .di-note { font-size: 0.86rem; color: var(--text-muted); margin: 0; }
+.di-lesson .di-clock { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text); }
+.di-lesson .di-zoom { border-top: 1px solid var(--cream-dark); padding: 0.6rem 0.2rem 0.2rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.di-lesson .di-zoom p { margin: 0; }
+.di-lesson .di-seg { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.di-lesson .di-done { background: white; border: 1px solid var(--cream-dark); border-radius: 12px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+.di-lesson .di-done.complete { border-color: var(--teal); background: #e8f8f5; align-items: center; text-align: center; }
+.di-lesson .di-done p { margin: 0; }
+.di-lesson .di-count { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 600; }
+.di-lesson .di-code-label { font-weight: 600; }
+.di-lesson .di-code { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--navy); border: 2px dashed var(--navy); border-radius: 10px; padding: 0.3rem 1rem; user-select: all; }
+.di-lesson .g-stroke { fill: none; stroke: var(--glass); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.di-lesson svg .t { font-family: 'JetBrains Mono', monospace; fill: var(--text); }
+.di-lesson svg .tm { font-family: 'JetBrains Mono', monospace; fill: var(--text-muted); }
+.di-lesson .fog { fill: white; stroke: rgba(110,130,142,0.35); stroke-width: 1; }
+.di-lesson .bub-c { fill: rgba(255,255,255,0.85); stroke: rgba(110,130,142,0.6); stroke-width: 1; animation: diRise 1.1s linear infinite; }
+.di-lesson .bub-o { fill: none; stroke: rgba(90,70,20,0.7); stroke-width: 1.4; animation: diRise 1.6s linear infinite; }
+.di-lesson .spill-l { animation: diSpillL 3.2s ease-in infinite; }
+.di-lesson .spill-r { animation: diSpillR 3.2s ease-in infinite; }
+.di-lesson .puff { animation: diPuff 2.6s ease-out infinite; }
+.di-lesson .creep-l { animation: diCreepL 3.4s ease-out infinite; }
+.di-lesson .creep-r { animation: diCreepR 3.4s ease-out infinite; }
+.di-lesson .faint { animation: diFaint 3.8s ease-out infinite; }
+.di-lesson .wisp { animation: diWisp 2.8s ease-out infinite; }
+.di-lesson .drop { fill: rgba(70,150,215,0.75); animation: diFall 2.6s ease-in infinite; }
+.di-lesson .di-ruler-in { animation: diRulerIn 0.45s ease-out both; }
+@keyframes diRulerIn { from { transform: translate(var(--rx), var(--ry)); opacity: 0; } to { transform: translate(0, 0); opacity: 1; } }
+@keyframes diRise { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(-122px); opacity: 0.2; } }
+@keyframes diSpillL { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: 0.9; } 40% { transform: translate(-42px,-34px); opacity: 0.9; } 60% { transform: translate(-68px,-20px); opacity: 0.8; } 100% { transform: translate(-82px,150px); opacity: 0; } }
+@keyframes diSpillR { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: 0.9; } 40% { transform: translate(42px,-34px); opacity: 0.9; } 60% { transform: translate(68px,-20px); opacity: 0.8; } 100% { transform: translate(82px,150px); opacity: 0; } }
+@keyframes diPuff { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 20% { opacity: 0.9; } 100% { transform: translateY(-38px) scale(1.4); opacity: 0; } }
+@keyframes diCreepL { 0% { transform: translate(0,0) scale(0.5); opacity: 0; } 20% { opacity: 0.85; } 100% { transform: translate(-80px,14px) scale(1.5); opacity: 0; } }
+@keyframes diCreepR { 0% { transform: translate(0,0) scale(0.5); opacity: 0; } 20% { opacity: 0.85; } 100% { transform: translate(80px,14px) scale(1.5); opacity: 0; } }
+@keyframes diFaint { 0% { transform: translateY(0) scale(0.5); opacity: 0; } 30% { opacity: 0.35; } 100% { transform: translateY(-20px) scale(1.1); opacity: 0; } }
+@keyframes diWisp { 0% { transform: translate(0,0) scale(0.5); opacity: 0; } 25% { opacity: 0.8; } 100% { transform: translate(-14px,46px) scale(1.4); opacity: 0; } }
+@keyframes diFall { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(124px); opacity: 0; } }
+.di-lesson svg .fog, .di-lesson svg .bub-c, .di-lesson svg .bub-o, .di-lesson svg .drop { transform-box: fill-box; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) {
+  .di-lesson .bub-c, .di-lesson .bub-o, .di-lesson .spill-l, .di-lesson .spill-r, .di-lesson .puff, .di-lesson .creep-l, .di-lesson .creep-r, .di-lesson .faint, .di-lesson .wisp, .di-lesson .drop { animation: none; opacity: 0.7; }
+  .di-lesson .di-ruler-in { animation: none; }
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  // ---------------------------------------------------------------- static drawings
+  // Part 1: bench, plate, beaker (water or oil), one sample, and effect layers toggled by combination.
+  function fogSet(cls, pts, r) {
+    return pts.map((p, i) => `<ellipse class="fog ${cls}" cx="${p[0]}" cy="${p[1]}" rx="${r}" ry="${Math.round(r * 0.62)}" style="animation-delay:${(i * 0.53).toFixed(2)}s"/>`).join('');
+  }
+  const P1_SVG = `
+<svg viewBox="0 0 360 340" role="img" data-id="p1-svg">
+  <rect x="0" y="0" width="360" height="340" fill="var(--scene)"/>
+  <rect x="0" y="306" width="360" height="34" fill="var(--benchtop)"/>
+  <g data-id="p1-plate">
+    <ellipse cx="180" cy="300" rx="112" ry="13" fill="white" stroke="var(--glass)" stroke-width="1.5"/>
+    <ellipse data-id="p1-puddle" cx="180" cy="297" rx="0" ry="0" fill="var(--water)" stroke="rgba(70,150,215,0.5)" stroke-width="1"/>
+  </g>
+  <g data-id="p1-beaker">
+    <rect data-id="p1-liquid" x="93" y="150" width="174" height="151" fill="var(--water)"/>
+    <ellipse data-id="p1-bead" cx="180" cy="297" rx="0" ry="0" fill="rgba(70,150,215,0.55)" stroke="rgba(40,110,170,0.7)" stroke-width="1"/>
+  </g>
+  <g data-id="fx-creep">${fogSet('creep-l', [[170, 282], [168, 286], [172, 284]], 12)}${fogSet('creep-r', [[190, 283], [192, 286], [188, 284]], 12)}</g>
+  <g data-id="fx-bubc">${[[168, 272, 0], [180, 274, 0.3], [192, 271, 0.6], [174, 273, 0.85], [186, 272, 0.15], [162, 274, 0.45], [198, 273, 0.75]].map(b => `<circle class="bub-c" cx="${b[0]}" cy="${b[1]}" r="${4 + (b[0] % 3)}" style="animation-delay:${b[2]}s"/>`).join('')}</g>
+  <g data-id="fx-bubo">${[[170, 272, 0], [184, 274, 0.55], [192, 271, 1.0], [176, 273, 1.3], [188, 272, 0.3]].map(b => `<circle class="bub-o" cx="${b[0]}" cy="${b[1]}" r="${3 + (b[0] % 3)}" style="animation-delay:${b[2]}s"/>`).join('')}</g>
+  <g data-id="fx-drops">${[[178, 0], [184, 0.9], [181, 1.7]].map(d => `<circle class="drop" cx="${d[0]}" cy="174" r="3.2" style="animation-delay:${d[1]}s"/>`).join('')}</g>
+  <g data-id="p1-sample">
+    <rect data-id="p1-sbody" x="150" y="260" width="60" height="32" rx="5"/>
+    <path data-id="p1-shine" d="" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+  </g>
+  <g data-id="fx-heavy">
+    ${fogSet('puff', [[150, 146], [180, 144], [210, 146], [165, 140], [195, 142]], 18)}
+    ${fogSet('spill-l', [[150, 142], [140, 146], [160, 140]], 17)}
+    ${fogSet('spill-r', [[210, 142], [220, 146], [200, 140]], 17)}
+  </g>
+  <g data-id="fx-faint">${fogSet('faint', [[172, 146], [192, 147]], 10)}</g>
+  <g data-id="p1-glass">
+    <path d="M92 110 V296 Q92 302 98 302 H262 Q268 302 268 296 V110" class="g-stroke"/>
+    <path d="M86 110 H96 M264 110 H274" class="g-stroke"/>
+  </g>
+  <text data-id="p1-label" class="tm" x="180" y="26" text-anchor="middle" font-size="12" font-weight="600"></text>
+</svg>`;
+
+  // Part 2: balance, foam cup, bag. Shapes that change are filled in by code.
+  const P2_SVG = `
+<svg viewBox="0 0 520 340" role="img" data-id="p2-svg">
+  <rect x="0" y="0" width="520" height="340" fill="var(--scene)"/>
+  <rect x="0" y="310" width="520" height="30" fill="var(--benchtop)"/>
+  <g>
+    <rect x="28" y="262" width="176" height="48" rx="8" fill="var(--plate)"/>
+    <rect x="58" y="276" width="116" height="24" rx="4" fill="#d4e8d2" stroke="var(--rubber)" stroke-width="1.5"/>
+    <text data-id="p2-display" class="t" x="168" y="294" text-anchor="end" font-size="15" font-weight="600">0.00 g</text>
+    <rect x="108" y="256" width="16" height="8" fill="var(--rubber)"/>
+    <rect x="44" y="248" width="144" height="9" rx="3" fill="#9aa6ae" stroke="var(--rubber)" stroke-width="1"/>
+  </g>
+  <g data-id="p2-cup">
+    <path d="M-27 -56 H27 L20 0 H-20 Z" fill="var(--cupc)" stroke="var(--dryline)" stroke-width="2" stroke-linejoin="round"/>
+    <g data-id="p2-cupice">
+      <rect x="-20" y="-64" width="13" height="10" rx="3" fill="var(--dry)" stroke="var(--dryline)" stroke-width="1.2"/>
+      <rect x="-6" y="-67" width="14" height="11" rx="3" fill="var(--dry)" stroke="var(--dryline)" stroke-width="1.2"/>
+      <rect x="9" y="-63" width="12" height="9" rx="3" fill="var(--dry)" stroke="var(--dryline)" stroke-width="1.2"/>
+      ${fogSet('wisp', [[-16, -60], [4, -64], [16, -60]], 8)}
+    </g>
+  </g>
+  <path data-id="p2-bag" d="" fill="var(--bag)" stroke="var(--bagline)" stroke-width="2" stroke-linejoin="round"/>
+  <g data-id="p2-pellets"></g>
+  <path data-id="p2-frost" d="" fill="white" opacity="0" stroke="none"/>
+  <rect data-id="p2-tie" x="392" y="0" width="16" height="6" rx="2" fill="#d4a017" class="di-off"/>
+  <text data-id="p2-label" class="tm" x="260" y="26" text-anchor="middle" font-size="12" font-weight="600"></text>
+</svg>`;
+
+  // Part 2, last step: the clear measurement box with the bag pressed in under a cardboard lid.
+  const BX = { x0: 60, y0: 305, px: 12, dx: 99 / 15, dy: -58 / 15 }; // per cm of depth
+  function boxPt(l, w, h) { return [BX.x0 + l * BX.px + w * BX.dx, BX.y0 - h * BX.px + w * BX.dy]; }
+  function poly(pts) { return pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '); }
+  const BOX_SVG = `
+<svg viewBox="0 0 520 340" role="img" data-id="bx-svg">
+  <rect x="0" y="0" width="520" height="340" fill="var(--scene)"/>
+  <rect x="0" y="305" width="520" height="35" fill="var(--benchtop)"/>
+  <polygon points="${poly([boxPt(0, BOX_W, 0), boxPt(BOX_L, BOX_W, 0), boxPt(BOX_L, BOX_W, BOX_H), boxPt(0, BOX_W, BOX_H)])}" fill="rgba(120,170,185,0.10)" stroke="var(--glass)" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <g data-id="bx-bag"></g>
+  <polygon points="${poly([boxPt(0, 0, 0), boxPt(BOX_L, 0, 0), boxPt(BOX_L, 0, BOX_H), boxPt(0, 0, BOX_H)])}" fill="rgba(120,170,185,0.10)" stroke="var(--glass)" stroke-width="2.5"/>
+  <polyline points="${poly([boxPt(BOX_L, 0, 0), boxPt(BOX_L, BOX_W, 0), boxPt(BOX_L, BOX_W, BOX_H), boxPt(BOX_L, 0, BOX_H)])}" fill="none" stroke="var(--glass)" stroke-width="2.5"/>
+  <polyline points="${poly([boxPt(0, 0, BOX_H), boxPt(0, BOX_W, BOX_H), boxPt(BOX_L, BOX_W, BOX_H)])}" fill="none" stroke="var(--glass)" stroke-width="2.5"/>
+  <g data-id="bx-edge"></g>
+  <text data-id="bx-label" class="tm" x="510" y="337" text-anchor="end" font-size="12" font-weight="600"></text>
+</svg>`;
+
+  // ---------------------------------------------------------------- render
+  function render(host, ctx) {
+    ensureStylesInjected();
+    const lang = getLang();
+    const _ = T(lang);
+    let S = loadState(ctx.getProgress());
+    let saveTimer = null;
+
+    const SAMPLE_TXT = {
+      dry: { label: _('Dry ice', 'Hielo seco'), hint: _('Solid carbon dioxide, CO₂(s)', 'Dióxido de carbono sólido, CO₂(s)') },
+      ice: { label: _('Water ice', 'Hielo de agua'), hint: _('Solid water, H₂O(s)', 'Agua sólida, H₂O(s)') }
+    };
+    const PLACE_TXT = {
+      bench: { label: _('On the bench', 'Sobre la mesa'), hint: _('On a plate at room temperature', 'En un plato a temperatura ambiente'), short: _('Bench', 'Mesa') },
+      water: { label: _('In water', 'En agua'), hint: _('Beaker of room-temperature water', 'Vaso con agua a temperatura ambiente'), short: _('Water', 'Agua') },
+      oil: { label: _('In oil', 'En aceite'), hint: _('Beaker of vegetable oil', 'Vaso con aceite vegetal'), short: _('Oil', 'Aceite') }
+    };
+    const DATA_TXT = {
+      mass: { label: _('Mass of dry ice', 'Masa del hielo seco'), unit: 'g' },
+      L: { label: _('Length of box', 'Largo de la caja'), unit: 'cm' },
+      W: { label: _('Width of box', 'Ancho de la caja'), unit: 'cm' },
+      H: { label: _('Height of bag in box', 'Altura de la bolsa en la caja'), unit: 'cm' },
+      Vcm: { label: _('Volume of CO₂ gas', 'Volumen del CO₂ gaseoso'), unit: 'cm³' },
+      V: { label: _('Volume of CO₂ gas', 'Volumen del CO₂ gaseoso'), unit: 'mL' },
+      D: { label: _('Density of CO₂ gas', 'Densidad del CO₂ gaseoso'), unit: 'g/mL' }
+    };
+
+    // ---- data checks (each against the student's own earlier numbers)
+    function check(id) {
+      const b = S.b, v = num(S.inp[id]);
+      const empty = S.inp[id] === '' || S.inp[id] == null;
+      const res = (ok, msg) => ({ ok, msg, empty });
+      if (id === 'mass') {
+        if (b.rec.full == null || b.rec.cup == null) return res(false, _('Record both masses first.', 'Primero anota las dos masas.'));
+        if (v == null) return res(false, _('Subtract: (cup + dry ice) − (empty cup).', 'Resta: (vaso + hielo seco) − (vaso vacío).'));
+        const want = b.rec.full - b.rec.cup;
+        return Math.abs(v - want) <= 0.015 ? res(true, _('Correct.', 'Correcto.')) : res(false, _('Check your subtraction: (cup + dry ice) − (empty cup).', 'Revisa tu resta: (vaso + hielo seco) − (vaso vacío).'));
+      }
+      if (id === 'L' || id === 'W' || id === 'H') {
+        if (b.stage !== 'boxed') return res(false, _('Press the bag into the box first.', 'Primero mete la bolsa en la caja.'));
+        if (v == null) return res(false, _('Use the zoomed-in ruler below the box.', 'Usa la regla ampliada debajo de la caja.'));
+        const want = id === 'L' ? BOX_L : id === 'W' ? BOX_W : boxHeight(S);
+        return Math.abs(v - want) <= 0.2 ? res(true, _('Good reading.', 'Buena lectura.')) : res(false, _('Read the ruler again, to the nearest 0.1 cm.', 'Vuelve a leer la regla, al 0.1 cm más cercano.'));
+      }
+      if (id === 'Vcm') {
+        const L = num(S.inp.L), W = num(S.inp.W), H = num(S.inp.H);
+        if (!check('L').ok || !check('W').ok || !check('H').ok) return res(false, _('Measure length, width and height first.', 'Primero mide el largo, el ancho y la altura.'));
+        if (v == null) return res(false, _('Volume = length × width × height.', 'Volumen = largo × ancho × altura.'));
+        const want = L * W * H;
+        return Math.abs(v - want) <= Math.max(1, want * 0.01) ? res(true, _('Correct.', 'Correcto.')) : res(false, _('Multiply your three measurements together.', 'Multiplica tus tres medidas.'));
+      }
+      if (id === 'V') {
+        const vcm = num(S.inp.Vcm);
+        if (!check('Vcm').ok) return res(false, _('Find the volume in cm³ first.', 'Primero encuentra el volumen en cm³.'));
+        if (v == null) return res(false, _('Convert to mL. Recall that 1 cm³ = 1 mL.', 'Convierte a mL. Recuerda que 1 cm³ = 1 mL.'));
+        return Math.abs(v - vcm) <= Math.max(1, vcm * 0.01) ? res(true, _('Correct.', 'Correcto.')) : res(false, _('1 cm³ = 1 mL, so the number does not change.', '1 cm³ = 1 mL, así que el número no cambia.'));
+      }
+      if (id === 'D') {
+        const m = num(S.inp.mass), V = num(S.inp.V);
+        if (!check('mass').ok || !check('V').ok) return res(false, _('Find the mass and the volume first.', 'Primero encuentra la masa y el volumen.'));
+        if (v == null) return res(false, _('Density = mass ÷ volume.', 'Densidad = masa ÷ volumen.'));
+        const want = m / V;
+        if (Math.abs(v - want) <= want * 0.03) return res(true, _('Correct.', 'Correcto.'));
+        if (Math.abs(v - V / m) <= (V / m) * 0.03) return res(false, _('Flipped: divide the mass by the volume.', 'Al revés: divide la masa entre el volumen.'));
+        return res(false, _('Divide your mass by your volume. Expect a very small decimal.', 'Divide tu masa entre tu volumen. Espera un decimal muy pequeño.'));
+      }
+      return res(false, '');
+    }
+
+    // ---- saving
+    function obsDone() { return OBS_IDS.filter(k => S.obs[k]).length; }
+    function dataDone() { return (S.b.rec.full != null ? 1 : 0) + (S.b.rec.cup != null ? 1 : 0) + DATA_IDS.filter(id => check(id).ok).length; }
+    const DATA_TOTAL = 2 + DATA_IDS.length;
+    function allDone() { return obsDone() === OBS_IDS.length && dataDone() === DATA_TOTAL; }
+    function buildRecord() {
+      const cur = ctx.getProgress() || {};
+      const rec = {
+        status: (allDone() || cur.status === 'completed') ? 'completed' : 'in_progress',
+        score: null,
+        totalQuestions: null,
+        answers: [{ questionId: '_lab', state: S }]
+      };
+      if (rec.status === 'completed' && cur.code) rec.code = cur.code;
+      return rec;
+    }
+    function save(now) {
+      clearTimeout(saveTimer);
+      const run = () => { saveTimer = null; return ctx.saveProgress(buildRecord()); };
+      if (now) return run();
+      saveTimer = setTimeout(run, 600);
+      return null;
+    }
+    function flushSave() { if (saveTimer) save(true); }
+    function dataChanged() {
+      const cur = ctx.getProgress() || {};
+      if (allDone() && cur.status !== 'completed') {
+        const p = save(true);
+        renderDone();
+        if (p && p.then) p.then(renderDone);
+      } else {
+        save(false);
+        renderDone();
+      }
+    }
+
+    // ---- shell
+    host.innerHTML = `
+      <div class="di-lesson">
+        <div class="di-header">
+          <div class="di-lang-toggle" role="group" aria-label="${escapeHtml(_('Language', 'Idioma'))}">
+            <button type="button" class="di-lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="di-lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="di-header-label">${escapeHtml(_('Chapter 11 · Pressing Matter · Lesson 56', 'Capítulo 11 · Materia bajo Presión · Lección 56'))}</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="di-header-meta">${escapeHtml(_('Virtual Lab · ~30 Minutes · Do the procedure here, answer on your worksheet', 'Laboratorio Virtual · ~30 Minutos · Haz el procedimiento aquí, responde en tu hoja'))}</div>
+        </div>
+        <div class="di-main">
+          <p class="di-purpose">${escapeHtml(_('Purpose: to measure the density and volume changes that happen when a substance changes phase. Run both parts here, then answer the questions on your worksheet.', 'Propósito: medir los cambios de densidad y de volumen que ocurren cuando una sustancia cambia de fase. Haz las dos partes aquí y luego responde las preguntas en tu hoja de trabajo.'))}</p>
+          <p class="di-safety"><strong>${escapeHtml(_('Safety:', 'Seguridad:'))}</strong> ${escapeHtml(_('In a real lab, never touch dry ice with bare hands. It is about −78 °C and can burn skin. Use tongs or gloves.', 'En un laboratorio real, nunca toques el hielo seco con las manos. Está a unos −78 °C y puede quemar la piel. Usa pinzas o guantes.'))}</p>
+          <div class="di-tabs" role="tablist">
+            <button type="button" class="di-tab" role="tab" data-tab="1">${escapeHtml(_('Part 1: Observations', 'Parte 1: Observaciones'))}</button>
+            <button type="button" class="di-tab" role="tab" data-tab="2">${escapeHtml(_('Part 2: Gas density', 'Parte 2: Densidad del gas'))}</button>
+          </div>
+
+          <section class="di-lab" data-part="1">
+            <div class="di-bench">
+              ${P1_SVG}
+              <div class="di-status" data-id="p1-status" aria-live="polite"></div>
+            </div>
+            <div class="di-side">
+              <div class="di-block">
+                <h2>${escapeHtml(_('Compare dry ice and water ice', 'Compara el hielo seco y el hielo de agua'))}</h2>
+                <ol class="di-steps">
+                  <li>${escapeHtml(_('Choose a sample and a place to put it.', 'Elige una muestra y un lugar donde ponerla.'))}</li>
+                  <li>${escapeHtml(_('Watch closely. Does it get smaller? Is there any liquid? Bubbles? Fog? Where does the fog go?', 'Observa con atención. ¿Se hace más pequeña? ¿Hay líquido? ¿Burbujas? ¿Niebla? ¿A dónde va la niebla?'))}</li>
+                  <li>${escapeHtml(_('Write what you see on your worksheet. Try all six combinations.', 'Escribe lo que ves en tu hoja de trabajo. Prueba las seis combinaciones.'))}</li>
+                </ol>
+              </div>
+              <div class="di-block">
+                <h3>${escapeHtml(_('Sample', 'Muestra'))}</h3>
+                <div class="di-choices">${SAMPLES.map(k => `<button type="button" class="di-choice" data-sample="${k}"><span>${escapeHtml(SAMPLE_TXT[k].label)}</span><small>${escapeHtml(SAMPLE_TXT[k].hint)}</small></button>`).join('')}</div>
+              </div>
+              <div class="di-block">
+                <h3>${escapeHtml(_('Put it', 'Ponla'))}</h3>
+                <div class="di-choices">${PLACES.map(k => `<button type="button" class="di-choice" data-place="${k}"><span>${escapeHtml(PLACE_TXT[k].label)}</span><small>${escapeHtml(PLACE_TXT[k].hint)}</small></button>`).join('')}</div>
+              </div>
+              <div class="di-row">
+                <button type="button" class="di-btn secondary" data-id="p1-probe">${escapeHtml(_('Measure its temperature', 'Medir su temperatura'))}</button>
+                <span class="di-probe" data-id="p1-probeval" aria-live="polite"></span>
+              </div>
+              <div class="di-block">
+                <h3>${escapeHtml(_('Combinations observed', 'Combinaciones observadas'))}</h3>
+                <div class="di-checks" data-id="p1-checks"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="di-lab" data-part="2">
+            <div class="di-bench">
+              ${P2_SVG}
+              ${BOX_SVG}
+              <div class="di-status" data-id="p2-status" aria-live="polite"></div>
+              <div class="di-zoom di-off" data-id="zoom">
+                <h3>${escapeHtml(_('Zoomed-in ruler', 'Regla ampliada'))}</h3>
+                <div class="di-seg" role="group">
+                  <button type="button" class="di-btn small" data-dim="L">${escapeHtml(_('Length', 'Largo'))}</button>
+                  <button type="button" class="di-btn small" data-dim="W">${escapeHtml(_('Width', 'Ancho'))}</button>
+                  <button type="button" class="di-btn small" data-dim="H">${escapeHtml(_('Height', 'Altura'))}</button>
+                </div>
+                <svg viewBox="0 0 360 96" role="img" data-id="zoom-svg"></svg>
+                <p class="di-note" data-id="zoom-note"></p>
+              </div>
+            </div>
+            <div class="di-side">
+              <div class="di-block">
+                <h2>${escapeHtml(_('Find the density of CO₂ gas', 'Encuentra la densidad del CO₂ gaseoso'))}</h2>
+                <ol class="di-steps" data-id="p2-steps">
+                  <li>${escapeHtml(_('Squeeze all the air out of the bag.', 'Saca todo el aire de la bolsa.'))}</li>
+                  <li>${escapeHtml(_('Put the cup of dry ice on the balance and record the mass.', 'Pon el vaso con hielo seco en la balanza y anota la masa.'))}</li>
+                  <li>${escapeHtml(_('Quickly pour the dry ice into the bag and close it with the twist tie.', 'Vierte rápido el hielo seco en la bolsa y ciérrala con el alambre.'))}</li>
+                  <li>${escapeHtml(_('Put the empty cup on the balance and record its mass.', 'Pon el vaso vacío en la balanza y anota su masa.'))}</li>
+                  <li>${escapeHtml(_('Wait until all of the solid is gone.', 'Espera hasta que desaparezca todo el sólido.'))}</li>
+                  <li>${escapeHtml(_('Press the bag into the measurement box. Measure its length, width and height.', 'Mete la bolsa en la caja de medición. Mide el largo, el ancho y la altura.'))}</li>
+                </ol>
+              </div>
+              <div class="di-block">
+                <h3>${escapeHtml(_('Do the next step', 'Haz el siguiente paso'))}</h3>
+                <div class="di-row">
+                  <button type="button" class="di-btn" data-id="p2-act"></button>
+                  <button type="button" class="di-btn" data-id="p2-record">${escapeHtml(_('Record the mass', 'Anotar la masa'))}</button>
+                </div>
+                <div class="di-row">
+                  <button type="button" class="di-btn secondary small" data-id="p2-fast"></button>
+                  <span class="di-note">${escapeHtml(_('Time since the bag was tied:', 'Tiempo desde que se cerró la bolsa:'))} <span class="di-clock" data-id="p2-clock">0:00</span></span>
+                </div>
+              </div>
+              <div class="di-block">
+                <h3>${escapeHtml(_('Your data', 'Tus datos'))}</h3>
+                <div class="di-tablebox"><table>
+                  <tbody data-id="p2-rows"></tbody>
+                </table></div>
+                <p class="di-note">${escapeHtml(_('Copy every row onto your worksheet. Recall that 1 cm³ = 1 mL.', 'Copia cada fila en tu hoja de trabajo. Recuerda que 1 cm³ = 1 mL.'))}</p>
+              </div>
+              <div class="di-row">
+                <button type="button" class="di-btn secondary" data-id="p2-reset">${escapeHtml(_('Start Part 2 over', 'Empezar la Parte 2 de nuevo'))}</button>
+              </div>
+            </div>
+          </section>
+
+          <div class="di-done" data-id="done"></div>
+        </div>
+      </div>`;
+
+    const root = host.querySelector('.di-lesson');
+    const q = id => root.querySelector('[data-id="' + id + '"]');
+    const show = (id, on) => q(id).classList.toggle('di-off', !on);
+
+    q('p1-svg').setAttribute('aria-label', _('A lab bench with a plate, or a beaker of water or oil, and a piece of dry ice or water ice.', 'Una mesa de laboratorio con un plato, o un vaso con agua o aceite, y un trozo de hielo seco o de hielo de agua.'));
+    q('p2-svg').setAttribute('aria-label', _('A balance, a foam cup of dry ice, and a plastic bag.', 'Una balanza, un vaso de espuma con hielo seco y una bolsa de plástico.'));
+    q('bx-svg').setAttribute('aria-label', _('A clear measurement box with the gas-filled bag pressed in under a cardboard lid.', 'Una caja de medición transparente con la bolsa llena de gas metida bajo una tapa de cartón.'));
+
+    // ---- language + tabs
+    root.querySelectorAll('[data-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nl = btn.getAttribute('data-lang');
+        if (nl === lang) return;
+        flushSave(); clearInterval(timer); setLang(nl); render(host, ctx);
+      });
+    });
+    function selectTab(n) {
+      S.tab = n;
+      root.querySelectorAll('[data-tab]').forEach(b => {
+        const on = Number(b.getAttribute('data-tab')) === n;
+        b.classList.toggle('active', on); b.setAttribute('aria-selected', on);
+      });
+      root.querySelectorAll('[data-part]').forEach(s => s.classList.toggle('di-off', Number(s.getAttribute('data-part')) !== n));
+    }
+    root.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => selectTab(Number(b.getAttribute('data-tab')))));
+
+    // ================= PART 1 =================
+    const p1 = { sample: 'dry', place: 'bench', t: 0, probe: false };
+    function p1Key() { return p1.sample + '-' + p1.place; }
+    function renderP1Scene() {
+      root.querySelectorAll('[data-sample]').forEach(b => { const on = b.getAttribute('data-sample') === p1.sample; b.classList.toggle('active', on); b.setAttribute('aria-pressed', on); });
+      root.querySelectorAll('[data-place]').forEach(b => { const on = b.getAttribute('data-place') === p1.place; b.classList.toggle('active', on); b.setAttribute('aria-pressed', on); });
+      const dry = p1.sample === 'dry', pl = p1.place;
+      show('p1-plate', pl === 'bench'); show('p1-beaker', pl !== 'bench'); show('p1-glass', pl !== 'bench');
+      q('p1-liquid').setAttribute('fill', pl === 'oil' ? 'var(--oil)' : 'var(--water)');
+      show('fx-creep', dry && pl === 'bench');
+      show('fx-heavy', dry && pl === 'water');
+      show('fx-faint', dry && pl === 'oil');
+      show('fx-bubc', dry && pl === 'water');
+      show('fx-bubo', dry && pl === 'oil');
+      show('fx-drops', !dry && pl === 'oil');
+      const body = q('p1-sbody');
+      body.setAttribute('fill', dry ? 'var(--dry)' : 'var(--ice)');
+      body.setAttribute('stroke', dry ? 'var(--dryline)' : 'var(--iceline)');
+      body.setAttribute('stroke-width', 1.6);
+      q('p1-label').textContent = SAMPLE_TXT[p1.sample].label + ' · ' + PLACE_TXT[pl].label;
+      q('p1-probeval').textContent = '';
+    }
+    function renderChecks() {
+      const box = q('p1-checks');
+      let html = '<span></span>' + PLACES.map(p => `<span class="hd">${escapeHtml(PLACE_TXT[p].short)}</span>`).join('');
+      SAMPLES.forEach(s => {
+        html += `<span class="rh">${escapeHtml(SAMPLE_TXT[s].label)}</span>`;
+        PLACES.forEach(p => {
+          const k = s + '-' + p, yes = !!S.obs[k], now = k === p1Key() && !yes;
+          html += `<span class="cell${yes ? ' yes' : ''}${now ? ' now' : ''}" data-cell="${k}">${yes ? '✓' : now ? '…' : '·'}</span>`;
+        });
+      });
+      box.innerHTML = html;
+    }
+    function pick(kind, val) {
+      if (p1[kind] === val) return;
+      p1[kind] = val; p1.t = 0; p1.probe = false;
+      renderP1Scene(); renderChecks(); stepP1(0);
+    }
+    root.querySelectorAll('[data-sample]').forEach(b => b.addEventListener('click', () => pick('sample', b.getAttribute('data-sample'))));
+    root.querySelectorAll('[data-place]').forEach(b => b.addEventListener('click', () => pick('place', b.getAttribute('data-place'))));
+    q('p1-probe').addEventListener('click', () => {
+      const t = p1.sample === 'dry' ? -78.5 + rnd(-0.6, 0.6) : rnd(-0.2, 0.2);
+      q('p1-probeval').textContent = _('Sample surface: ', 'Superficie de la muestra: ') + t.toFixed(1).replace('-', '−') + ' °C';
+    });
+
+    function stepP1(dt) {
+      if (S.tab !== 1 && dt > 0) return; // paused while Part 2 is showing, so nothing is "observed" unseen
+      p1.t += dt;
+      const dry = p1.sample === 'dry', pl = p1.place, t = p1.t;
+      // fraction of the sample left (held at a floor so there is always something to look at)
+      const life = dry ? { bench: 70, water: 40, oil: 60 }[pl] : { bench: 40, water: 80, oil: 50 }[pl];
+      const floor = dry ? { bench: 0.45, water: 0.3, oil: 0.35 }[pl] : { bench: 0.5, water: 0.6, oil: 0.6 }[pl];
+      const r = Math.max(floor, 1 - t / life);
+      const melt = (1 - r) / (1 - floor);
+      const k = Math.cbrt(r);
+      const bw = (dry ? 60 : 44) * k, bh = (dry ? 32 : 44) * k;
+      let yTop;
+      if (pl === 'bench') yTop = 296 - bh;
+      else if (dry) yTop = 301 - bh;                       // dry ice sinks in water and oil
+      else yTop = 150 - (pl === 'water' ? 0.1 : 0.03) * bh; // water ice floats (barely, in oil)
+      const body = q('p1-sbody');
+      body.setAttribute('x', (180 - bw / 2).toFixed(1)); body.setAttribute('y', yTop.toFixed(1));
+      body.setAttribute('width', bw.toFixed(1)); body.setAttribute('height', bh.toFixed(1));
+      body.setAttribute('rx', dry ? 4 : 6);
+      q('p1-shine').setAttribute('d', dry ? '' : 'M' + (180 - bw / 2 + 6).toFixed(1) + ' ' + (yTop + 8).toFixed(1) + ' l ' + (bw * 0.35).toFixed(1) + ' 0');
+      // bench: melted water spreads into a puddle under water ice; dry ice leaves nothing
+      const pud = q('p1-puddle');
+      if (!dry && pl === 'bench') { pud.setAttribute('rx', (bw / 2 + 4 + 62 * melt).toFixed(1)); pud.setAttribute('ry', (3 + 6 * melt).toFixed(1)); }
+      else { pud.setAttribute('rx', 0); pud.setAttribute('ry', 0); }
+      // oil: meltwater drips through the oil and collects as a bead on the bottom
+      const bead = q('p1-bead');
+      if (!dry && pl === 'oil') { const br = 3 + 26 * melt; bead.setAttribute('rx', br.toFixed(1)); bead.setAttribute('ry', Math.min(8, br * 0.45).toFixed(1)); }
+      else { bead.setAttribute('rx', 0); bead.setAttribute('ry', 0); }
+      // bubbles start at the top of the sunken dry ice
+      const shift = (yTop - 268).toFixed(1);
+      q('fx-bubc').setAttribute('transform', 'translate(0 ' + shift + ')');
+      q('fx-bubo').setAttribute('transform', 'translate(0 ' + shift + ')');
+      q('fx-creep').setAttribute('transform', 'translate(0 ' + (yTop + bh - 296).toFixed(1) + ')');
+      q('fx-drops').setAttribute('transform', 'translate(0 ' + (yTop + bh - 174 - 4).toFixed(1) + ')');
+
+      const key = p1Key();
+      if (!S.obs[key] && t >= WATCH_S) { S.obs[key] = true; renderChecks(); dataChanged(); }
+      const s = q('p1-status');
+      let text, cls;
+      if (S.obs[key]) { text = _('Observed. Write down what you saw, then try another combination.', 'Observado. Escribe lo que viste y luego prueba otra combinación.'); cls = 'di-status ok'; }
+      else { text = _('Keep watching… ', 'Sigue observando… ') + Math.max(1, Math.ceil(WATCH_S - t)) + ' s'; cls = 'di-status wait'; }
+      if (s.textContent !== text) s.textContent = text;
+      if (s.className !== cls) s.className = cls;
+    }
+
+    // ================= PART 2 =================
+    const p2 = { f: S.b.stage === 'start' ? 0.72 : 0, fast: false, dim: 'H', resetArmed: false };
+    function bagTarget() {
+      const st = S.b.stage;
+      if (st === 'start') return 0.72;
+      if (st === 'flat' || st === 'weighing') return 0;
+      return clamp(gasVolume(S) * S.b.sub / BAG_MAX, 0, 1);
+    }
+    function bagPath(f) {
+      const cx = 400, base = 310;
+      const hw = 78 + 30 * f, ht = 16 + 175 * f, ny = base - ht;
+      const bulge = 22 * f;
+      return { d: 'M' + (cx - hw) + ' ' + base +
+        ' C' + (cx - hw - bulge) + ' ' + (base - ht * 0.75) + ' ' + (cx - 34) + ' ' + (ny + 4) + ' ' + (cx - 8) + ' ' + ny +
+        ' L' + (cx - 7) + ' ' + (ny - 16) + ' L' + (cx + 7) + ' ' + (ny - 16) + ' L' + (cx + 8) + ' ' + ny +
+        ' C' + (cx + 34) + ' ' + (ny + 4) + ' ' + (cx + hw + bulge) + ' ' + (base - ht * 0.75) + ' ' + (cx + hw) + ' ' + base + ' Z', ny };
+    }
+    const PELLETS = [[-30, 0], [-14, -2], [2, 0], [18, -1], [-22, -10], [-4, -11], [12, -10]];
+    function drawPellets() {
+      const g = q('p2-pellets'); g.textContent = '';
+      const st = S.b.stage;
+      if (st !== 'poured' || S.b.sub >= 1) return;
+      const k = Math.cbrt(Math.max(0.02, 1 - S.b.sub));
+      PELLETS.forEach(p => {
+        const w = 13 * k, h = 9 * k;
+        g.appendChild(svgEl('rect', { x: (400 + p[0] - w / 2).toFixed(1), y: (306 + p[1] - h).toFixed(1), width: w.toFixed(1), height: h.toFixed(1), rx: 2.5, fill: 'var(--dry)', stroke: 'var(--dryline)', 'stroke-width': 1.1 }));
+      });
+    }
+    function balanceReading() {
+      const b = S.b;
+      if (b.stage === 'weighing') return S.env.cup + b.ice;
+      if (b.cupOn) return S.env.cup;
+      return 0;
+    }
+    function renderP2() {
+      const b = S.b, st = b.stage, boxed = st === 'boxed';
+      show('p2-svg', !boxed); show('bx-svg', boxed); show('zoom', boxed);
+      // cup
+      const onBal = st === 'weighing' || b.cupOn;
+      q('p2-cup').setAttribute('transform', onBal ? 'translate(116 248)' : 'translate(250 310)');
+      show('p2-cupice', st === 'start' || st === 'flat' || st === 'weighing');
+      show('p2-tie', st === 'poured' || st === 'gone' || st === 'boxed');
+      drawPellets();
+      // buttons
+      const act = q('p2-act');
+      const ACT = {
+        start: _('Squeeze the air out of the bag', 'Sacar el aire de la bolsa'),
+        flat: _('Put the cup on the balance', 'Poner el vaso en la balanza'),
+        weighing: _('Pour into the bag and tie it', 'Verter en la bolsa y cerrarla'),
+        poured: b.cupOn ? _('Wait for the solid to sublime', 'Espera a que el sólido se sublime') : _('Put the empty cup on the balance', 'Poner el vaso vacío en la balanza'),
+        gone: (b.rec.cup == null && !b.cupOn) ? _('Put the empty cup on the balance', 'Poner el vaso vacío en la balanza') : _('Press the bag into the box', 'Meter la bolsa en la caja'),
+        boxed: _('Bag is in the box', 'La bolsa está en la caja')
+      };
+      act.textContent = ACT[st];
+      act.disabled = (st === 'weighing' && b.rec.full == null) || (st === 'poured' && b.cupOn) || (st === 'gone' && b.rec.cup == null && b.cupOn) || st === 'boxed';
+      const canRecord = (st === 'weighing' && b.rec.full == null) || (b.cupOn && b.rec.cup == null);
+      q('p2-record').disabled = !canRecord;
+      const fast = q('p2-fast');
+      fast.textContent = p2.fast ? _('Normal speed', 'Velocidad normal') : _('Speed up ×5', 'Acelerar ×5');
+      fast.disabled = st !== 'poured';
+      // procedure step highlight
+      let idx = { start: 0, flat: 1, weighing: b.rec.full == null ? 1 : 2, poured: b.rec.cup == null ? 3 : 4, gone: b.rec.cup == null ? 3 : 5, boxed: 5 }[st];
+      const lis = q('p2-steps').children;
+      for (let i = 0; i < lis.length; i++) lis[i].className = (i < idx || (st === 'boxed' && dataDone() === DATA_TOTAL)) ? 'done' : i === idx ? 'now' : '';
+      q('p2-label').textContent = st === 'start' ? _('The bag still has air in it', 'La bolsa todavía tiene aire')
+        : (st === 'poured' || st === 'gone') ? _('Bag tied shut with dry ice inside', 'Bolsa cerrada con hielo seco adentro') : '';
+      if (boxed) renderBox();
+    }
+    function renderRows() {
+      const b = S.b, tb = q('p2-rows');
+      const fmt = v => v == null ? '—' : v.toFixed(2) + ' g';
+      let html = `<tr><td>${escapeHtml(_('Mass of cup + dry ice', 'Masa del vaso + hielo seco'))}</td><td class="num">${fmt(b.rec.full)}</td></tr>
+        <tr><td>${escapeHtml(_('Mass of empty cup', 'Masa del vaso vacío'))}</td><td class="num">${fmt(b.rec.cup)}</td></tr>`;
+      DATA_IDS.forEach(id => {
+        html += `<tr><td>${escapeHtml(DATA_TXT[id].label)}</td><td><input type="text" inputmode="decimal" autocomplete="off" data-inp="${id}" aria-label="${escapeHtml(DATA_TXT[id].label)}"><span class="di-unit">${escapeHtml(DATA_TXT[id].unit)}</span><span class="di-fb" data-fb="${id}"></span></td></tr>`;
+      });
+      tb.innerHTML = html;
+      DATA_IDS.forEach(id => {
+        const inp = tb.querySelector('[data-inp="' + id + '"]');
+        inp.value = S.inp[id] || '';
+        inp.addEventListener('input', () => { S.inp[id] = inp.value; renderFeedback(); dataChanged(); });
+      });
+      renderFeedback();
+    }
+    function renderFeedback() {
+      const tb = q('p2-rows');
+      DATA_IDS.forEach(id => {
+        const c = check(id), inp = tb.querySelector('[data-inp="' + id + '"]'), fb = tb.querySelector('[data-fb="' + id + '"]');
+        const enabled = id === 'mass' ? (S.b.rec.full != null && S.b.rec.cup != null) : S.b.stage === 'boxed';
+        inp.disabled = !enabled;
+        inp.classList.toggle('ok', c.ok);
+        inp.classList.toggle('bad', !c.ok && !c.empty && enabled);
+        fb.className = 'di-fb' + (c.ok ? ' ok' : (!c.empty && enabled ? ' bad' : ''));
+        fb.textContent = enabled ? c.msg : '';
+      });
+      renderP2Steps();
+    }
+    function renderP2Steps() {
+      if (S.b.stage !== 'boxed') return;
+      const lis = q('p2-steps').children, all = dataDone() === DATA_TOTAL;
+      for (let i = 0; i < lis.length; i++) lis[i].className = (i < 5 || all) ? 'done' : 'now';
+    }
+
+    // ---- measurement box drawing + zoomed ruler
+    function renderBox() {
+      const H = boxHeight(S);
+      const g = q('bx-bag'); g.textContent = '';
+      // bag: rounded plastic filling the box up to H, with a cardboard lid on top
+      const front = [boxPt(0.3, 0.6, 0), boxPt(BOX_L - 0.3, 0.6, 0), boxPt(BOX_L - 0.3, 0.6, H - 0.4), boxPt(0.3, 0.6, H - 0.4)];
+      const side = [boxPt(BOX_L - 0.3, 0.6, 0), boxPt(BOX_L - 0.3, BOX_W - 0.4, 0), boxPt(BOX_L - 0.3, BOX_W - 0.4, H - 0.4), boxPt(BOX_L - 0.3, 0.6, H - 0.4)];
+      g.appendChild(svgEl('polygon', { points: poly(side), fill: 'rgba(70,84,96,0.22)', stroke: 'var(--bagline)', 'stroke-width': 1.5, 'stroke-linejoin': 'round' }));
+      g.appendChild(svgEl('polygon', { points: poly(front), fill: 'rgba(70,84,96,0.16)', stroke: 'var(--bagline)', 'stroke-width': 1.5, 'stroke-linejoin': 'round' }));
+      const wr = [boxPt(3, 0.6, H * 0.35), boxPt(9, 0.6, H * 0.5), boxPt(15, 0.6, H * 0.3)];
+      g.appendChild(svgEl('path', { d: 'M' + wr[0].join(' ') + ' Q' + wr[1].join(' ') + ' ' + wr[2].join(' '), fill: 'none', stroke: 'var(--bagline)', 'stroke-width': 1, opacity: 0.5 }));
+      g.appendChild(svgEl('polygon', { points: poly([boxPt(0, 0, H), boxPt(BOX_L, 0, H), boxPt(BOX_L, BOX_W, H), boxPt(0, BOX_W, H)]), fill: 'var(--card)', stroke: 'var(--cardline)', 'stroke-width': 1.5, opacity: 0.95 }));
+      // the edge being measured, with a ruler laid along its outside
+      const e = q('bx-edge'); e.textContent = '';
+      const seg = p2.dim === 'L' ? [boxPt(0, 0, 0), boxPt(BOX_L, 0, 0)]
+        : p2.dim === 'W' ? [boxPt(BOX_L, 0, 0), boxPt(BOX_L, BOX_W, 0)]
+        : [boxPt(0, 0, 0), boxPt(0, 0, H)];
+      e.appendChild(svgEl('line', { x1: seg[0][0], y1: seg[0][1], x2: seg[1][0], y2: seg[1][1], stroke: 'var(--teal)', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0.9 }));
+      drawEdgeRuler(e, H);
+      q('bx-label').textContent = _('Measuring: ', 'Midiendo: ') + (p2.dim === 'L' ? _('length', 'largo') : p2.dim === 'W' ? _('width', 'ancho') : _('height (bottom to lid)', 'altura (fondo a tapa)'));
+      root.querySelectorAll('[data-dim]').forEach(b => { const on = b.getAttribute('data-dim') === p2.dim; b.classList.toggle('secondary', !on); b.setAttribute('aria-pressed', on); });
+      renderZoom();
+    }
+    // A ruler strip laid along the outside of the edge being measured: zero at the start corner,
+    // a tick every cm (half-cm ticks where there is room), numbers every 5 cm, and a red mark at
+    // the reading that matches the zoomed-in ruler. It slides in from outside on each selection.
+    function drawEdgeRuler(parent, H) {
+      const d = p2.dim;
+      const v = d === 'L' ? BOX_L : d === 'W' ? BOX_W : H;
+      const p0 = d === 'W' ? boxPt(BOX_L, 0, 0) : boxPt(0, 0, 0);
+      const dir = d === 'L' ? [BX.px, 0] : d === 'H' ? [0, -BX.px] : [BX.dx, BX.dy]; // px per cm along the edge
+      const len = Math.hypot(dir[0], dir[1]);
+      let n = d === 'L' ? [0, 1] : d === 'H' ? [-1, 0] : [-dir[1] / len, dir[0] / len]; // outward normal
+      if (d === 'W' && n[1] < 0) n = [-n[0], -n[1]];
+      const at = (cm, off) => [p0[0] + dir[0] * cm + n[0] * off, p0[1] + dir[1] * cm + n[1] * off];
+      const end = (d === 'H' ? BOX_H : v) + 1;
+      const w = d === 'L' ? 13 : 14;
+      const g = svgEl('g', { 'class': 'di-ruler-in', style: '--rx:' + (n[0] * 14).toFixed(1) + 'px;--ry:' + (n[1] * 14).toFixed(1) + 'px' });
+      g.appendChild(svgEl('polygon', { points: poly([at(-0.4, 2), at(end, 2), at(end, 2 + w), at(-0.4, 2 + w)]), fill: 'var(--ruler)', stroke: 'var(--glass)', 'stroke-width': 1 }));
+      const halves = len >= 10;
+      for (let i = 0; i <= end * 2; i++) {
+        const cm = i / 2, whole = i % 2 === 0;
+        if (!whole && !halves) continue;
+        const tl = cm % 5 === 0 ? 7 : whole ? 5 : 3;
+        const a = at(cm, 2), b = at(cm, 2 + tl);
+        g.appendChild(svgEl('line', { x1: a[0].toFixed(1), y1: a[1].toFixed(1), x2: b[0].toFixed(1), y2: b[1].toFixed(1), stroke: 'var(--text)', 'stroke-width': cm % 5 === 0 ? 1.2 : 0.7 }));
+        if (whole && cm % 5 === 0) {
+          const t = at(cm, 2 + w - 3);
+          g.appendChild(svgEl('text', { x: t[0].toFixed(1), y: (t[1] + 2.5).toFixed(1), 'text-anchor': 'middle', 'font-size': 7.5, 'font-weight': 600, 'class': 't' }, String(cm)));
+        }
+      }
+      const r0 = at(v, 0), r1 = at(v, 2 + w + 2);
+      g.appendChild(svgEl('line', { x1: r0[0].toFixed(1), y1: r0[1].toFixed(1), x2: r1[0].toFixed(1), y2: r1[1].toFixed(1), stroke: 'var(--redmark)', 'stroke-width': 1.5 }));
+      parent.appendChild(g);
+    }
+    function renderZoom() {
+      const z = q('zoom-svg'); z.textContent = '';
+      const v = p2.dim === 'L' ? BOX_L : p2.dim === 'W' ? BOX_W : boxHeight(S);
+      const PXC = 48, left = v - 3.5;
+      const X = c => 12 + (c - left) * PXC;
+      z.appendChild(svgEl('rect', { x: Math.max(4, X(0)), y: 30, width: 352 - Math.max(4, X(0)) + 4, height: 44, rx: 3, fill: 'var(--ruler)', stroke: 'var(--glass)', 'stroke-width': 1 }));
+      for (let mm = Math.ceil(left * 10); mm <= (left + 7.1) * 10; mm++) {
+        if (mm < 0) continue;
+        const x = X(mm / 10), big = mm % 10 === 0, mid = mm % 5 === 0;
+        z.appendChild(svgEl('line', { x1: x, x2: x, y1: 30, y2: 30 + (big ? 20 : mid ? 14 : 8), stroke: 'var(--text)', 'stroke-width': big ? 1.4 : 0.8 }));
+        if (big) z.appendChild(svgEl('text', { x: x, y: 66, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, 'class': 't' }, String(mm / 10)));
+      }
+      // the object: shaded from the ruler's zero up to the edge being measured
+      const xv = X(v);
+      z.appendChild(svgEl('rect', { x: Math.max(4, X(0)), y: 6, width: Math.max(0, xv - Math.max(4, X(0))), height: 20, fill: p2.dim === 'H' ? 'var(--card)' : 'rgba(120,170,185,0.35)', stroke: 'none' }));
+      z.appendChild(svgEl('line', { x1: xv, x2: xv, y1: 2, y2: 80, stroke: 'var(--redmark)', 'stroke-width': 1.5 }));
+      z.appendChild(svgEl('text', { x: xv - 4, y: 19, 'text-anchor': 'end', 'font-size': 10, 'class': 'tm' }, p2.dim === 'H' ? _('lid', 'tapa') : _('edge of box', 'borde de la caja')));
+      z.appendChild(svgEl('text', { x: 352, y: 90, 'text-anchor': 'end', 'font-size': 9.5, 'class': 'tm' }, 'cm'));
+      z.setAttribute('aria-label', _('A ruler zoomed in near the end of the measurement. The small marks are millimeters.', 'Una regla ampliada cerca del final de la medida. Las marcas pequeñas son milímetros.'));
+      q('zoom-note').textContent = _('The ruler starts at 0 at the other end. Each small mark is 0.1 cm. Read where the red line falls, to the nearest 0.1 cm.', 'La regla empieza en 0 en el otro extremo. Cada marca pequeña es 0.1 cm. Lee dónde cae la línea roja, al 0.1 cm más cercano.');
+    }
+    root.querySelectorAll('[data-dim]').forEach(b => b.addEventListener('click', () => { p2.dim = b.getAttribute('data-dim'); renderBox(); }));
+
+    // ---- Part 2 actions
+    q('p2-act').addEventListener('click', () => {
+      const b = S.b;
+      if (b.stage === 'start') b.stage = 'flat';
+      else if (b.stage === 'flat') b.stage = 'weighing';
+      else if (b.stage === 'weighing') {
+        if (b.rec.full == null) return;
+        b.massIn = b.ice * (1 - S.env.leak); // a little gas escapes before the tie is on
+        b.stage = 'poured'; b.sub = 0; b.cupOn = false;
+      } else if ((b.stage === 'poured' || b.stage === 'gone') && !b.cupOn && b.rec.cup == null) b.cupOn = true;
+      else if (b.stage === 'gone') {
+        if (b.rec.cup == null) return;
+        b.stage = 'boxed'; b.cupOn = false; p2.dim = 'H';
+      }
+      p2.fast = false;
+      renderP2(); renderFeedback(); dataChanged();
+    });
+    q('p2-record').addEventListener('click', () => {
+      const b = S.b;
+      const m = Math.round(balanceReading() * 100) / 100;
+      if (b.stage === 'weighing' && b.rec.full == null) b.rec.full = m;
+      else if (b.cupOn && b.rec.cup == null) b.rec.cup = m;
+      renderP2(); renderRows(); dataChanged();
+    });
+    q('p2-fast').addEventListener('click', () => { p2.fast = !p2.fast; renderP2(); });
+    const resetBtn = q('p2-reset');
+    resetBtn.addEventListener('click', () => {
+      if (!p2.resetArmed) {
+        p2.resetArmed = true;
+        resetBtn.textContent = _('Erase Part 2 data and start over?', '¿Borrar los datos de la Parte 2 y empezar de nuevo?');
+        setTimeout(() => { if (!root.isConnected) return; p2.resetArmed = false; resetBtn.textContent = _('Start Part 2 over', 'Empezar la Parte 2 de nuevo'); }, 5000);
+        return;
+      }
+      p2.resetArmed = false; resetBtn.textContent = _('Start Part 2 over', 'Empezar la Parte 2 de nuevo');
+      const env = newEnv(); env.T = S.env.T;
+      S.env = env; S.b = newBag(env); S.inp = newInputs(); p2.fast = false;
+      renderP2(); renderRows(); dataChanged();
+    });
+
+    let lastSubSave = Math.floor(S.b.sub * 4);
+    function stepP2(dt) {
+      const b = S.b;
+      if (b.stage === 'weighing' && b.rec.full == null) b.ice = Math.max(0.5, b.ice - DRIFT * dt);
+      else if (b.stage === 'weighing') b.ice = Math.max(0.5, b.ice - DRIFT * dt); // still subliming while you get ready to pour
+      if (b.stage === 'poured') {
+        b.sub = Math.min(1, b.sub + dt * (p2.fast ? 5 : 1) / SUB_S);
+        const quarter = Math.floor(b.sub * 4);
+        if (b.sub >= 1) { b.stage = 'gone'; p2.fast = false; renderP2(); save(false); }
+        else if (quarter !== lastSubSave) { lastSubSave = quarter; save(false); }
+        drawPellets();
+      }
+      // bag shape eases toward its target
+      const target = bagTarget();
+      p2.f += (target - p2.f) * (1 - Math.exp(-dt / 0.35));
+      const bp = bagPath(p2.f);
+      q('p2-bag').setAttribute('d', bp.d);
+      q('p2-tie').setAttribute('y', (bp.ny - 12).toFixed(1));
+      const frosty = b.stage === 'poured' ? 0.28 * Math.sin(Math.PI * Math.min(1, b.sub * 1.2)) + 0.08 : (b.stage === 'gone' ? 0.06 : 0);
+      q('p2-frost').setAttribute('d', bp.d); q('p2-frost').setAttribute('opacity', frosty.toFixed(2));
+      // balance display
+      const disp = balanceReading().toFixed(2) + ' g';
+      if (q('p2-display').textContent !== disp) q('p2-display').textContent = disp;
+      // clock: sublimation takes ~15 minutes of lab time
+      const mins = (b.stage === 'poured' || b.stage === 'gone' || b.stage === 'boxed') ? b.sub * 15 : 0;
+      const clock = Math.floor(mins) + ':' + ('0' + Math.floor((mins % 1) * 60)).slice(-2);
+      if (q('p2-clock').textContent !== clock) q('p2-clock').textContent = clock;
+      // status
+      const s = q('p2-status');
+      let text, cls = 'di-status';
+      if (b.stage === 'start') text = _('The cup holds a few grams of dry ice. The bag is still full of air.', 'El vaso tiene unos gramos de hielo seco. La bolsa todavía está llena de aire.');
+      else if (b.stage === 'flat') { text = _('The bag is flat, with no air inside.', 'La bolsa está plana, sin aire adentro.'); cls = 'di-status ok'; }
+      else if (b.stage === 'weighing') { text = b.rec.full == null ? _('Watch the balance. Record the mass now.', 'Observa la balanza. Anota la masa ahora.') : _('Mass recorded. Pour it in quickly!', '¡Masa anotada. Viértelo rápido!'); cls = 'di-status wait'; }
+      else if (b.stage === 'poured') { text = b.cupOn && b.rec.cup == null ? _('Record the mass of the empty cup.', 'Anota la masa del vaso vacío.') : _('The solid is disappearing…', 'El sólido está desapareciendo…'); cls = 'di-status wait'; }
+      else if (b.stage === 'gone') { text = b.rec.cup == null ? (b.cupOn ? _('Record the mass of the empty cup.', 'Anota la masa del vaso vacío.') : _('All of the solid is gone. Weigh the empty cup before you move on.', 'Ya no queda sólido. Pesa el vaso vacío antes de seguir.')) : _('All of the solid is gone. Press the bag into the box.', 'Ya no queda sólido. Mete la bolsa en la caja.'); cls = 'di-status ok'; }
+      else { text = _('Measure the length, width and height, then fill in your data.', 'Mide el largo, el ancho y la altura y luego completa tus datos.'); cls = 'di-status ok'; }
+      if (b.stage === 'poured' && b.rec.cup == null && !b.cupOn) text = _('The solid is disappearing… Meanwhile, weigh the empty cup.', 'El sólido está desapareciendo… Mientras tanto, pesa el vaso vacío.');
+      if (s.textContent !== text) s.textContent = text;
+      if (s.className !== cls) s.className = cls;
+    }
+
+    // ================= completion =================
+    function renderDone() {
+      const box = q('done');
+      const progress = ctx.getProgress();
+      const completed = !!(progress && progress.status === 'completed');
+      const counts = `<p class="di-count">${escapeHtml(_('Observations', 'Observaciones'))}: ${obsDone()} / ${OBS_IDS.length} · ${escapeHtml(_('Data', 'Datos'))}: ${dataDone()} / ${DATA_TOTAL}</p>`;
+      if (!completed) {
+        box.className = 'di-done';
+        box.innerHTML = `<h3>${escapeHtml(_('Lab progress', 'Progreso del laboratorio'))}</h3>${counts}
+          <p class="di-note">${escapeHtml(_('Observe all six combinations in Part 1 and complete every row of data in Part 2 to finish the lab and get your completion code.', 'Observa las seis combinaciones en la Parte 1 y completa cada fila de datos en la Parte 2 para terminar el laboratorio y recibir tu código de finalización.'))}</p>`;
+        return;
+      }
+      const code = progress.code || '';
+      box.className = 'di-done complete';
+      box.innerHTML = `<h3>${escapeHtml(_('Lab procedure complete', 'Procedimiento del laboratorio completo'))}</h3>${counts}
+        ${code ? `<p class="di-code-label">${escapeHtml(_('Your completion code', 'Tu código de finalización'))}</p><div class="di-code">${escapeHtml(code)}</div>`
+               : `<p><button type="button" class="di-btn" data-showcode>${escapeHtml(_('Show my code', 'Mostrar mi código'))}</button></p>`}
+        <p class="di-note">${escapeHtml(_('Copy your observations and data onto your worksheet, then answer the questions there.', 'Copia tus observaciones y datos en tu hoja de trabajo y luego responde las preguntas ahí.'))}</p>
+        <button type="button" class="di-btn secondary" data-redo>${escapeHtml(_('Redo the whole lab', 'Repetir todo el laboratorio'))}</button>`;
+      const showBtn = box.querySelector('[data-showcode]');
+      if (showBtn) showBtn.addEventListener('click', async () => {
+        showBtn.disabled = true;
+        await ctx.saveProgress(Object.assign({}, buildRecord(), { status: 'completed' }));
+        renderDone();
+      });
+      const redo = box.querySelector('[data-redo]');
+      redo.addEventListener('click', async () => {
+        if (!redo.hasAttribute('data-armed')) {
+          redo.setAttribute('data-armed', '1');
+          redo.textContent = _('Erase my data and start over?', '¿Borrar mis datos y empezar de nuevo?');
+          return;
+        }
+        clearTimeout(saveTimer); saveTimer = null;
+        const tab = S.tab;
+        S = newState(); S.tab = tab;
+        p1.t = 0; p2.f = 0.72; p2.fast = false; lastSubSave = 0;
+        renderP1Scene(); renderChecks(); renderP2(); renderRows();
+        const p = ctx.saveProgress({ status: 'in_progress', score: null, totalQuestions: null, answers: [{ questionId: '_lab', state: S }] });
+        renderDone();
+        await p;
+      });
+    }
+
+    // ---- start
+    selectTab(S.tab);
+    renderP1Scene(); renderChecks(); renderP2(); renderRows(); renderDone();
+    let last = performance.now();
+    // A timer (not requestAnimationFrame) so the lab keeps running even when the tab is not being painted.
+    const timer = setInterval(() => {
+      if (!root.isConnected) { clearInterval(timer); flushSave(); return; }
+      const now = performance.now();
+      const dt = Math.min(1, Math.max(0, (now - last) / 1000)); last = now;
+      stepP1(dt); stepP2(dt);
+    }, 33);
+    stepP1(0); stepP2(0);
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['dry-ice-lab'] = { render };
+})();

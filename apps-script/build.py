@@ -20,9 +20,15 @@ files locally without touching the live site. `clasp login` (one-time)
 must already be done. Code.gs is hand-maintained, not generated -- this
 script never touches it, but --deploy still pushes it along with
 everything else, so edit it directly when it needs to change.
+
+After deploying, it runs verify-live.js, which fetches the live page and checks
+that every script still parses and every review in content.js is registered
+(Apps Script post-processes the page and can mangle code, e.g. a `//` inside a
+backtick string). You can also run it alone: node apps-script/verify-live.js
 """
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 DEPLOYMENT_ID = 'AKfycbwAFlUrS72L4b6bR5rNr-RVdFXzLiZ7dqhJ8QevUVuyr5fktTRBymZ8vQI2EfxsJ2fxbQ'
@@ -47,6 +53,7 @@ JS_FILES = [
     ('MiniMathReviewJs.html', 'js/activities/mini-math-review.js'),
     ('ThermometerLabJs.html', 'js/activities/thermometer-lab.js'),
     ('PhysicalChangesReviewJs.html', 'js/activities/physical-changes-review.js'),
+    ('DryIceLabJs.html', 'js/activities/dry-ice-lab.js'),
     ('AppJs.html', 'js/app.js'),
 ]
 
@@ -91,6 +98,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <?!= include('MiniMathReviewJs'); ?>
   <?!= include('ThermometerLabJs'); ?>
   <?!= include('PhysicalChangesReviewJs'); ?>
+  <?!= include('DryIceLabJs'); ?>
   <?!= include('AppJs'); ?>
 </body>
 </html>
@@ -111,6 +119,22 @@ def deploy():
         cwd=OUT, check=True
     )
     print("\nLive at the usual /exec URL.")
+    verify_live()
+
+
+def verify_live():
+    """Fetch the live page and check every script parses and every review is
+    registered (see verify-live.js). Retries briefly while the new version
+    propagates; exits non-zero if the live site is broken."""
+    print("\nVerifying the live site...")
+    for attempt in range(3):
+        time.sleep(5)
+        result = subprocess.run(['node', str(OUT / 'verify-live.js')])
+        if result.returncode == 0:
+            return
+        if attempt < 2:
+            print("Retrying in case the new version is still propagating...")
+    raise SystemExit("Live check failed -- the deployed site is broken. Fix and redeploy.")
 
 
 def main():

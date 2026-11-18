@@ -122,6 +122,14 @@ const CONTENT = {
           title: 'Chapter 10 Review: Physically Changing Matter',
           description: 'A guided review of Lessons 50–54 — rain gauges and proportional relationships, density and phase changes, temperature scales, absolute zero, and gas particles — with extra practice on Lesson 54 (Charles\'s law): a balloon simulator, a step-by-step problem solver, and a spot-the-mistake tool. Ends with a graded check and a completion code. Good prep for Quiz A/B.',
           estimatedMinutes: 65
+        },
+        {
+          id: 'dry-ice-lab',
+          chapter: 'Chapter 11 · Pressing Matter',
+          type: 'review',
+          title: "Lesson 56: It's Sublime (Virtual Lab)",
+          description: 'A virtual version of the dry ice lab procedure — compare dry ice and water ice on the bench, in water, and in oil, then seal dry ice in a bag, let it sublime, and measure the gas to find the density of CO₂ gas. Do the procedure here and answer the questions on your worksheet. Not graded; ends with a completion code.',
+          estimatedMinutes: 30
         }
       ]
     }
