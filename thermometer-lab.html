@@ -1,0 +1,475 @@
+<meta charset="utf-8">
+<title>Lesson 52 Thermometer Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Rubik:wght@500;600;700&display=swap">
+<style>
+/* Layout: a lab bench. Apparatus on the left, procedure and data on the right; one part on screen at a time. */
+:root{
+  --bg:#f1f6f6; --surface:#ffffff; --fg:#12292b; --muted:#506769; --line:#cddbdb;
+  --accent:#0f7c80; --accent-fg:#ffffff; --accent-soft:#dff0f0;
+  --glass:#6f9092; --glassfill:rgba(160,200,205,.16);
+  --liquid:#35a652; --water:rgba(70,150,215,.26); --dye:rgba(214,60,105,.34);
+  --icefill:rgba(255,255,255,.75); --ink:#1c1740; --skin:#e3ae8c; --skinline:#b98263;
+  --ruler:#f5e7b0; --plate:#5d6d6f; --rubber:#3a4446;
+  --ok:#1b7443; --wait:#955c07;
+  --display:"Rubik","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito Sans","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d1a1b; --surface:#152628; --fg:#e5f0f0; --muted:#9ab2b3; --line:#2b4143;
+  --accent:#4cc2c4; --accent-fg:#052022; --accent-soft:#1c3536;
+  --glass:#8fb0b2; --glassfill:rgba(160,210,215,.10);
+  --liquid:#5fd07a; --water:rgba(110,180,240,.28); --dye:rgba(240,100,145,.36);
+  --icefill:rgba(225,240,250,.55); --ink:#f1efff; --skin:#c8906f; --skinline:#8d6047;
+  --ruler:#4b4630; --plate:#7d8f91; --rubber:#0a1112;
+  --ok:#6fd49b; --wait:#e9b458; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0d1a1b; --surface:#152628; --fg:#e5f0f0; --muted:#9ab2b3; --line:#2b4143;
+  --accent:#4cc2c4; --accent-fg:#052022; --accent-soft:#1c3536;
+  --glass:#8fb0b2; --glassfill:rgba(160,210,215,.10);
+  --liquid:#5fd07a; --water:rgba(110,180,240,.28); --dye:rgba(240,100,145,.36);
+  --icefill:rgba(225,240,250,.55); --ink:#f1efff; --skin:#c8906f; --skinline:#8d6047;
+  --ruler:#4b4630; --plate:#7d8f91; --rubber:#0a1112;
+  --ok:#6fd49b; --wait:#e9b458; color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding-block:28px 48px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-direction:column;gap:6px}
+.eyebrow{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(26px,5vw,36px);line-height:1.15;margin:0;text-wrap:balance}
+.purpose{margin:0;color:var(--muted);max-width:62ch}
+h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0;text-wrap:balance}
+h3{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{font:600 15px var(--display);padding:10px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+
+.lab{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:780px){.lab{grid-template-columns:minmax(0,1fr)}}
+.bench{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.bench svg{display:block;width:100%;height:auto;max-width:380px;margin:0 auto}
+.status{font-weight:700;font-size:15px;text-align:center;padding:8px 10px;border-radius:8px;background:var(--bg);min-height:40px;display:flex;align-items:center;justify-content:center}
+.status.ok{color:var(--ok)} .status.wait{color:var(--wait)}
+.side{display:flex;flex-direction:column;gap:20px;min-width:0}
+.block{display:flex;flex-direction:column;gap:10px}
+ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px;max-width:60ch}
+ol.steps li.now{font-weight:700}
+ol.steps li.done{color:var(--muted)}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.choice{text-align:left;font:600 15px var(--body);padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.choice small{font-weight:400;font-size:13px;color:var(--muted)}
+.choice[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:600 15px var(--display);padding:11px 16px;border-radius:10px;border:1.5px solid var(--accent);background:var(--accent);color:var(--accent-fg);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.small{padding:5px 10px;font-size:13px}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}
+th{font:600 13px var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;font-weight:700}
+td.empty{color:var(--muted)}
+.note{font-size:14px;color:var(--muted);margin:0;max-width:62ch}
+.clock{font-variant-numeric:tabular-nums;font-weight:700}
+
+/* apparatus */
+.g-stroke{fill:none;stroke:var(--glass);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.g-fill{fill:var(--glassfill);stroke:var(--glass);stroke-width:2.5;stroke-linejoin:round}
+.t{font-family:var(--body);fill:var(--fg)}
+.tm{font-family:var(--body);fill:var(--muted)}
+.off{display:none}
+.bub{fill:none;stroke:var(--glass);stroke-width:1.5;animation:rise 1.5s linear infinite}
+@keyframes rise{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(-104px);opacity:0}}
+#cyl{transition:transform .6s ease}
+@media (prefers-reduced-motion: reduce){.bub{animation:none;transform:translateY(-50px)}#cyl{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Unit 3 Weather · Lesson 52 Lab</div>
+    <h1>Hot Enough: Thermometers</h1>
+    <p class="purpose">Run the lab procedure here, then answer the questions on your worksheet. You will watch how the volume of a liquid and the volume of a gas change with temperature.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab1" aria-selected="true" aria-controls="part1">Part 1: Liquid thermometer</button>
+    <button class="tab" role="tab" id="tab2" aria-selected="false" aria-controls="part2">Part 2: Gas thermometer</button>
+  </div>
+
+  <!-- ================= PART 1 ================= -->
+  <section class="lab" id="part1" role="tabpanel" aria-labelledby="tab1">
+    <div class="bench">
+      <svg viewBox="0 0 360 540" role="img" aria-label="A glass vial of green ethylene glycol with a stopper and a clear straw. A ruler stands beside the straw.">
+        <!-- environment behind -->
+        <g id="p1-handback" class="off">
+          <rect x="126" y="388" width="130" height="92" rx="30" fill="var(--skin)" stroke="var(--skinline)" stroke-width="2"/>
+        </g>
+        <g id="p1-beaker" class="off">
+          <rect x="97" y="388" width="166" height="113" fill="var(--water)"/>
+          <g id="p1-plate" class="off">
+            <rect x="70" y="504" width="220" height="26" rx="6" fill="var(--plate)"/>
+            <rect x="82" y="500" width="196" height="6" rx="2" fill="var(--rubber)"/>
+          </g>
+        </g>
+        <!-- ruler -->
+        <g id="p1-ruler"></g>
+        <!-- thermometer -->
+        <rect x="139" y="384" width="70" height="94" rx="10" class="g-fill"/>
+        <rect x="142" y="394" width="64" height="81" rx="7" fill="var(--liquid)" opacity=".8"/>
+        <rect x="160" y="366" width="28" height="20" class="g-fill"/>
+        <rect x="168" y="44" width="12" height="412" rx="2" class="g-fill"/>
+        <rect id="p1-liq" x="170" y="300" width="8" height="155" fill="var(--liquid)"/>
+        <path d="M156 350 H192 L188 372 H160 Z" fill="var(--rubber)"/>
+        <!-- environment in front -->
+        <g id="p1-beakerfront" class="off">
+          <g id="p1-ice" class="off">
+            <rect x="103" y="378" width="24" height="24" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(-12 115 390)"/>
+            <rect x="228" y="380" width="24" height="24" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(14 240 392)"/>
+            <rect x="108" y="412" width="22" height="22" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(20 119 423)"/>
+            <rect x="222" y="414" width="24" height="24" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(-18 234 426)"/>
+            <rect x="214" y="446" width="20" height="20" rx="4" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(8 224 456)"/>
+          </g>
+          <g id="p1-salt" class="off" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1">
+            <rect x="106" y="493" width="5" height="5"/><rect x="118" y="495" width="4" height="4"/><rect x="128" y="492" width="5" height="5"/>
+            <rect x="216" y="494" width="5" height="5"/><rect x="230" y="492" width="4" height="4"/><rect x="242" y="495" width="5" height="5"/>
+            <rect x="112" y="486" width="4" height="4"/><rect x="236" y="486" width="4" height="4"/><rect x="222" y="487" width="4" height="4"/>
+          </g>
+          <g id="p1-boil" class="off">
+            <circle class="bub" cx="110" cy="494" r="5" style="animation-delay:0s"/>
+            <circle class="bub" cx="126" cy="496" r="3.5" style="animation-delay:.5s"/>
+            <circle class="bub" cx="222" cy="495" r="4.5" style="animation-delay:.25s"/>
+            <circle class="bub" cx="244" cy="494" r="3.5" style="animation-delay:.9s"/>
+            <circle class="bub" cx="234" cy="496" r="5.5" style="animation-delay:1.2s"/>
+            <circle class="bub" cx="116" cy="495" r="4" style="animation-delay:1.05s"/>
+          </g>
+          <path d="M96 362 V494 Q96 502 104 502 H256 Q264 502 264 494 V362" class="g-stroke"/>
+          <path d="M90 362 H100 M260 362 H270" class="g-stroke"/>
+        </g>
+        <g id="p1-handfront" class="off" fill="var(--skin)" stroke="var(--skinline)" stroke-width="2">
+          <rect x="150" y="394" width="100" height="18" rx="9"/>
+          <rect x="146" y="415" width="106" height="18" rx="9"/>
+          <rect x="148" y="436" width="104" height="18" rx="9"/>
+          <rect x="154" y="457" width="94" height="17" rx="8.5"/>
+        </g>
+        <!-- marks -->
+        <g id="p1-marks"></g>
+        <text id="p1-envlabel" class="tm" x="180" y="24" text-anchor="middle" font-size="13" font-weight="700"></text>
+      </svg>
+      <div class="status" id="p1-status" aria-live="polite"></div>
+    </div>
+
+    <div class="side">
+      <div class="block">
+        <h2>Mark the liquid level in five conditions</h2>
+        <ol class="steps">
+          <li>Choose a condition to put the ethylene glycol thermometer in.</li>
+          <li>Watch the liquid in the straw. Wait until it stops moving.</li>
+          <li>Mark the level with the marker. Repeat for all five conditions.</li>
+        </ol>
+      </div>
+      <div class="block">
+        <h3>Put the thermometer in</h3>
+        <div class="choices" id="p1-choices"></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="p1-mark">Mark the level</button>
+        <button class="btn ghost" id="p1-clear">Wipe off all marks</button>
+      </div>
+      <div class="block">
+        <h3>Your marks</h3>
+        <div class="tablebox">
+          <table>
+            <thead><tr><th>Condition</th><th>Height on ruler</th><th></th></tr></thead>
+            <tbody id="p1-rows"></tbody>
+          </table>
+        </div>
+        <p class="note">Heights are measured from the top of the stopper. A mark made while the liquid is still moving will be off, just like in the real lab. Mark it again to replace it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PART 2 ================= -->
+  <section class="lab" id="part2" role="tabpanel" aria-labelledby="tab2" hidden>
+    <div class="bench">
+      <svg viewBox="0 0 360 540" role="img" aria-label="A 10 mL graduated cylinder held upside down over a beaker of water.">
+        <rect id="p2-water" x="71" y="372" width="218" height="129" fill="var(--dye)"/>
+        <g id="p2-plate">
+          <rect x="50" y="504" width="260" height="26" rx="6" fill="var(--plate)"/>
+          <rect x="62" y="500" width="236" height="6" rx="2" fill="var(--rubber)"/>
+        </g>
+        <g id="p2-ice" class="off">
+          <rect x="82" y="362" width="26" height="26" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(-12 95 375)"/>
+          <rect x="114" y="366" width="24" height="24" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(16 126 378)"/>
+          <rect x="222" y="364" width="26" height="26" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(10 235 377)"/>
+          <rect x="254" y="366" width="24" height="24" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(-20 266 378)"/>
+          <rect x="92" y="396" width="22" height="22" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(24 103 407)"/>
+          <rect x="244" y="398" width="22" height="22" rx="5" fill="var(--icefill)" stroke="var(--glass)" stroke-width="1.5" transform="rotate(-8 255 409)"/>
+        </g>
+        <g id="cyl">
+          <rect x="165" y="252" width="30" height="240" fill="var(--surface)"/>
+          <rect id="p2-inner" x="165" y="492" width="30" height="0" fill="var(--water)"/>
+          <g id="p2-grads"></g>
+          <path d="M164 492 V252 H196 V492" class="g-stroke"/>
+          <path d="M148 240 H212 L206 252 H154 Z" class="g-fill"/>
+          <path d="M197 300 H330 M197 308 H330 M160 296 V312 M200 296 V312" stroke="var(--plate)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path id="p2-meniscus" d="M165 492 H195" stroke="var(--accent)" stroke-width="2" class="off"/>
+        </g>
+        <g id="p2-bubbles" class="off">
+          <circle class="bub" cx="204" cy="486" r="4" style="animation-delay:0s"/>
+          <circle class="bub" cx="210" cy="488" r="3" style="animation-delay:.45s"/>
+          <circle class="bub" cx="154" cy="487" r="3.5" style="animation-delay:.8s"/>
+          <circle class="bub" cx="206" cy="486" r="5" style="animation-delay:1.1s"/>
+        </g>
+        <path d="M70 330 V494 Q70 502 78 502 H282 Q290 502 290 494 V330" class="g-stroke"/>
+        <path d="M64 330 H74 M286 330 H296" class="g-stroke"/>
+        <text id="p2-envlabel" class="tm" x="180" y="24" text-anchor="middle" font-size="13" font-weight="700"></text>
+      </svg>
+      <div class="status" id="p2-status" aria-live="polite"></div>
+    </div>
+
+    <div class="side">
+      <div class="block">
+        <h2>Trap a sample of air and change its temperature</h2>
+        <ol class="steps" id="p2-steps">
+          <li>The beaker holds 200 mL of water with two drops of food coloring, heated to about 80 °C. Turn the dry 10 mL graduated cylinder upside down and lower it until its mouth almost touches the bottom.</li>
+          <li>Hold it in the hot water for at least one minute. Watch the mouth of the cylinder.</li>
+          <li>Quickly move the cylinder to the beaker of room-temperature water. Keep the mouth near the bottom.</li>
+          <li>Leave the cylinder where it is and add ice to the water.</li>
+        </ol>
+      </div>
+      <div class="block">
+        <h3>Do the next step</h3>
+        <div class="row">
+          <button class="btn" id="p2-lower">Lower into hot water</button>
+          <button class="btn" id="p2-move" disabled>Move to room-temperature water</button>
+          <button class="btn" id="p2-addice" disabled>Add ice</button>
+        </div>
+        <p class="note">Time in hot water: <span class="clock" id="p2-clock">0:00</span> <span id="p2-clocknote">(the clock runs 10 times faster than real time)</span></p>
+      </div>
+      <div class="row">
+        <button class="btn" id="p2-record" disabled>Record the reading</button>
+        <button class="btn ghost" id="p2-reset">Start over</button>
+      </div>
+      <div class="block">
+        <h3>Your readings</h3>
+        <div class="tablebox">
+          <table>
+            <thead><tr><th>Situation</th><th>Air in the cylinder</th></tr></thead>
+            <tbody id="p2-rows"></tbody>
+          </table>
+        </div>
+        <p class="note">The scale on the upside-down cylinder starts at the closed end, so the number at the water line is the volume of trapped air.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var NS='http://www.w3.org/2000/svg';
+  function $(id){return document.getElementById(id)}
+  function el(tag,attrs,text){var e=document.createElementNS(NS,tag);for(var k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;return e}
+  function rnd(a,b){return a+Math.random()*(b-a)}
+  function show(id,on){$(id).classList.toggle('off',!on)}
+
+  // Each group gets slightly different bench conditions, like real lab stations.
+  var ROOM=rnd(21,23.5), HAND=rnd(29.5,32.5), SALT=rnd(-7,-4.5), ICEBATH=rnd(1,3);
+
+  /* ---------- tabs ---------- */
+  function selectTab(n){
+    $('tab1').setAttribute('aria-selected',n===1);$('tab2').setAttribute('aria-selected',n===2);
+    $('part1').hidden=n!==1;$('part2').hidden=n!==2;
+  }
+  $('tab1').onclick=function(){selectTab(1)};$('tab2').onclick=function(){selectTab(2)};
+
+  /* ================= PART 1 ================= */
+  var ZERO=350, PX=18;           // ruler zero = top of stopper; 18 px per cm
+  var CONDS=[
+    {id:'room',label:'Room temperature',hint:'Standing on the bench',mark:'room',t:ROOM},
+    {id:'hand',label:'Warmed by your hand',hint:'Hold the vial in your palm',mark:'hand',t:HAND},
+    {id:'ice',label:'Ice water',hint:'Beaker of ice and water',mark:'ice water',t:0.3},
+    {id:'salt',label:'Salted ice water',hint:'200 mL ice water + 1 tbsp salt',mark:'salted ice',t:SALT},
+    {id:'boil',label:'Boiling water',hint:'On the hot plate, off the bottom',mark:'boiling',t:100}
+  ];
+  var p1={cur:'room',T:ROOM,marks:{}};
+  function cond(id){for(var i=0;i<CONDS.length;i++)if(CONDS[i].id===id)return CONDS[i]}
+  function levelCm(T){return 3.0+0.12*T}
+
+  // ruler
+  (function(){
+    var g=$('p1-ruler');
+    g.appendChild(el('rect',{x:116,y:ZERO-16*PX-14,width:36,height:16*PX+20,rx:3,fill:'var(--ruler)',stroke:'var(--glass)','stroke-width':1}));
+    for(var i=0;i<=32;i++){
+      var y=ZERO-i*PX/2, big=i%2===0;
+      g.appendChild(el('line',{x1:big?141:146,x2:152,y1:y,y2:y,stroke:'var(--fg)','stroke-width':big?1.4:.8}));
+      if(big)g.appendChild(el('text',{x:137,y:y+3.5,'text-anchor':'end','font-size':10,'class':'t','font-weight':600},String(i/2)));
+    }
+    g.appendChild(el('text',{x:134,y:ZERO-16*PX-18,'text-anchor':'middle','font-size':10,'class':'tm'},'cm'));
+  })();
+
+  // condition buttons
+  CONDS.forEach(function(c){
+    var b=document.createElement('button');b.className='choice';b.id='p1-c-'+c.id;b.type='button';
+    b.innerHTML='<span></span><small></small>';b.firstChild.textContent=c.label;b.lastChild.textContent=c.hint;
+    b.onclick=function(){p1.cur=c.id;renderEnv()};
+    $('p1-choices').appendChild(b);
+  });
+  function renderEnv(){
+    var c=p1.cur;
+    CONDS.forEach(function(k){$('p1-c-'+k.id).setAttribute('aria-pressed',k.id===c)});
+    var beaker=c==='ice'||c==='salt'||c==='boil';
+    show('p1-handback',c==='hand');show('p1-handfront',c==='hand');
+    show('p1-beaker',beaker);show('p1-beakerfront',beaker);
+    show('p1-ice',c==='ice'||c==='salt');show('p1-salt',c==='salt');
+    show('p1-boil',c==='boil');show('p1-plate',c==='boil');
+    $('p1-envlabel').textContent=cond(c).label;
+  }
+  function renderMarks(){
+    var g=$('p1-marks');g.textContent='';
+    var list=CONDS.filter(function(c){return p1.marks[c.id]!=null}).map(function(c){return {c:c,y:ZERO-p1.marks[c.id]*PX}});
+    list.sort(function(a,b){return a.y-b.y});
+    var prev=-1e9;
+    list.forEach(function(m){
+      var ly=Math.max(m.y,prev+15);prev=ly;
+      g.appendChild(el('line',{x1:163,x2:185,y1:m.y,y2:m.y,stroke:'var(--ink)','stroke-width':2.5,'stroke-linecap':'round'}));
+      g.appendChild(el('polyline',{points:'187,'+m.y+' 198,'+ly+' 203,'+ly,fill:'none',stroke:'var(--muted)','stroke-width':1}));
+      g.appendChild(el('text',{x:206,y:ly+4,'font-size':12.5,'font-weight':700,'class':'t'},m.c.mark));
+    });
+    var tb=$('p1-rows');tb.textContent='';
+    var any=false;
+    CONDS.forEach(function(c){
+      if(p1.marks[c.id]==null)return;any=true;
+      var tr=document.createElement('tr');
+      var a=document.createElement('td');a.textContent=c.label;
+      var b=document.createElement('td');b.className='num';b.textContent=p1.marks[c.id].toFixed(1)+' cm';
+      var d=document.createElement('td');var x=document.createElement('button');x.className='btn ghost small';x.type='button';x.textContent='Wipe off';
+      x.setAttribute('aria-label','Wipe off the '+c.label+' mark');
+      x.onclick=function(){delete p1.marks[c.id];renderMarks()};d.appendChild(x);
+      tr.appendChild(a);tr.appendChild(b);tr.appendChild(d);tb.appendChild(tr);
+    });
+    if(!any){var tr=document.createElement('tr');var td=document.createElement('td');td.colSpan=3;td.className='empty';td.textContent='No marks yet. Choose a condition, wait for the liquid to stop, then mark it.';tr.appendChild(td);tb.appendChild(tr)}
+  }
+  $('p1-mark').onclick=function(){p1.marks[p1.cur]=Math.round((levelCm(p1.T)+rnd(-0.03,0.03))*100)/100;renderMarks()};
+  $('p1-clear').onclick=function(){p1.marks={};renderMarks()};
+
+  function stepP1(dt){
+    var target=cond(p1.cur).t;
+    p1.T+=(target-p1.T)*(1-Math.exp(-dt/2.0));
+    var y=ZERO-levelCm(p1.T)*PX;
+    $('p1-liq').setAttribute('y',y);$('p1-liq').setAttribute('height',455-y);
+    var d=target-p1.T, s=$('p1-status');
+    if(Math.abs(d)<0.35){s.textContent='The liquid has stopped moving. Mark the level.';s.className='status ok'}
+    else{s.textContent=d>0?'The liquid is rising in the straw…':'The liquid is dropping in the straw…';s.className='status wait'}
+  }
+
+  /* ================= PART 2 ================= */
+  var TOP=252, PXML=24, FULL=10, HOT=80;
+  var SIT={hot:'Hot water (about 80 °C)',room:'Room-temperature water',ice:'Ice water'};
+  var p2;
+  function resetP2(){
+    p2={stage:'ready',Tair:ROOM,Tmax:ROOM,bath:HOT,sim:0,busy:false,V:FULL,rec:{}};
+    $('cyl').style.transform='translateY(-200px)';
+    renderP2();renderRecs();
+  }
+  // graduations
+  (function(){
+    var g=$('p2-grads');
+    for(var i=1;i<=50;i++){
+      var y=TOP+i*PXML/5, big=i%5===0;
+      g.appendChild(el('line',{x1:165,x2:big?181:173,y1:y,y2:y,stroke:'var(--fg)','stroke-width':big?1.3:.7}));
+      if(big)g.appendChild(el('text',{x:158,y:y+3.5,'text-anchor':'end','font-size':10,'font-weight':700,'class':'t'},String(i/5)));
+    }
+    g.appendChild(el('text',{x:158,y:TOP-18,'text-anchor':'end','font-size':10,'class':'tm'},'mL'));
+  })();
+  function renderP2(){
+    var st=p2.stage;
+    $('p2-water').setAttribute('fill',st==='ready'||st==='hot'?'var(--dye)':'var(--water)');
+    show('p2-plate',st==='ready'||st==='hot');
+    show('p2-ice',st==='ice');
+    $('p2-envlabel').textContent=st==='ready'||st==='hot'?'Hot water, about 80 °C':st==='room'?'Room-temperature water':'Room-temperature water with ice added';
+    $('p2-lower').disabled=st!=='ready'||p2.busy;
+    $('p2-move').disabled=st!=='hot'||p2.busy;
+    $('p2-addice').disabled=st!=='room'||p2.busy;
+    $('p2-record').disabled=st==='ready'||p2.busy;
+    var idx={ready:0,hot:1,room:3,ice:4}[st];
+    if(st==='hot'&&p2.sim>=60)idx=2;
+    var lis=$('p2-steps').children;
+    for(var i=0;i<lis.length;i++){lis[i].className=i<idx?'done':i===idx?'now':''}
+  }
+  function renderRecs(){
+    var tb=$('p2-rows');tb.textContent='';var any=false;
+    ['hot','room','ice'].forEach(function(k){
+      if(p2.rec[k]==null)return;any=true;
+      var tr=document.createElement('tr');var a=document.createElement('td');a.textContent=SIT[k];
+      var b=document.createElement('td');b.className='num';b.textContent=p2.rec[k].toFixed(1)+' mL';
+      tr.appendChild(a);tr.appendChild(b);tb.appendChild(tr);
+    });
+    if(!any){var tr=document.createElement('tr');var td=document.createElement('td');td.colSpan=2;td.className='empty';td.textContent='No readings yet. Record one in each of the three situations.';tr.appendChild(td);tb.appendChild(tr)}
+  }
+  $('p2-lower').onclick=function(){
+    p2.busy=true;renderP2();$('cyl').style.transform='translateY(0)';
+    setTimeout(function(){p2.stage='hot';p2.busy=false;renderP2()},650);
+  };
+  $('p2-move').onclick=function(){
+    p2.busy=true;renderP2();$('cyl').style.transform='translateY(-200px)';
+    setTimeout(function(){p2.stage='room';p2.bath=ROOM;renderP2();$('cyl').style.transform='translateY(0)';
+      setTimeout(function(){p2.busy=false;renderP2()},650)},650);
+  };
+  $('p2-addice').onclick=function(){p2.stage='ice';renderP2()};
+  $('p2-record').onclick=function(){p2.rec[p2.stage]=Math.round((p2.V+rnd(-0.04,0.04))*10)/10;if(p2.rec[p2.stage]>FULL)p2.rec[p2.stage]=FULL;renderRecs()};
+  $('p2-reset').onclick=resetP2;
+
+  function stepP2(dt){
+    var st=p2.stage, s=$('p2-status'), target=st==='hot'?HOT:st==='ice'?ICEBATH:ROOM;
+    if(st==='ice')p2.bath+=(ICEBATH-p2.bath)*(1-Math.exp(-dt/1.5));
+    var bubbling=false;
+    if(st!=='ready'&&!p2.busy){
+      p2.Tair+=(p2.bath-p2.Tair)*(1-Math.exp(-dt/1.6));
+      if(st==='hot'){
+        var was=p2.sim;p2.sim+=dt*10;
+        if(p2.Tair>p2.Tmax)p2.Tmax=p2.Tair;
+        bubbling=HOT-p2.Tair>1.5;
+        if(was<60&&p2.sim>=60)renderP2();
+      }
+    }
+    p2.V=Math.min(FULL,FULL*(p2.Tair+273.15)/(p2.Tmax+273.15));
+    var submerged=st!=='ready'&&!p2.busy;
+    var wy=TOP+p2.V*PXML;
+    $('p2-inner').setAttribute('y',wy);$('p2-inner').setAttribute('height',submerged?Math.max(0,492-wy):0);
+    var men=$('p2-meniscus');men.setAttribute('d','M165 '+wy+' H195');men.classList.toggle('off',!submerged||p2.V>FULL-0.05);
+    show('p2-bubbles',bubbling);
+    var t=Math.floor(p2.sim);$('p2-clock').textContent=Math.floor(t/60)+':'+('0'+t%60).slice(-2);
+    if(st==='ready'){s.textContent='The cylinder is dry and full of room air.';s.className='status'}
+    else if(p2.busy){s.textContent='Moving the cylinder…';s.className='status wait'}
+    else if(st==='hot'){
+      if(bubbling){s.textContent='Bubbles of air are escaping from the mouth.';s.className='status wait'}
+      else if(p2.sim<60){s.textContent='Keep holding. Air fills the cylinder to '+FULL.toFixed(1)+' mL.';s.className='status wait'}
+      else{s.textContent='One minute is up. Air fills the cylinder: '+FULL.toFixed(1)+' mL.';s.className='status ok'}
+    }else{
+      var steady=Math.abs(target-p2.Tair)<0.4;
+      if(p2.V>FULL-0.05){s.textContent='No water has entered the cylinder.';s.className='status ok'}
+      else if(steady){s.textContent='The water line is steady at '+p2.V.toFixed(1)+' mL.';s.className='status ok'}
+      else{s.textContent='Water is rising inside the cylinder…';s.className='status wait'}
+    }
+  }
+
+  /* ---------- loop ---------- */
+  renderEnv();renderMarks();resetP2();
+  var last=performance.now();
+  function frame(){
+    var now=performance.now();
+    var dt=Math.min(30,Math.max(0,(now-last)/1000));last=now;
+    stepP1(dt);stepP2(dt);
+  }
+  stepP1(0);stepP2(0);
+  setInterval(frame,33);   // a timer keeps the lab running even when the tab is not being painted
+})();
+</script>

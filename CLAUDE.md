@@ -20,3 +20,12 @@ the `CompletionCode` column. A new review only has to display it. Copy the patte
 
 Deploying: `python3 apps-script/build.py --deploy` (see README). Don't deploy or push
 unfinished work (e.g. unit1-review) — confirm with the user first.
+
+## Live check after deploying
+
+`python3 apps-script/build.py --deploy` now ends by running `apps-script/verify-live.js`, which
+fetches the live page and confirms every script parses and every review in `js/content.js` is
+registered. If it fails, don't leave it: Apps Script post-processes the served page (it strips
+comments and is not template-literal aware), so avoid `//` inside backtick strings in activity
+files (for example, leave `xmlns="http://..."` off inline SVG). Run it alone any time with
+`node apps-script/verify-live.js`.

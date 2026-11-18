@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Completion code demo (dev only)</title>
+</head>
+<body style="background:#f6f5fb; margin:0; font-family:-apple-system,sans-serif;">
+<!--
+  Dev-only demo of the completion-code flow using the REAL js/storage.js with
+  a fake in-browser backend (fetch is mocked), so nothing touches the live
+  Google Sheet. Not referenced by index.html or build.py / .claspignore.
+  Serve with `python3 -m http.server`, open /dev/code-demo.html
+  ?legacy=1 starts with a quiz already completed before codes existed.
+-->
+<div style="max-width:900px;margin:20px auto;padding:0 16px;">
+  <p style="font-family:monospace;font-size:0.8rem;color:#666;">
+    demo — real Storage + mock backend. Fake "Sheet" (Progress tab) is shown below.
+  </p>
+  <div id="host"></div>
+  <h3 style="font-family:monospace;">Fake Sheet: Progress - Demo (what the teacher sees)</h3>
+  <table id="sheet" border="1" cellpadding="6" style="border-collapse:collapse;font-family:monospace;font-size:0.8rem;background:white;">
+    <tr><th>Name</th><th>ActivityId</th><th>Status</th><th>Score</th><th>CompletionCode</th></tr>
+  </table>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/activities/moving-electrons-review.js"></script>
+<script>
+  // Fake Code.gs: mirrors handleSaveProgress (one row per student+activity, overwritten).
+  const sheetRows = {};
+  window.fetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    if (body.action === 'saveProgress') {
+      sheetRows[body.studentKey + '|' + body.activityId] = body;
+      renderSheet();
+    }
+    return { json: async () => ({ ok: true }) };
+  };
+  function renderSheet() {
+    const t = document.getElementById('sheet');
+    t.innerHTML = t.rows[0].outerHTML;
+    Object.values(sheetRows).forEach(r => {
+      t.insertAdjacentHTML('beforeend',
+        `<tr><td>${r.name}</td><td>${r.activityId}</td><td>${r.status}</td><td>${r.score ?? ''}</td><td>${r.completionCode || ''}</td></tr>`);
+    });
+  }
+
+  localStorage.clear();
+  const student = { name: 'Demo Student', period: 'Demo', studentKey: 'demo student|demo' };
+  const activity = { id: 'moving-electrons-review', title: 'Chapter 4 Review: Moving Electrons' };
+  if (new URLSearchParams(location.search).get('legacy')) {
+    // Finished before codes existed: completed, no code, already in the Sheet.
+    const rec = { status: 'completed', score: 17, totalQuestions: 20, answers: [], lastUpdated: new Date().toISOString() };
+    Storage.setProgressLocal(activity.id, rec);
+    sheetRows[student.studentKey + '|' + activity.id] = { name: student.name, activityId: activity.id, status: 'completed', score: 17, completionCode: '' };
+    renderSheet();
+  }
+  const ctx = {
+    activity, unit: { id: 'unit1-alchemy' }, student,
+    getProgress: () => Storage.getProgress(activity.id),
+    saveProgress: (record) => Storage.saveProgress(student, activity, 'unit1-alchemy', record)
+  };
+  window.Activities[activity.id].render(document.getElementById('host'), ctx);
+</script>
+</body>
+</html>
