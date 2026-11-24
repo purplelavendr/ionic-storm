@@ -54,6 +54,7 @@ JS_FILES = [
     ('ThermometerLabJs.html', 'js/activities/thermometer-lab.js'),
     ('PhysicalChangesReviewJs.html', 'js/activities/physical-changes-review.js'),
     ('DryIceLabJs.html', 'js/activities/dry-ice-lab.js'),
+    ('BoylesLawPracticeJs.html', 'js/activities/boyles-law-practice.js'),
     ('AppJs.html', 'js/app.js'),
 ]
 
