@@ -21,6 +21,12 @@ the `CompletionCode` column. A new review only has to display it. Copy the patte
 Deploying: `python3 apps-script/build.py --deploy` (see README). Don't deploy or push
 unfinished work (e.g. unit1-review) — confirm with the user first.
 
+## Adding a new activity file
+
+Add it to `JS_FILES` in apps-script/build.py and as a `<script src>` in index.html (same
+order; build.py stops if they differ). The Apps Script page's includes and
+apps-script/.claspignore are generated from `JS_FILES`, so don't edit those by hand.
+
 ## Live check after deploying
 
 `python3 apps-script/build.py --deploy` now ends by running `apps-script/verify-live.js`, which
