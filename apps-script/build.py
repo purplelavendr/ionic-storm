@@ -100,6 +100,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <?!= include('ThermometerLabJs'); ?>
   <?!= include('PhysicalChangesReviewJs'); ?>
   <?!= include('DryIceLabJs'); ?>
+  <?!= include('BoylesLawPracticeJs'); ?>
   <?!= include('AppJs'); ?>
 </body>
 </html>
