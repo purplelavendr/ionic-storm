@@ -139,7 +139,11 @@ function handleIdentify(body) {
     return { ok: false, error: 'name, period, and studentId are required' };
   }
   var studentKey = normalizeKey(name, period);
-  var sheet = getSheet(rosterSheetName(period), ['Name', 'StudentID', 'FirstSeen', 'LastSeen']);
+  // Only sign in to a period that still has a roster tab. Creating the tab
+  // here would bring an archived period (e.g. last trimester's, renamed
+  // away) back into the dropdown for everyone.
+  var sheet = findSheet(rosterSheetName(period));
+  if (!sheet) return { ok: false, error: 'unknown_period' };
   var data = sheet.getDataRange().getValues();
   var now = new Date();
   var matchedRow = -1;

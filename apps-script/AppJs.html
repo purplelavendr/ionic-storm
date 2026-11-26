@@ -35,6 +35,19 @@ async function init() {
   if (student) {
     State.view = 'dashboard';
     render();
+    // A remembered student whose period no longer exists (rosters changed
+    // for a new term) is signed out, so a shared device doesn't keep opening
+    // as last term's student. Only acts on a real answer from the server --
+    // offline, the student stays signed in as before.
+    const periodsRes = await Storage.getPeriods();
+    if (periodsRes.ok && Array.isArray(periodsRes.periods) && periodsRes.periods.length &&
+        periodsRes.periods.indexOf(student.period) === -1) {
+      Storage.clearStudent();
+      State.view = 'landing';
+      State.notice = 'Class lists have changed. Please pick your period and name again.';
+      render();
+      return;
+    }
     await Storage.refreshFromServer(student);
     if (State.view === 'dashboard') render();
   } else {
@@ -87,8 +100,10 @@ async function renderLanding(app) {
     ${ATOM_EMBLEM_SVG}
     <h2>Enter the Lab</h2>
     <p class="muted">Pick your class period, then find your name to pick up where you left off.</p>
+    ${State.notice ? `<p class="status-error">${escapeHtml(State.notice)}</p>` : ''}
     <div id="landing-body"><p class="muted">Loading class list...</p></div>
   `;
+  State.notice = null;
   app.appendChild(div);
 
   const body = $('#landing-body', div);
@@ -168,6 +183,14 @@ async function renderLanding(app) {
     statusEl.className = 'muted';
     statusEl.textContent = 'Entering the lab...';
     const result = await Storage.identify(name, period, studentId);
+    if (!result.ok && result.error === 'unknown_period') {
+      // The period list on this screen is out of date (e.g. rosters just
+      // changed for a new term) -- reload it fresh.
+      Storage.clearPeriodsCache();
+      State.notice = "That class period isn't available anymore. Please pick your period again.";
+      render();
+      return;
+    }
     if (!result.ok) {
       statusEl.className = 'status-error';
       statusEl.textContent = result.error === 'incorrect_id'

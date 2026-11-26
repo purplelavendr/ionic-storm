@@ -62,8 +62,16 @@ const Storage = {
   setStudent(student) {
     localStorage.setItem(StorageKeys.STUDENT, JSON.stringify(student));
   },
+  // Also drops this device's cached progress, which isn't per-student: left
+  // in place, the next student would see (and could resume or show the
+  // completion code of) the previous student's work. Unsynced saves are
+  // safe -- they wait in the queue, tagged with their own studentKey.
   clearStudent() {
     localStorage.removeItem(StorageKeys.STUDENT);
+    localStorage.removeItem(StorageKeys.PROGRESS);
+  },
+  clearPeriodsCache() {
+    try { localStorage.removeItem('ionicstorm_cache_periods'); } catch (e) {}
   },
 
   getAllProgress() {
