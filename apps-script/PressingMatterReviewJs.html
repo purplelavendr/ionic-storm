@@ -1,0 +1,2175 @@
+<script>
+// "Chapter 11 Review: Pressing Matter" (registered as CONTENT activity id
+// 'pressing-matter-review'). Same accordion + graded-quiz shape as the earlier
+// chapter reviews, built from the Chapter 11 packet and slides (Lessons 56-61
+// plus the Boyle's, Gay-Lussac's and combined gas law practice days) and
+// aimed at the Chapter 11 Quiz: explaining volume and density changes, Boyle's
+// law, the combined gas law, and completing a P-V-T table. Gas law problems are
+// solved the class way: set up before/after, find k, then use k.
+// Numbers deliberately differ from the quiz, packet and slides.
+// Interactive widgets are an ungraded warm-up; only the quiz saves a score
+// (via ctx.saveProgress) and shows a completion code.
+//
+// Supports an EN/ES language toggle (shared LANG_KEY). Grading is always by the
+// answer's positional index (QUESTIONS[i].correct), never by displayed text.
+(function () {
+  const STYLE_ID = 'pm-lesson-styles';
+  const FONT_LINK_ID = 'el-lesson-fonts'; // shared Google Fonts <link>, same font family as every other review
+  const LANG_KEY = 'ionicstorm_lang_v1';  // shared literal: keeps language in sync across all activities
+  const SECTION_COUNT = 10; // sections 0-8 (intro + 8 content sections) + the graded quiz at index 9
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function getLang() {
+    try { return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'; } catch (e) { return 'en'; }
+  }
+  function setLang(lang) {
+    try { localStorage.setItem(LANG_KEY, lang === 'es' ? 'es' : 'en'); } catch (e) { /* private mode */ }
+  }
+  function tr(field, lang) {
+    return (field && typeof field === 'object') ? (field[lang] || field.en) : field;
+  }
+  function t(key, lang, ...args) {
+    const entry = STRINGS[key] || {};
+    const val = entry[lang] || entry.en;
+    return typeof val === 'function' ? val(...args) : val;
+  }
+  // Round to d decimals and drop trailing zeros ("4.40" -> "4.4").
+  function fmt(n, d) {
+    const p = Math.pow(10, d === undefined ? 1 : d);
+    return String(Math.round(n * p) / p);
+  }
+  function comma(n) { return Math.round(n).toLocaleString('en-US'); }
+  function parseNum(s) {
+    let v = String(s).trim().replace(/\s/g, '');
+    if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(v)) v = v.replace(/,/g, '');
+    else v = v.replace(',', '.');
+    v = v.replace('−', '-');
+    const n = parseFloat(v);
+    return isNaN(n) || !/^-?\d*\.?\d+$/.test(v) ? NaN : n;
+  }
+  const closeTo = (a, b, rel, abs) => Math.abs(a - b) <= Math.max(abs || 0, Math.abs(b) * (rel || 0)) + 1e-12;
+  // Shorthand for a bilingual string.
+  const L = (en, es) => ({ en, es });
+
+  const DIFF_LABELS = {
+    en: { basic: 'Basic', medium: 'Medium', challenge: 'Challenge' },
+    es: { basic: 'Básico', medium: 'Medio', challenge: 'Desafío' }
+  };
+
+  const STRINGS = {
+    headerLabel: L('Chapter 11 · Pressing Matter', 'Capítulo 11 · Materia Bajo Presión'),
+    headerMeta: L('Self-Paced Review · ~70 Minutes · Lessons 56–61 · Good prep for the Chapter 11 Quiz', 'Repaso a tu Propio Ritmo · ~70 Minutos · Lecciones 56–61 · Buena preparación para el Quiz del Capítulo 11'),
+    langToggleAria: L('Language', 'Idioma'),
+    progress: L('Progress', 'Progreso'),
+    sectionCount: { en: (done, total) => `${done} / ${total} sections`, es: (done, total) => `${done} / ${total} secciones` },
+    checkForUnderstanding: L('Check for Understanding', 'Comprobación de Comprensión'),
+    quizTimeGraded: L('24 min · graded', '24 min · calificado'),
+    quizNote: L(
+      'Unlike the sections above, this quiz <strong>saves your score</strong> and reports it to your teacher. You can retake it any time — your most recent attempt is what\'s saved. Calculators are fine.',
+      'A diferencia de las secciones anteriores, este quiz <strong>guarda tu puntaje</strong> y se lo reporta a tu maestro. Puedes volver a hacerlo en cualquier momento — se guarda tu intento más reciente. Puedes usar calculadora.'),
+    markSectionComplete: L('✓ Mark Section Complete', '✓ Marcar Sección como Completa'),
+    sectionComplete: L('✓ Section Complete', '✓ Sección Completa'),
+    hintShow: L('💡 Hint', '💡 Pista'),
+    hintHide: L('▲ Hide Hint', '▲ Ocultar Pista'),
+    revealAnswer: L('Reveal Answer', 'Mostrar Respuesta'),
+    hideAnswer: L('Hide Answer', 'Ocultar Respuesta'),
+    answerLabel: L('✓ Answer', '✓ Respuesta'),
+    questionCount: { en: (n, total) => `Question ${n} of ${total}`, es: (n, total) => `Pregunta ${n} de ${total}` },
+    nextQuestion: L('Next Question', 'Siguiente Pregunta'),
+    correctPrefix: L('✓ Correct!', '✓ ¡Correcto!'),
+    incorrectPrefix: L('✗ Not quite.', '✗ No exactamente.'),
+    retakeQuiz: L('Retake Quiz', 'Repetir el Quiz'),
+    showMyCode: L('Show my code', 'Mostrar mi código'),
+    completionCode: L('Your completion code — show this to your teacher:', 'Tu código de finalización — muéstraselo a tu maestro:'),
+    summaryText: L(
+      'Nice work! You can retake this any time — your most recent attempt is what\'s saved and sent to your teacher.',
+      '¡Buen trabajo! Puedes repetirlo en cualquier momento — se guarda y se envía a tu maestro tu intento más reciente.'),
+    guidedModeLabel: L('Guided Example', 'Ejemplo Guiado'),
+    independentModeLabel: L('Your Turn — Independent', 'Tu Turno — Independiente'),
+    focusBadge: L('Quiz focus', 'Enfoque del quiz'),
+    check: L('Check', 'Revisar'),
+    showHint: L('Show hint', 'Ver pista'),
+    hideHint: L('Hide hint', 'Ocultar pista'),
+    right: L('✓ Correct', '✓ Correcto'),
+    needNum: L('Type a number in every box first.', 'Primero escribe un número en cada casilla.'),
+    wrongGeneric: L('Not yet. Check your numbers and try again.', 'Todavía no. Revisa tus números e inténtalo otra vez.'),
+    problemN: { en: (n) => `Problem ${n}`, es: (n) => `Problema ${n}` },
+    pickProblem: L('Pick a problem (start with the guided one):', 'Elige un problema (empieza con el guiado):'),
+    nextProblem: L('Next problem →', 'Siguiente problema →'),
+    startOver: L('Start over', 'Empezar de nuevo'),
+    next: L('Next →', 'Siguiente →')
+  };
+
+  function ensureStylesInjected() {
+    if (!document.getElementById(FONT_LINK_ID)) {
+      const link = document.createElement('link');
+      link.id = FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap';
+      document.head.appendChild(link);
+    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+.pm-lesson {
+  --navy: #0d1b2a; --navy-mid: #1b2d42; --navy-light: #253a52;
+  --teal: #2ec4b6; --teal-dim: #1a8c83; --amber: #f4a261;
+  --cream: #f7f3ec; --cream-dark: #ede8df;
+  --text: #1a1a2e; --text-muted: #5a6475;
+  --note-bg: #fff8e7; --note-border: #f4a261;
+  --correct-bg: #e8f8f5; --correct-border: #2ec4b6;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text); font-size: 17px; line-height: 1.7;
+  background: var(--cream); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(27,24,48,0.08);
+}
+.pm-lesson * { box-sizing: border-box; }
+.pm-lesson .pm-header { background: var(--navy); color: var(--cream); padding: 2rem 1.75rem 1.6rem; position: relative; overflow: hidden; }
+.pm-lesson .pm-header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; border: 32px solid rgba(46,196,182,0.12); }
+.pm-lesson .pm-lang-toggle { position: absolute; top: 1.75rem; right: 1.75rem; z-index: 2; display: flex; gap: 0.3rem; }
+.pm-lesson .pm-lang-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.3rem 0.6rem; border-radius: 6px; background: transparent; border: 1px solid rgba(247,243,236,0.35); color: rgba(247,243,236,0.65); cursor: pointer; }
+.pm-lesson .pm-lang-btn.active { background: var(--teal); border-color: var(--teal); color: var(--navy); }
+.pm-lesson .pm-lang-btn:hover:not(.active) { border-color: var(--teal); color: var(--cream); }
+.pm-lesson .pm-header-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem; position: relative; }
+.pm-lesson .pm-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; line-height: 1.2; margin: 0 0 0.4rem; position: relative; }
+.pm-lesson .pm-header-meta { font-size: 0.82rem; color: rgba(247,243,236,0.65); font-family: 'JetBrains Mono', monospace; position: relative; }
+.pm-lesson .pm-progress-wrap { background: var(--navy-mid); padding: 0.7rem 1.75rem; display: flex; align-items: center; gap: 0.9rem; position: sticky; top: 0; z-index: 10; }
+.pm-lesson .pm-progress-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--teal); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+.pm-lesson .pm-progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; }
+.pm-lesson .pm-progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--amber)); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+.pm-lesson .pm-progress-count { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: rgba(247,243,236,0.55); white-space: nowrap; }
+.pm-lesson main { padding: 1.5rem 1.25rem 2.5rem; }
+.pm-lesson .section-card { background: white; border-radius: 12px; margin-bottom: 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+.pm-lesson .section-header { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.2rem; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; }
+.pm-lesson .section-header:hover { background: #fafafa; }
+.pm-lesson .section-header.open { border-bottom-color: var(--cream-dark); }
+.pm-lesson .section-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; color: white; background: var(--navy); border-radius: 6px; padding: 0.22rem 0.5rem; flex-shrink: 0; }
+.pm-lesson .section-card.done .section-num { background: var(--teal-dim); }
+.pm-lesson .section-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; flex: 1; }
+.pm-lesson .section-time { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); }
+.pm-lesson .section-arrow { font-size: 0.9rem; color: var(--text-muted); transition: transform 0.25s; flex-shrink: 0; }
+.pm-lesson .section-header.open .section-arrow { transform: rotate(180deg); }
+.pm-lesson .section-body { display: none; padding: 1.3rem; }
+.pm-lesson .section-body.open { display: block; animation: meFadeIn 0.25s ease; }
+@keyframes meFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.pm-lesson h2 { font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--navy); margin: 0 0 0.6rem; }
+.pm-lesson h3 { font-size: 0.95rem; font-weight: 600; color: var(--navy-mid); margin: 1.1rem 0 0.5rem; }
+.pm-lesson p { margin: 0 0 0.85rem; }
+.pm-lesson p:last-child { margin-bottom: 0; }
+.pm-lesson .note-box { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin: 1.1rem 0; display: flex; gap: 0.7rem; font-size: 0.9rem; }
+.pm-lesson .note-box .note-icon { font-size: 1.15rem; flex-shrink: 0; }
+.pm-lesson .concept-box { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%); color: var(--cream); border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.1rem 0; }
+.pm-lesson .concept-box .concept-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--teal); margin-bottom: 0.4rem; }
+.pm-lesson .concept-box p { color: rgba(247,243,236,0.92); margin-bottom: 0; }
+.pm-lesson .info-panel { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 0.9rem 1.1rem; margin: 1.1rem 0; font-size: 0.9rem; }
+.pm-lesson .info-panel .panel-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.14em; color: #0369a1; margin-bottom: 0.35rem; }
+.pm-lesson table { width: 100%; border-collapse: collapse; margin: 0.9rem 0; font-size: 0.85rem; }
+.pm-lesson th { background: var(--navy); color: var(--cream); font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.75rem; text-align: left; }
+.pm-lesson td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cream-dark); }
+.pm-lesson tr:nth-child(even) td { background: #fafafa; }
+.pm-lesson ul, .pm-lesson ol { padding-left: 1.3rem; margin: 0 0 0.85rem; }
+.pm-lesson li { margin-bottom: 0.3rem; font-size: 0.93rem; }
+.pm-lesson .objectives-list { list-style: none; padding: 0; margin: 0.4rem 0; }
+.pm-lesson .objectives-list li { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.4rem 0; font-size: 0.92rem; border-bottom: 1px solid var(--cream-dark); }
+.pm-lesson .objectives-list li:last-child { border-bottom: none; }
+.pm-lesson .obj-check { color: var(--teal); flex-shrink: 0; }
+.pm-lesson .practice-problem { border: 1.5px solid var(--cream-dark); border-radius: 10px; margin-bottom: 1.1rem; overflow: hidden; }
+.pm-lesson .pp-header { display: flex; align-items: center; gap: 0.65rem; padding: 0.85rem 1.1rem; background: #fafafa; border-bottom: 1px solid var(--cream-dark); }
+.pm-lesson .pp-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700; color: white; background: var(--amber); border-radius: 6px; padding: 0.18rem 0.45rem; flex-shrink: 0; }
+.pm-lesson .pp-difficulty { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; margin-left: auto; }
+.pm-lesson .diff-basic { color: #16a34a; }
+.pm-lesson .diff-medium { color: #d97706; }
+.pm-lesson .diff-challenge { color: #dc2626; }
+.pm-lesson .pp-body { padding: 0.95rem 1.1rem; }
+.pm-lesson .pp-body p { font-size: 0.92rem; }
+.pm-lesson .hint-btn, .pm-lesson .reveal-btn, .pm-lesson .mark-done-btn, .pm-lesson .pm-choice, .pm-lesson .pm-next-btn, .pm-lesson .pm-retake-btn, .pm-lesson .pm-flame-btn, .pm-lesson .pm-builder-btn {
+  font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none;
+}
+.pm-lesson .hint-btn, .pm-lesson .reveal-btn { border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.pm-lesson .hint-btn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; margin-right: 0.5rem; }
+.pm-lesson .hint-btn:hover { background: #fde68a; }
+.pm-lesson .reveal-btn { background: var(--navy); color: white; }
+.pm-lesson .reveal-btn:hover { background: var(--navy-light); }
+.pm-lesson .hint-box, .pm-lesson .answer-box { border-radius: 7px; padding: 0.75rem 0.95rem; margin-top: 0.7rem; font-size: 0.87rem; display: none; }
+.pm-lesson .hint-box.open, .pm-lesson .answer-box.open { display: block; animation: meFadeIn 0.2s ease; }
+.pm-lesson .hint-box { background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; }
+.pm-lesson .answer-box { background: var(--correct-bg); border: 1px solid var(--correct-border); color: #065f46; }
+.pm-lesson .answer-box .answer-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--teal-dim); margin-bottom: 0.35rem; font-weight: 700; }
+.pm-lesson .mark-done-btn { display: block; width: 100%; margin-top: 1.2rem; background: var(--navy); color: var(--cream); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; transition: background 0.2s; }
+.pm-lesson .mark-done-btn:hover:not(:disabled) { background: var(--teal-dim); }
+.pm-lesson .mark-done-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.pm-lesson .quiz-note { background: var(--note-bg); border-left: 4px solid var(--note-border); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; margin-bottom: 1.1rem; font-size: 0.88rem; }
+.pm-lesson .quiz-progress-bar { height: 6px; background: var(--cream-dark); border-radius: 999px; overflow: hidden; margin: 0.6rem 0 0.9rem; }
+.pm-lesson .quiz-progress-fill { height: 100%; background: linear-gradient(90deg, var(--navy), var(--teal)); transition: width 0.2s ease; }
+.pm-lesson .quiz-question-count { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+.pm-lesson .quiz-prompt { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--navy); margin: 0.5rem 0 1rem; }
+.pm-lesson .pm-choice { display: block; width: 100%; text-align: left; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem; font-size: 0.93rem; color: var(--text); font-family: 'Source Serif 4', serif; transition: border-color 0.15s, background 0.15s; }
+.pm-lesson .pm-choice:hover:not(:disabled) { border-color: var(--teal); background: #f3fdfc; }
+.pm-lesson .pm-choice:disabled { cursor: default; }
+.pm-lesson .pm-choice.selected-correct { border-color: var(--correct-border); background: var(--correct-bg); }
+.pm-lesson .pm-choice.selected-incorrect { border-color: #dc2626; background: #fef2f2; }
+.pm-lesson .pm-feedback { border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.4rem; font-size: 0.9rem; font-weight: 600; }
+.pm-lesson .pm-feedback.correct { background: var(--correct-bg); color: var(--teal-dim); }
+.pm-lesson .pm-feedback.incorrect { background: #fef2f2; color: #b91c1c; }
+.pm-lesson .pm-next-btn, .pm-lesson .pm-retake-btn { background: var(--navy); color: white; border-radius: 8px; padding: 0.65rem 1.2rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1rem; }
+.pm-lesson .pm-next-btn:hover, .pm-lesson .pm-retake-btn:hover { background: var(--navy-light); }
+.pm-lesson .pm-summary { text-align: center; padding: 1rem 0.5rem; }
+.pm-summary .pm-code-label { margin: 0.6rem 0 0.2rem; font-weight: 600; }
+.pm-summary .pm-code { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--navy); border: 2px dashed var(--navy); border-radius: 10px; padding: 0.3rem 1rem; margin-bottom: 0.8rem; user-select: all; }
+.pm-lesson .pm-score { font-family: 'JetBrains Mono', monospace; font-size: 2.4rem; font-weight: 700; color: var(--navy); margin: 0.4rem 0; }
+
+/* ---- Shared interactive-widget styles ---- */
+.pm-lesson .pm-header-label { padding-right: 5.5rem; }
+.pm-lesson .pm-widget { background: var(--cream-dark); border-radius: 12px; padding: 1.1rem; margin: 1rem 0; }
+.pm-lesson .pm-lead { margin: 0 0 0.5rem; }
+.pm-lesson .pm-choices { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.3rem 0 0.9rem; }
+.pm-lesson .pm-opt { background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; cursor: pointer; color: var(--text); }
+.pm-lesson .pm-opt:hover { border-color: var(--teal); }
+.pm-lesson .pm-opt.selected { border-color: var(--navy); background: var(--navy); color: white; }
+.pm-lesson .pm-btn { font-family: 'JetBrains Mono', monospace; cursor: pointer; border: none; background: var(--navy); color: white; border-radius: 8px; padding: 0.5rem 0.9rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.pm-lesson .pm-btn:hover:not(:disabled) { background: var(--navy-light); }
+.pm-lesson .pm-btn:disabled { background: var(--cream-dark); color: var(--text-muted); cursor: not-allowed; }
+.pm-lesson .pm-btn.secondary { background: white; color: var(--navy); border: 1.5px solid var(--navy-light); }
+.pm-lesson .pm-stage { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: center; }
+.pm-lesson .pm-svg { max-width: 100%; height: auto; }
+.pm-lesson .pm-panel { flex: 1 1 230px; min-width: 220px; display: flex; flex-direction: column; gap: 0.55rem; }
+.pm-lesson .pm-panel label { font-size: 0.85rem; }
+.pm-lesson input[type=range] { width: 100%; accent-color: var(--teal-dim); }
+.pm-lesson .pm-formula { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.55rem 0.7rem; line-height: 1.5; }
+.pm-lesson .pm-formula-label { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--teal-dim); font-weight: 700; margin-bottom: 0.3rem; }
+.pm-lesson .pm-formula.good { border-color: var(--correct-border); background: var(--correct-bg); }
+.pm-lesson .pm-compare { font-size: 0.8rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.pm-lesson .pm-insight { margin-top: 0.7rem; font-size: 0.88rem; font-weight: 600; color: var(--teal-dim); min-height: 1.3em; }
+.pm-lesson .pm-insight.warn { color: #b45309; }
+.pm-lesson .pm-key { font-size: 0.82rem; font-style: italic; color: var(--text-muted); margin: 0.6rem 0 0; }
+.pm-lesson .pm-table { width: 100%; max-width: 420px; margin: 0.7rem auto 0; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; }
+.pm-lesson .pm-table th { font-size: 0.6rem; }
+.pm-lesson .pm-mode-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 999px; background: var(--cream-dark); color: var(--navy-mid); margin-bottom: 0.5rem; }
+.pm-lesson .pm-mode-badge.guided { background: var(--amber); color: white; }
+.pm-lesson .pm-focus-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; padding: 0.3rem 0.7rem; border-radius: 999px; background: var(--teal); color: var(--navy); margin-bottom: 0.6rem; }
+
+/* ---- Temperature converter ---- */
+.pm-lesson .pm-input { font-family: 'JetBrains Mono', monospace; font-size: 1rem; padding: 0.4rem 0.6rem; border: 1.5px solid var(--navy-light); border-radius: 8px; width: 7.5rem; background: white; color: var(--text); }
+.pm-lesson .pm-results { display: grid; gap: 0.45rem; }
+.pm-lesson .pm-result { background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.5rem 0.7rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+.pm-lesson .pm-result.given { border-color: var(--navy); }
+.pm-lesson .pm-result strong { font-size: 1rem; }
+
+/* ---- Gas particle simulator ---- */
+.pm-lesson .pm-canvas { background: #0d1b2a; border-radius: 10px; max-width: 100%; display: block; margin: 0 auto; }
+.pm-lesson .pm-energy { height: 8px; background: rgba(13,27,42,0.15); border-radius: 4px; overflow: hidden; }
+.pm-lesson .pm-energy-fill { height: 100%; background: linear-gradient(90deg, #4a8fe7, #e8384f); transition: width 0.2s; }
+
+/* ---- Step-by-step solver ---- */
+.pm-lesson .pm-step { background: white; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.7rem 0.9rem; margin: 0.6rem 0; }
+.pm-lesson .pm-step.locked { opacity: 0.45; pointer-events: none; }
+.pm-lesson .pm-step.done { border-color: var(--correct-border); background: var(--correct-bg); }
+.pm-lesson .pm-step-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.4rem; }
+.pm-lesson .pm-fields { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 0.5rem; }
+.pm-lesson .pm-field { display: flex; align-items: center; gap: 0.35rem; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+.pm-lesson .pm-field input { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; padding: 0.35rem 0.5rem; width: 7rem; border: 1.5px solid var(--navy-light); border-radius: 6px; background: white; color: var(--text); }
+.pm-lesson .pm-mc { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
+.pm-lesson .pm-mc button { text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; background: white; border: 1.5px solid var(--cream-dark); border-radius: 8px; padding: 0.5rem 0.7rem; cursor: pointer; color: var(--text); }
+.pm-lesson .pm-mc button:hover:not(:disabled) { border-color: var(--teal); }
+.pm-lesson .pm-mc button.right { border-color: var(--correct-border); background: var(--correct-bg); }
+.pm-lesson .pm-mc button.wrong { border-color: #dc2626; background: #fef2f2; }
+.pm-lesson .pm-hint { font-size: 0.82rem; background: #fffbeb; border: 1px dashed #fcd34d; color: #78350f; border-radius: 7px; padding: 0.5rem 0.7rem; margin: 0.4rem 0; display: none; }
+.pm-lesson .pm-hint.open { display: block; }
+.pm-lesson .pm-msg { font-size: 0.84rem; font-weight: 600; min-height: 1.2em; margin-top: 0.3rem; }
+.pm-lesson .pm-msg.ok { color: var(--teal-dim); }
+.pm-lesson .pm-msg.bad { color: #b91c1c; }
+.pm-lesson .pm-solved { background: var(--correct-bg); border: 1.5px solid var(--correct-border); border-radius: 10px; padding: 0.7rem 0.9rem; margin-top: 0.6rem; font-weight: 600; color: var(--teal-dim); }
+
+/* ---- Spot the mistake ---- */
+.pm-lesson .pm-work { background: white; border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 0.4rem; margin: 0.5rem 0; }
+.pm-lesson .pm-line { display: block; width: 100%; text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; background: transparent; border: 1.5px solid transparent; border-radius: 6px; padding: 0.45rem 0.6rem; cursor: pointer; color: var(--text); }
+.pm-lesson .pm-line:hover:not(:disabled) { background: #f3fdfc; border-color: var(--teal); }
+.pm-lesson .pm-line.error { background: #fef2f2; border-color: #dc2626; }
+.pm-lesson .pm-line.picked-wrong { background: #fff7ed; border-color: #f59e0b; }
+.pm-lesson .pm-line:disabled { cursor: default; }
+
+/* ---- Chapter 11 additions ---- */
+.pm-lesson .pm-compare { margin-bottom: 0.4rem; }
+.pm-lesson .pm-mc button { font-family: 'Source Serif 4', Georgia, serif; font-size: 0.93rem; line-height: 1.45; }
+.pm-lesson .pm-setup { max-width: 460px; margin: 0.2rem 0 0.7rem; background: white; }
+.pm-lesson .pm-setup th, .pm-lesson .pm-setup td { text-align: center; white-space: nowrap; padding-left: 0.45rem; padding-right: 0.45rem; }
+.pm-lesson .pm-slot select { max-width: calc(100% - 0.8rem); }
+.pm-lesson .pm-setup td.pm-unknown { background: #fff1d6; font-weight: 700; font-size: 1rem; }
+.pm-lesson .pm-pair { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.6rem; }
+.pm-lesson .pm-card { flex: 1 1 220px; background: white; border-radius: 10px; padding: 0.7rem; text-align: center; }
+.pm-lesson .pm-card .pm-formula { text-align: left; font-size: 0.74rem; }
+.pm-lesson .pm-slot { font-size: 0.93rem; margin: 0 0 0.6rem; line-height: 2; }
+.pm-lesson select { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; max-width: 100%; padding: 0.3rem 0.4rem; border: 1.5px solid var(--navy-light); border-radius: 6px; background: white; color: var(--text); }
+.pm-lesson select.ok { border-color: var(--correct-border); background: var(--correct-bg); }
+.pm-lesson select.bad { border: 2px solid #dc2626; background: #fef2f2; }
+.pm-lesson .pm-text { width: 100%; font-family: 'Source Serif 4', Georgia, serif; font-size: 0.95rem; padding: 0.6rem 0.7rem; border: 1.5px solid var(--navy-light); border-radius: 8px; background: white; color: var(--text); resize: vertical; }
+.pm-lesson .pm-tick { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.9rem; padding: 0.2rem 0; }
+.pm-lesson .pm-tick input { margin-top: 0.35rem; }
+.pm-lesson .pm-figs { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; margin: 0 0 1rem; }
+.pm-lesson .pm-figs figure { margin: 0; background: var(--cream); border-radius: 8px; padding: 0.4rem; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; }
+.pm-lesson .section-body table { display: block; overflow-x: auto; }
+.pm-lesson .section-body table.pm-table, .pm-lesson .section-body table.pm-setup { display: table; }
+
+`;
+    document.head.appendChild(style);
+  }
+
+  function practiceProblem(lang, idSuffix, prompt, difficulty, hint, answer) {
+    const diffClass = { basic: 'diff-basic', medium: 'diff-medium', challenge: 'diff-challenge' }[difficulty] || 'diff-basic';
+    const diffLabel = (DIFF_LABELS[lang] || DIFF_LABELS.en)[difficulty] || difficulty;
+    return `
+      <div class="practice-problem">
+        <div class="pp-header">
+          <span class="pp-num">Q</span>
+          <span class="pp-difficulty ${diffClass}">● ${escapeHtml(diffLabel)}</span>
+        </div>
+        <div class="pp-body">
+          <p><strong>${prompt}</strong></p>
+          <button type="button" class="hint-btn" data-hint-target="hint-${idSuffix}">${escapeHtml(t('hintShow', lang))}</button>
+          <button type="button" class="reveal-btn" data-answer-target="ans-${idSuffix}">${escapeHtml(t('revealAnswer', lang))}</button>
+          <div class="hint-box" id="hint-${idSuffix}">${hint}</div>
+          <div class="answer-box" id="ans-${idSuffix}">
+            <div class="answer-label">${escapeHtml(t('answerLabel', lang))}</div>
+            ${answer}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ======================================================================
+  // Shared step-by-step problem engine. The first problem in a set is guided
+  // (hints open); the rest are independent. A step unlocks only after the one
+  // before it is correct. Number steps give targeted feedback for common
+  // mistakes ("traps") before falling back to a generic message.
+  // ======================================================================
+  function renderStepProblems(mount, lang, problems) {
+    mount.innerHTML = `
+      <div class="pm-widget">
+        <p class="pm-lead"><strong>${escapeHtml(t('pickProblem', lang))}</strong></p>
+        <div class="pm-choices">${problems.map((p, i) => `<button type="button" class="pm-opt${i === 0 ? ' selected' : ''}" data-prob="${i}">${escapeHtml(t('problemN', lang, i + 1))}</button>`).join('')}</div>
+        <div data-stage></div>
+      </div>`;
+    const stage = mount.querySelector('[data-stage]');
+
+    function mountProblem(pi) {
+      const p = problems[pi], guided = pi === 0;
+      const table = p.table ? `
+        <div class="pm-formula-label" style="margin-top:0.4rem;">${escapeHtml(tr(p.table.caption, lang))}</div>
+        <table class="pm-table pm-setup"><thead><tr>${p.table.head.map(h => `<th>${escapeHtml(tr(h, lang))}</th>`).join('')}</tr></thead>
+        <tbody>${p.table.rows.map(r => `<tr>${r.map(c => { const v = tr(c, lang); return `<td${v === '?' ? ' class="pm-unknown"' : ''}>${escapeHtml(v)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>` : '';
+      stage.innerHTML = `
+        <div class="pm-mode-badge${guided ? ' guided' : ''}">${escapeHtml(t(guided ? 'guidedModeLabel' : 'independentModeLabel', lang))}</div>
+        <p style="margin:0.2rem 0 0.4rem;"><strong>${escapeHtml(tr(p.prompt, lang))}</strong></p>
+        ${table}
+        <div data-steps></div>
+        <div data-end></div>`;
+      const stepsHost = stage.querySelector('[data-steps]');
+      stepsHost.innerHTML = p.steps.map((s, i) => `
+        <div class="pm-step${i === 0 ? '' : ' locked'}" data-step="${i}">
+          <div class="pm-step-title">${i + 1}. ${escapeHtml(tr(s.title, lang))}</div>
+          ${s.fields
+            ? `<div class="pm-fields">${s.fields.map((f, fi) => `<label class="pm-field">${escapeHtml(tr(f.label, lang))} <input type="text" inputmode="decimal" data-f="${fi}" autocomplete="off"> ${escapeHtml(tr(f.unit, lang))}</label>`).join('')}</div>`
+            : `<div class="pm-mc">${s.choices.map((c, ci) => `<button type="button" data-c="${ci}">${escapeHtml(tr(c, lang))}</button>`).join('')}</div>`}
+          <div class="pm-hint${guided ? ' open' : ''}" data-hint>${escapeHtml(tr(s.hint, lang))}</div>
+          <div>${s.fields ? `<button type="button" class="pm-btn" data-check>${escapeHtml(t('check', lang))}</button> ` : ''}${guided ? '' : `<button type="button" class="pm-btn secondary" data-hbtn>${escapeHtml(t('showHint', lang))}</button>`}</div>
+          <div class="pm-msg" data-msg></div>
+        </div>`).join('');
+
+      function finishStep(i) {
+        const card = stepsHost.querySelector(`[data-step="${i}"]`);
+        card.classList.add('done');
+        const msg = card.querySelector('[data-msg]');
+        msg.className = 'pm-msg ok';
+        msg.textContent = t('right', lang);
+        card.querySelectorAll('input,button[data-c],[data-check]').forEach(e => { e.disabled = true; });
+        if (i + 1 < p.steps.length) {
+          stepsHost.querySelector(`[data-step="${i + 1}"]`).classList.remove('locked');
+          return;
+        }
+        const end = stage.querySelector('[data-end]');
+        const label = pi + 1 < problems.length ? t('nextProblem', lang) : t('startOver', lang);
+        end.innerHTML = `<div class="pm-solved">${escapeHtml(tr(p.done, lang))}</div><p style="margin-top:0.6rem;"><button type="button" class="pm-btn" data-nextprob>${escapeHtml(label)}</button></p>`;
+        end.querySelector('[data-nextprob]').addEventListener('click', () => pickProblem((pi + 1) % problems.length));
+      }
+
+      p.steps.forEach((s, i) => {
+        const card = stepsHost.querySelector(`[data-step="${i}"]`);
+        const msg = card.querySelector('[data-msg]');
+        const hbtn = card.querySelector('[data-hbtn]');
+        if (hbtn) hbtn.addEventListener('click', () => {
+          const open = card.querySelector('[data-hint]').classList.toggle('open');
+          hbtn.textContent = open ? t('hideHint', lang) : t('showHint', lang);
+        });
+        const fail = (text) => { msg.className = 'pm-msg bad'; msg.textContent = text; };
+        if (s.fields) {
+          const run = () => {
+            const vals = s.fields.map((f, fi) => parseNum(card.querySelector(`[data-f="${fi}"]`).value));
+            if (vals.some(isNaN)) { fail(t('needNum', lang)); return; }
+            if (s.fields.every((f, fi) => closeTo(vals[fi], f.answer, f.rel === undefined ? 0.02 : f.rel, f.abs))) { finishStep(i); return; }
+            const trap = (s.traps || []).find(tp => closeTo(vals[tp.field || 0], tp.value, 0.01, tp.abs));
+            fail(trap ? tr(trap.msg, lang) : t('wrongGeneric', lang));
+          };
+          card.querySelector('[data-check]').addEventListener('click', run);
+          card.querySelectorAll('input').forEach(inp => inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); }));
+        } else {
+          card.querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
+            if (Number(b.getAttribute('data-c')) === s.correct) { b.classList.add('right'); finishStep(i); }
+            else { b.classList.add('wrong'); b.disabled = true; fail(tr(s.wrong, lang)); }
+          }));
+        }
+      });
+    }
+
+    function pickProblem(i) {
+      mount.querySelectorAll('[data-prob]').forEach(b => b.classList.toggle('selected', Number(b.getAttribute('data-prob')) === i));
+      mountProblem(i);
+    }
+    mount.querySelectorAll('[data-prob]').forEach(b => b.addEventListener('click', () => pickProblem(Number(b.getAttribute('data-prob')))));
+    mountProblem(0);
+  }
+
+  // ======================================================================
+  // Widget (Lesson 56): dry ice subliming in a bag. Same mass, growing
+  // volume, falling density.
+  // ======================================================================
+  const SUB_TXT = {
+    en: {
+      slider: 'How much of the dry ice has sublimed', title: 'Sealed bag holding 6.0 g of CO₂ — what is inside right now',
+      th: ['Part of the CO₂', 'Mass (g)', 'Volume (mL)'], solid: 'Solid (dry ice)', gas: 'Gas', total: 'Whole bag',
+      dens: (d) => `Density of everything in the bag: ${d} g/mL`,
+      start: 'All solid: a small, dense chunk. Drag the slider.',
+      mid: 'The mass has not changed — it is still 6.0 g in total. Only the volume is growing, so the density is falling.',
+      end: 'All gas: the same 6.0 g now fills hundreds of times more space (about 1000 times is a good rule of thumb for solid → gas). Same molecules, much farther apart.',
+      svg: 'Bag of carbon dioxide', note: 'Solid CO₂: 1.56 g/mL · CO₂ gas in this bag: about 0.0018 g/mL. The bag drawing is not to scale.'
+    },
+    es: {
+      slider: 'Cuánto hielo seco se ha sublimado', title: 'Bolsa sellada con 6.0 g de CO₂ — lo que hay dentro ahora',
+      th: ['Parte del CO₂', 'Masa (g)', 'Volumen (mL)'], solid: 'Sólido (hielo seco)', gas: 'Gas', total: 'Bolsa completa',
+      dens: (d) => `Densidad de todo lo que hay en la bolsa: ${d} g/mL`,
+      start: 'Todo sólido: un trozo pequeño y denso. Mueve el control.',
+      mid: 'La masa no ha cambiado — sigue siendo 6.0 g en total. Solo crece el volumen, así que la densidad baja.',
+      end: 'Todo gas: los mismos 6.0 g ahora ocupan cientos de veces más espacio (unas 1000 veces es una buena regla para sólido → gas). Las mismas moléculas, mucho más separadas.',
+      svg: 'Bolsa de dióxido de carbono', note: 'CO₂ sólido: 1.56 g/mL · CO₂ gaseoso en esta bolsa: unos 0.0018 g/mL. El dibujo de la bolsa no está a escala.'
+    }
+  };
+
+  function renderSublimeWidget(mount, lang) {
+    const X = SUB_TXT[lang];
+    mount.innerHTML = `
+      <div class="pm-widget">
+        <label style="font-size:0.85rem;">${escapeHtml(X.slider)}: <strong data-pct></strong></label>
+        <input type="range" data-p min="0" max="100" step="5" value="0">
+        <div class="pm-stage" style="margin-top:0.5rem;">
+          <div data-art></div>
+          <div class="pm-panel">
+            <div class="pm-formula-label">${escapeHtml(X.title)}</div>
+            <table class="pm-table" style="margin-top:0;"><thead><tr>${X.th.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody data-rows></tbody></table>
+            <div class="pm-formula" data-dens></div>
+          </div>
+        </div>
+        <div class="pm-insight" data-insight></div>
+        <p class="pm-key">${escapeHtml(X.note)}</p>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+    function redraw() {
+      const p = Number($('[data-p]').value) / 100;
+      const ms = 6 * (1 - p), mg = 6 * p, vs = ms / 1.56, vg = mg / 0.0018, total = vs + vg;
+      const w = 60 + 150 * p, h = 22 + 100 * p, chunk = 34 * Math.cbrt(1 - p);
+      let dots = '';
+      const n = Math.round(24 * p);
+      for (let i = 0; i < n; i++) {
+        const fx = ((i * 0.618) % 1), fy = ((i * 0.377 + 0.13) % 1);
+        dots += `<circle cx="${(120 - w / 2 + 8 + fx * (w - 16)).toFixed(1)}" cy="${(140 - h + 7 + fy * (h - 14)).toFixed(1)}" r="3" fill="#1a8c83"/>`;
+      }
+      $('[data-art]').innerHTML = `<svg viewBox="0 0 240 155" width="240" class="pm-svg" role="img" aria-label="${escapeHtml(X.svg)}">
+        <rect x="${120 - w / 2}" y="${140 - h}" width="${w}" height="${h}" rx="${Math.min(28, h / 2)}" fill="rgba(46,196,182,0.16)" stroke="#253a52" stroke-width="2"/>
+        ${dots}
+        ${chunk > 1 ? `<rect x="${120 - chunk / 2}" y="${138 - chunk * 0.55}" width="${chunk}" height="${chunk * 0.55}" rx="3" fill="#dbeafe" stroke="#253a52"/>` : ''}
+        <line x1="10" y1="142" x2="230" y2="142" stroke="#8a8275" stroke-width="3"/>
+      </svg>`;
+      $('[data-pct]').textContent = `${Math.round(p * 100)}%`;
+      $('[data-rows]').innerHTML = [[X.solid, ms, vs], [X.gas, mg, vg], [X.total, 6, total]].map((r, i) =>
+        `<tr><td>${i === 2 ? '<strong>' : ''}${escapeHtml(r[0])}${i === 2 ? '</strong>' : ''}</td><td>${r[1].toFixed(1)}</td><td>${r[2] < 10 ? r[2].toFixed(1) : comma(r[2])}</td></tr>`).join('');
+      const d = 6 / total;
+      $('[data-dens]').textContent = X.dens(d >= 0.1 ? d.toFixed(2) : d.toFixed(4));
+      $('[data-insight]').textContent = p === 0 ? X.start : p === 1 ? X.end : X.mid;
+    }
+    $('[data-p]').addEventListener('input', redraw);
+    redraw();
+  }
+
+  // Lesson 56 step problems: volume of a box, then density.
+  const DENSITY_PROBLEMS = [
+    {
+      prompt: L('A group presses their bag of CO₂ gas into a box shape: 25 cm × 20 cm × 6 cm. The dry ice they started with had a mass of 5.4 g. Find the density of the gas.', 'Un grupo presiona su bolsa de gas CO₂ en forma de caja: 25 cm × 20 cm × 6 cm. El hielo seco con que empezaron tenía una masa de 5.4 g. Encuentra la densidad del gas.'),
+      steps: [
+        { title: L('Find the volume of the box', 'Encuentra el volumen de la caja'), hint: L('V = length × width × height. 1 cm³ = 1 mL.', 'V = largo × ancho × altura. 1 cm³ = 1 mL.'),
+          fields: [{ label: L('V =', 'V ='), unit: L('mL', 'mL'), answer: 3000, rel: 0.001 }],
+          traps: [{ value: 51, msg: L('You added the sides. Multiply them.', 'Sumaste los lados. Multiplícalos.') }] },
+        { title: L('Find the density', 'Encuentra la densidad'), hint: L('D = m ÷ V. The mass of the gas equals the mass of the dry ice you started with.', 'D = m ÷ V. La masa del gas es igual a la masa del hielo seco inicial.'),
+          fields: [{ label: L('D =', 'D ='), unit: L('g/mL', 'g/mL'), answer: 0.0018 }],
+          traps: [{ value: 555.6, msg: L('That is volume ÷ mass. Density is mass ÷ volume.', 'Eso es volumen ÷ masa. La densidad es masa ÷ volumen.') }] }
+      ],
+      done: L('D = 5.4 g ÷ 3,000 mL = 0.0018 g/mL. Solid CO₂ is 1.56 g/mL, so the gas is hundreds of times less dense.', 'D = 5.4 g ÷ 3,000 mL = 0.0018 g/mL. El CO₂ sólido es 1.56 g/mL, así que el gas es cientos de veces menos denso.')
+    },
+    {
+      prompt: L('A 7.8 g piece of dry ice (solid density 1.56 g/mL) sublimes into a bag that ends up holding 4,000 mL of gas. Compare the two densities.', 'Un trozo de hielo seco de 7.8 g (densidad del sólido 1.56 g/mL) se sublima en una bolsa que termina con 4,000 mL de gas. Compara las dos densidades.'),
+      steps: [
+        { title: L('Volume of the solid', 'Volumen del sólido'), hint: L('V = m ÷ D', 'V = m ÷ D'),
+          fields: [{ label: L('V =', 'V ='), unit: L('mL', 'mL'), answer: 5 }],
+          traps: [{ value: 12.17, msg: L('You multiplied. To get volume, divide mass by density.', 'Multiplicaste. Para hallar el volumen, divide la masa entre la densidad.') }] },
+        { title: L('Density of the gas', 'Densidad del gas'), hint: L('D = m ÷ V. The mass did not change.', 'D = m ÷ V. La masa no cambió.'),
+          fields: [{ label: L('D =', 'D ='), unit: L('g/mL', 'g/mL'), answer: 0.00195, rel: 0.03 }],
+          traps: [{ value: 512.8, msg: L('That is volume ÷ mass. Density is mass ÷ volume.', 'Eso es volumen ÷ masa. La densidad es masa ÷ volumen.') }] },
+        { title: L('How many times bigger did the volume get?', '¿Cuántas veces creció el volumen?'), hint: L('Gas volume ÷ solid volume', 'Volumen del gas ÷ volumen del sólido'),
+          fields: [{ label: L('×', '×'), unit: L('times', 'veces'), answer: 800 }] }
+      ],
+      done: L('The volume grew 800 times (5.0 mL → 4,000 mL) with the same mass, so the density dropped from 1.56 to about 0.0020 g/mL.', 'El volumen creció 800 veces (5.0 mL → 4,000 mL) con la misma masa, así que la densidad bajó de 1.56 a unos 0.0020 g/mL.')
+    }
+  ];
+
+  // ======================================================================
+  // Widget (Lesson 57): the seven class demos -- where is the air trapped,
+  // and where is it pushing harder?
+  // ======================================================================
+  const DEMOS = [
+    { name: L('Balloon in a bottle', 'Globo en una botella'),
+      what: L('A balloon is stretched over the mouth of an empty bottle and hangs inside. You blow hard, but it will barely inflate.', 'Un globo se estira sobre la boca de una botella vacía y cuelga dentro. Soplas fuerte, pero casi no se infla.'),
+      choices: [L('The air trapped in the bottle pushes back on the outside of the balloon', 'El aire atrapado en la botella empuja la parte exterior del globo'), L('The bottle has no air in it, so the balloon has nothing to push on', 'La botella no tiene aire, así que el globo no tiene nada que empujar'), L('Your breath weighs too little to stretch rubber', 'Tu aliento pesa muy poco para estirar el hule')], correct: 0,
+      why: L('"Empty" bottles are full of air. As the balloon grows, that trapped air is squeezed into less space and pushes back harder.', 'Las botellas "vacías" están llenas de aire. Al crecer el globo, ese aire atrapado se comprime y empuja más fuerte.') },
+    { name: L('Soft drink can', 'Lata de refresco'),
+      what: L('A can with a little water is heated until it steams, then flipped into cold water. It crumples instantly.', 'Una lata con un poco de agua se calienta hasta que sale vapor y se voltea en agua fría. Se aplasta al instante.'),
+      choices: [L('The cold water squeezes the metal until it shrinks', 'El agua fría aprieta el metal hasta encogerlo'), L('The steam condenses, pressure inside drops, and the atmosphere outside pushes harder', 'El vapor se condensa, la presión interior baja y la atmósfera exterior empuja más'), L('The steam inside gets stronger and pulls the walls in', 'El vapor interior se hace más fuerte y jala las paredes')], correct: 1,
+      why: L('Far fewer gas molecules are left hitting the inside walls, while the air outside keeps hitting just as hard. Gases push — they do not pull.', 'Quedan muchas menos moléculas golpeando las paredes por dentro, mientras el aire de afuera golpea igual. Los gases empujan — no jalan.') },
+    { name: L('Submerged cup', 'Vaso sumergido'),
+      what: L('An upside-down cup is pushed straight down into water. A paper towel stuffed inside stays dry.', 'Un vaso boca abajo se empuja recto dentro del agua. Una toalla de papel metida dentro queda seca.'),
+      choices: [L('Water cannot flow upward', 'El agua no puede subir'), L('The paper towel repels water', 'La toalla de papel repele el agua'), L('The air trapped in the cup pushes on the water and keeps it out', 'El aire atrapado en el vaso empuja el agua y la mantiene fuera')], correct: 2,
+      why: L('Air takes up space and exerts pressure. It is trapped in the cup, so the water cannot move into that space.', 'El aire ocupa espacio y ejerce presión. Está atrapado en el vaso, así que el agua no puede entrar en ese espacio.') },
+    { name: L('Air pressure mat', 'Tapete de presión de aire'),
+      what: L('A flat rubber mat lies on a smooth table. Pulling up from the middle is surprisingly hard.', 'Un tapete de hule plano está sobre una mesa lisa. Jalarlo desde el centro es sorprendentemente difícil.'),
+      choices: [L('The atmosphere pushes down on the whole area of the mat, with almost no air underneath', 'La atmósfera empuja hacia abajo en toda el área del tapete, casi sin aire debajo'), L('The table pulls the mat with suction', 'La mesa jala el tapete con succión'), L('The mat is extremely heavy', 'El tapete es extremadamente pesado')], correct: 0,
+      why: L('F = P × A. A large area times 14.7 lb/in² is a very large downward force. "Suction" is really the outside air pushing.', 'F = P × A. Un área grande por 14.7 lb/in² es una fuerza muy grande hacia abajo. La "succión" es en realidad el aire exterior empujando.') },
+    { name: L('Cup and card', 'Vaso y tarjeta'),
+      what: L('A cup of water is covered with a card and turned upside down. The card stays on.', 'Un vaso con agua se cubre con una tarjeta y se voltea. La tarjeta se queda puesta.'),
+      choices: [L('The water is sticky enough to hold any weight', 'El agua es tan pegajosa que sostiene cualquier peso'), L('The atmosphere pushes up on the card harder than the water pushes down', 'La atmósfera empuja la tarjeta hacia arriba más fuerte que el agua hacia abajo'), L('Gravity does not act on water in a closed cup', 'La gravedad no actúa sobre el agua en un vaso cerrado')], correct: 1,
+      why: L('Air pressure pushes in every direction — including up.', 'La presión del aire empuja en todas direcciones — también hacia arriba.') },
+    { name: L('Balloon in a vacuum', 'Globo en el vacío'),
+      what: L('A barely inflated, tied balloon is put in a chamber and the air is pumped out. The balloon swells.', 'Un globo amarrado y poco inflado se pone en una cámara y se saca el aire. El globo se hincha.'),
+      choices: [L('More air leaks into the balloon', 'Entra más aire al globo'), L('The vacuum pulls on the rubber', 'El vacío jala el hule'), L('The outside push drops, so the gas trapped inside expands the balloon', 'El empuje exterior baja, así que el gas atrapado expande el globo')], correct: 2,
+      why: L('The knot keeps the same gas inside. With less outside pressure, the inside gas spreads into a bigger volume — lowering its own pressure until they match.', 'El nudo mantiene el mismo gas dentro. Con menos presión exterior, el gas se extiende a un volumen mayor — bajando su presión hasta igualarse.') },
+    { name: L('Marshmallows', 'Malvaviscos'),
+      what: L('Marshmallows in the vacuum chamber puff up to a much bigger size.', 'Los malvaviscos en la cámara de vacío se inflan mucho.'),
+      choices: [L('Tiny bubbles of trapped air inside them expand when the outside pressure drops', 'Pequeñas burbujas de aire atrapado se expanden cuando baja la presión exterior'), L('The sugar cooks and rises', 'El azúcar se cocina y sube'), L('The marshmallows gain mass from the vacuum', 'Los malvaviscos ganan masa del vacío')], correct: 0,
+      why: L('Same idea as the balloon, repeated thousands of times in tiny pockets. The mass does not change.', 'La misma idea del globo, repetida miles de veces en bolsitas diminutas. La masa no cambia.') }
+  ];
+  const DEMO_TXT = {
+    en: { count: (n, t2) => `Demo ${n} of ${t2}`, ask: 'Why does this happen?', wrong: 'Not quite. Ask yourself: where is air trapped, and which side is pushing harder?' },
+    es: { count: (n, t2) => `Demostración ${n} de ${t2}`, ask: '¿Por qué pasa esto?', wrong: 'No exactamente. Pregúntate: ¿dónde está atrapado el aire y qué lado empuja más?' }
+  };
+
+  function renderDemoWidget(mount, lang) {
+    const X = DEMO_TXT[lang];
+    let idx = 0;
+    function show() {
+      const d = DEMOS[idx];
+      mount.innerHTML = `
+        <div class="pm-widget">
+          <div class="pm-mode-badge">${escapeHtml(X.count(idx + 1, DEMOS.length))}</div>
+          <p style="margin:0.2rem 0 0.3rem;"><strong>${escapeHtml(tr(d.name, lang))}.</strong> ${escapeHtml(tr(d.what, lang))}</p>
+          <p class="pm-lead">${escapeHtml(X.ask)}</p>
+          <div class="pm-mc">${d.choices.map((c, i) => `<button type="button" data-c="${i}">${escapeHtml(tr(c, lang))}</button>`).join('')}</div>
+          <div class="pm-msg" data-msg></div>
+          <div data-why></div>
+          <p data-nextwrap style="display:none;margin-top:0.6rem;"><button type="button" class="pm-btn" data-next></button></p>
+        </div>`;
+      const msg = mount.querySelector('[data-msg]');
+      mount.querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
+        if (Number(b.getAttribute('data-c')) !== d.correct) { b.classList.add('wrong'); b.disabled = true; msg.className = 'pm-msg bad'; msg.textContent = X.wrong; return; }
+        b.classList.add('right');
+        mount.querySelectorAll('[data-c]').forEach(x => { x.disabled = true; });
+        msg.className = 'pm-msg ok'; msg.textContent = t('right', lang);
+        mount.querySelector('[data-why]').innerHTML = `<div class="pm-solved" style="font-weight:400;color:var(--text);">${escapeHtml(tr(d.why, lang))}</div>`;
+        mount.querySelector('[data-nextwrap]').style.display = 'block';
+        const nb = mount.querySelector('[data-next]');
+        nb.textContent = idx + 1 < DEMOS.length ? t('next', lang) : t('startOver', lang);
+        nb.addEventListener('click', () => { idx = (idx + 1) % DEMOS.length; show(); });
+      }));
+    }
+    show();
+  }
+
+  // ======================================================================
+  // Widget (Lesson 57): same force, different area. P = F / A.
+  // ======================================================================
+  const PRESS_TXT = {
+    en: {
+      force: 'Force pushing down (weight)', pick: 'Pick what the weight rests on:',
+      areas: ['Thin heel · 0.5 in²', 'Shoe · 25 in²', 'Snowshoe · 200 in²'],
+      label: 'Pressure on the floor right now', arrow: 'force',
+      insight: 'Same force on a SMALLER area → BIGGER pressure. That is why snowshoes keep you on top of snow and a thin heel can dent a floor.'
+    },
+    es: {
+      force: 'Fuerza hacia abajo (peso)', pick: 'Elige sobre qué descansa el peso:',
+      areas: ['Tacón delgado · 0.5 in²', 'Zapato · 25 in²', 'Raqueta de nieve · 200 in²'],
+      label: 'Presión sobre el piso ahora', arrow: 'fuerza',
+      insight: 'La misma fuerza en un área MÁS PEQUEÑA → presión MAYOR. Por eso las raquetas de nieve te sostienen y un tacón delgado puede marcar el piso.'
+    }
+  };
+  const PRESS_AREAS = [0.5, 25, 200];
+
+  function renderPressureWidget(mount, lang) {
+    const X = PRESS_TXT[lang];
+    let ai = 1;
+    mount.innerHTML = `
+      <div class="pm-widget">
+        <p class="pm-lead"><strong>${escapeHtml(X.pick)}</strong></p>
+        <div class="pm-choices">${X.areas.map((a, i) => `<button type="button" class="pm-opt${i === ai ? ' selected' : ''}" data-a="${i}">${escapeHtml(a)}</button>`).join('')}</div>
+        <label style="font-size:0.85rem;">${escapeHtml(X.force)}: <strong data-fval></strong></label>
+        <input type="range" data-f min="20" max="200" step="10" value="100">
+        <div class="pm-stage" style="margin-top:0.5rem;">
+          <div data-art></div>
+          <div class="pm-panel"><div class="pm-formula-label">${escapeHtml(X.label)}</div><div class="pm-formula" data-read></div></div>
+        </div>
+        <div class="pm-insight">${escapeHtml(X.insight)}</div>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+    function redraw() {
+      const F = Number($('[data-f]').value), A = PRESS_AREAS[ai], P = F / A;
+      const w = [14, 90, 200][ai], ah = 20 + F * 0.25;
+      $('[data-fval]').textContent = `${F} lb`;
+      $('[data-read]').textContent = `P = F ÷ A = ${F} lb ÷ ${A} in² = ${fmt(P, 2)} lb/in²`;
+      $('[data-art]').innerHTML = `<svg viewBox="0 0 230 140" width="230" class="pm-svg" role="img" aria-label="${escapeHtml(X.arrow)}">
+        <rect x="108" y="${78 - ah}" width="14" height="${ah}" fill="#f4a261"/>
+        <polygon points="100,76 130,76 115,92" fill="#f4a261"/>
+        <rect x="${115 - w / 2}" y="95" width="${w}" height="16" rx="3" fill="#253a52"/>
+        <rect x="5" y="111" width="220" height="14" fill="${P > 50 ? '#f3b3b3' : P > 2 ? '#f6dfb0' : '#c9ece6'}"/>
+      </svg>`;
+    }
+    mount.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => {
+      ai = Number(b.getAttribute('data-a'));
+      mount.querySelectorAll('[data-a]').forEach(x => x.classList.toggle('selected', x === b));
+      redraw();
+    }));
+    $('[data-f]').addEventListener('input', redraw);
+    redraw();
+  }
+
+  const PRESSURE_PROBLEMS = [
+    {
+      prompt: L('A 180 lb stack of books rests on a stool top with an area of 120 in². What pressure does it put on the stool?', 'Una pila de libros de 180 lb descansa sobre un banco con un área de 120 in². ¿Qué presión ejerce sobre el banco?'),
+      steps: [
+        { title: L('Which equation do you need?', '¿Qué ecuación necesitas?'), hint: L('Pressure is force per unit area. "Per" means divide.', 'La presión es fuerza por unidad de área. "Por" significa dividir.'),
+          choices: [L('P = F × A', 'P = F × A'), L('P = F ÷ A', 'P = F ÷ A'), L('P = A ÷ F', 'P = A ÷ F')], correct: 1, wrong: L('Pressure is force PER area: divide the force by the area.', 'La presión es fuerza POR área: divide la fuerza entre el área.') },
+        { title: L('Solve', 'Resuelve'), hint: L('180 lb ÷ 120 in²', '180 lb ÷ 120 in²'),
+          fields: [{ label: L('P =', 'P ='), unit: L('lb/in²', 'lb/in²'), answer: 1.5 }],
+          traps: [{ value: 21600, msg: L('You multiplied. Divide force by area.', 'Multiplicaste. Divide la fuerza entre el área.') }, { value: 0.667, msg: L('That is area ÷ force. Flip it.', 'Eso es área ÷ fuerza. Inviértelo.') }] }
+      ],
+      done: L('P = 180 lb ÷ 120 in² = 1.5 lb/in².', 'P = 180 lb ÷ 120 in² = 1.5 lb/in².')
+    },
+    {
+      prompt: L('The atmosphere pushes with 14.7 lb/in². How much force pushes on a notebook cover that is 8 in × 10 in?', 'La atmósfera empuja con 14.7 lb/in². ¿Cuánta fuerza empuja la portada de un cuaderno de 8 in × 10 in?'),
+      steps: [
+        { title: L('Find the area', 'Encuentra el área'), hint: L('Area of a rectangle = length × width', 'Área de un rectángulo = largo × ancho'),
+          fields: [{ label: L('A =', 'A ='), unit: L('in²', 'in²'), answer: 80, rel: 0.001 }],
+          traps: [{ value: 18, msg: L('You added the sides. Multiply them.', 'Sumaste los lados. Multiplícalos.') }] },
+        { title: L('Find the force', 'Encuentra la fuerza'), hint: L('F = P × A', 'F = P × A'),
+          fields: [{ label: L('F =', 'F ='), unit: L('lb', 'lb'), answer: 1176, rel: 0.005 }],
+          traps: [{ value: 5.44, msg: L('You divided area by pressure. F = P × A.', 'Dividiste el área entre la presión. F = P × A.') }, { value: 0.184, msg: L('To get a force, multiply pressure by area.', 'Para hallar una fuerza, multiplica presión por área.') }] }
+      ],
+      done: L('F = 14.7 lb/in² × 80 in² = 1,176 lb. You can still lift the cover because air underneath pushes up just as hard.', 'F = 14.7 lb/in² × 80 in² = 1,176 lb. Aun así puedes levantar la portada porque el aire de abajo empuja igual de fuerte.')
+    },
+    {
+      prompt: L('A pump piston pushes with a force of 90 lb and creates a pressure of 45 lb/in². What is the area of the piston?', 'El pistón de una bomba empuja con 90 lb y crea una presión de 45 lb/in². ¿Cuál es el área del pistón?'),
+      steps: [
+        { title: L('Rearrange and solve for the area', 'Despeja y resuelve el área'), hint: L('P = F ÷ A, so A = F ÷ P', 'P = F ÷ A, así que A = F ÷ P'),
+          fields: [{ label: L('A =', 'A ='), unit: L('in²', 'in²'), answer: 2 }],
+          traps: [{ value: 4050, msg: L('You multiplied. A = F ÷ P.', 'Multiplicaste. A = F ÷ P.') }, { value: 0.5, msg: L('That is P ÷ F. A = F ÷ P.', 'Eso es P ÷ F. A = F ÷ P.') }] }
+      ],
+      done: L('A = 90 lb ÷ 45 lb/in² = 2.0 in².', 'A = 90 lb ÷ 45 lb/in² = 2.0 in².')
+    }
+  ];
+
+  // Small shared SVG line-graph used by the Boyle and Gay-Lussac widgets.
+  function graphSvg(o) {
+    const Wd = 320, Ht = 230, ml = 46, mr = 12, mt = 12, mb = 36;
+    const pw = Wd - ml - mr, ph = Ht - mt - mb;
+    const sx = (v) => ml + (v - o.xMin) / (o.xMax - o.xMin) * pw, sy = (v) => mt + ph - v / o.yMax * ph;
+    const font = 'font-family="JetBrains Mono, monospace" font-size="9.5" fill="#5a6475"';
+    let s = `<svg viewBox="0 0 ${Wd} ${Ht}" class="pm-svg" width="320" role="img" aria-label="${escapeHtml(o.xLabel + ' / ' + o.yLabel)}">`;
+    o.xTicks.forEach(v => { s += `<line x1="${sx(v)}" y1="${mt}" x2="${sx(v)}" y2="${mt + ph}" stroke="#d9d3c7"/><text x="${sx(v)}" y="${mt + ph + 13}" text-anchor="middle" ${font}>${v}</text>`; });
+    o.yTicks.forEach(v => { s += `<line x1="${ml}" y1="${sy(v)}" x2="${ml + pw}" y2="${sy(v)}" stroke="#d9d3c7"/><text x="${ml - 5}" y="${sy(v) + 3}" text-anchor="end" ${font}>${v}</text>`; });
+    s += `<line x1="${ml}" y1="${mt}" x2="${ml}" y2="${mt + ph}" stroke="#253a52" stroke-width="1.6"/><line x1="${ml}" y1="${mt + ph}" x2="${ml + pw}" y2="${mt + ph}" stroke="#253a52" stroke-width="1.6"/>`;
+    s += `<text x="${ml + pw / 2}" y="${Ht - 4}" text-anchor="middle" ${font}>${escapeHtml(o.xLabel)}</text><text x="11" y="${mt + ph / 2}" transform="rotate(-90 11 ${mt + ph / 2})" text-anchor="middle" ${font}>${escapeHtml(o.yLabel)}</text>`;
+    const pts = o.points.map(p => `${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join(' ');
+    s += `<polyline points="${pts}" fill="none" stroke="#1a8c83" stroke-width="3"/>`;
+    s += `<circle cx="${sx(o.dot[0])}" cy="${sy(o.dot[1])}" r="6" fill="#e8384f" stroke="#fff" stroke-width="2"/>`;
+    return s + '</svg>';
+  }
+
+  // ======================================================================
+  // Widget (Lesson 58): piston + P-V graph. PV = k.
+  // ======================================================================
+  const PISTON_TXT = {
+    en: {
+      vol: 'Volume of the trapped gas', axisPV: 'Graph: P vs. V', axisInv: 'Graph: P vs. 1/V',
+      label: 'Your red point on the graph', cap: 'Same molecules · same temperature · only the volume changes',
+      xV: 'Volume (L)', xInv: '1/V (1/L)', y: 'Pressure (atm)', svg: 'Gas in a cylinder with a piston',
+      insightPV: 'P vs. V is a CURVE: steep at small volumes, flat at large volumes. One goes up while the other goes down — an inverse proportion.',
+      insightInv: 'P vs. 1/V is a STRAIGHT LINE through (0, 0), so P = k × (1/V).'
+    },
+    es: {
+      vol: 'Volumen del gas atrapado', axisPV: 'Gráfica: P vs. V', axisInv: 'Gráfica: P vs. 1/V',
+      label: 'Tu punto rojo en la gráfica', cap: 'Mismas moléculas · misma temperatura · solo cambia el volumen',
+      xV: 'Volumen (L)', xInv: '1/V (1/L)', y: 'Presión (atm)', svg: 'Gas en un cilindro con pistón',
+      insightPV: 'P vs. V es una CURVA: empinada con volúmenes pequeños, plana con volúmenes grandes. Una sube mientras la otra baja — una proporción inversa.',
+      insightInv: 'P vs. 1/V es una LÍNEA RECTA que pasa por (0, 0), así que P = k × (1/V).'
+    }
+  };
+
+  function renderPistonWidget(mount, lang) {
+    const X = PISTON_TXT[lang];
+    const K = 8;
+    let V = 4, axis = 0;
+    mount.innerHTML = `
+      <div class="pm-widget">
+        <div data-art style="text-align:center;"></div>
+        <p class="pm-compare" style="text-align:center;margin:0.2rem 0 0.6rem;">${escapeHtml(X.cap)}</p>
+        <label style="font-size:0.85rem;">${escapeHtml(X.vol)}: <strong data-vval></strong></label>
+        <input type="range" data-v min="1" max="8" step="0.5" value="4">
+        <div class="pm-stage" style="margin-top:0.6rem;">
+          <div data-graph></div>
+          <div class="pm-panel">
+            <div><div class="pm-formula-label">${escapeHtml(X.label)}</div><div class="pm-formula" data-read style="white-space:pre-line;"></div></div>
+            <div class="pm-choices" style="margin:0;">
+              <button type="button" class="pm-opt selected" data-axis="0">${escapeHtml(X.axisPV)}</button>
+              <button type="button" class="pm-opt" data-axis="1">${escapeHtml(X.axisInv)}</button>
+            </div>
+          </div>
+        </div>
+        <div class="pm-insight" data-insight></div>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+    function redraw() {
+      const P = K / V, px = 30 + V / 8 * 260;
+      let dots = '';
+      for (let i = 0; i < 28; i++) {
+        const fx = (i * 0.618) % 1, fy = (i * 0.414 + 0.07) % 1;
+        dots += `<circle cx="${(36 + fx * (px - 42)).toFixed(1)}" cy="${(22 + fy * 46).toFixed(1)}" r="3.2" fill="#ffd166" stroke="#7a5b00" stroke-width="0.6"/>`;
+      }
+      $('[data-art]').innerHTML = `<svg viewBox="0 0 360 90" width="360" class="pm-svg" role="img" aria-label="${escapeHtml(X.svg)}">
+        <rect x="30" y="15" width="266" height="60" fill="#fff" stroke="#253a52" stroke-width="2.5"/>
+        <rect x="31" y="16" width="${px - 31}" height="58" fill="rgba(46,196,182,0.16)"/>
+        ${dots}
+        <rect x="${px}" y="17" width="9" height="56" fill="#e8384f"/>
+        <rect x="${px + 9}" y="41" width="${345 - px - 9}" height="8" fill="#8a8275"/>
+        <rect x="343" y="28" width="9" height="34" fill="#8a8275"/>
+      </svg>`;
+      $('[data-vval]').textContent = `${V.toFixed(1)} L`;
+      $('[data-read]').textContent = `V = ${V.toFixed(1)} L\nP = ${fmt(P, 2)} atm\nk = P × V = ${K}.0 atm·L`;
+      const pts = [];
+      if (axis === 0) for (let v = 0.95; v <= 8.001; v += 0.15) pts.push([v, K / v]);
+      else pts.push([0, 0], [1.05, K * 1.05]);
+      $('[data-graph]').innerHTML = graphSvg(axis === 0
+        ? { xMin: 0, xMax: 8.4, yMax: 9, xTicks: [0, 2, 4, 6, 8], yTicks: [0, 2, 4, 6, 8], xLabel: X.xV, yLabel: X.y, points: pts, dot: [V, P] }
+        : { xMin: 0, xMax: 1.1, yMax: 9, xTicks: [0, 0.25, 0.5, 0.75, 1], yTicks: [0, 2, 4, 6, 8], xLabel: X.xInv, yLabel: X.y, points: pts, dot: [1 / V, P] });
+      $('[data-insight]').textContent = axis === 0 ? X.insightPV : X.insightInv;
+    }
+    $('[data-v]').addEventListener('input', (e) => { V = Number(e.target.value); redraw(); });
+    mount.querySelectorAll('[data-axis]').forEach(b => b.addEventListener('click', () => {
+      axis = Number(b.getAttribute('data-axis'));
+      mount.querySelectorAll('[data-axis]').forEach(x => x.classList.toggle('selected', x === b));
+      redraw();
+    }));
+    redraw();
+  }
+
+  // ======================================================================
+  // Widget (Lesson 59): rigid vs. flexible container, same heating.
+  // ======================================================================
+  const RIGID_TXT = {
+    en: {
+      temp: 'Temperature of both gas samples', rigid: 'Rigid steel tank (volume cannot change)', flex: 'Balloon (flexible: volume can change)',
+      stays: 'stays the same', changes: 'changes', vol: 'Volume', pres: 'Pressure',
+      graph: 'Graph for the rigid tank: pressure vs. temperature', axisK: 'Temperature axis in K', axisC: 'Temperature axis in °C',
+      xK: 'Temperature (K)', xC: 'Temperature (°C)', y: 'Pressure (atm)',
+      insightK: 'In KELVINS the line points straight at (0, 0): pressure is directly proportional to kelvin temperature. P = kT — Gay-Lussac\'s law.',
+      insightC: 'In °C the line misses (0, 0): there is still pressure at 0 °C. So P is NOT proportional to Celsius temperature — always convert to kelvins.',
+      same: 'Heat both the same amount: the tank answers with more PRESSURE, the balloon answers with more VOLUME.'
+    },
+    es: {
+      temp: 'Temperatura de ambas muestras de gas', rigid: 'Tanque rígido de acero (el volumen no cambia)', flex: 'Globo (flexible: el volumen puede cambiar)',
+      stays: 'se mantiene', changes: 'cambia', vol: 'Volumen', pres: 'Presión',
+      graph: 'Gráfica del tanque rígido: presión vs. temperatura', axisK: 'Eje de temperatura en K', axisC: 'Eje de temperatura en °C',
+      xK: 'Temperatura (K)', xC: 'Temperatura (°C)', y: 'Presión (atm)',
+      insightK: 'En KELVIN la línea apunta directo a (0, 0): la presión es directamente proporcional a la temperatura Kelvin. P = kT — la ley de Gay-Lussac.',
+      insightC: 'En °C la línea no pasa por (0, 0): todavía hay presión a 0 °C. Así que P NO es proporcional a la temperatura Celsius — siempre convierte a kelvin.',
+      same: 'Calienta ambos por igual: el tanque responde con más PRESIÓN, el globo responde con más VOLUMEN.'
+    }
+  };
+
+  function renderRigidWidget(mount, lang) {
+    const X = RIGID_TXT[lang];
+    let T = 300, axis = 0;
+    mount.innerHTML = `
+      <div class="pm-widget">
+        <label style="font-size:0.85rem;">${escapeHtml(X.temp)}: <strong data-tval></strong></label>
+        <input type="range" data-t min="200" max="600" step="25" value="300">
+        <div class="pm-pair">
+          <div class="pm-card"><div class="pm-formula-label">${escapeHtml(X.rigid)}</div><div data-rigid></div><div class="pm-formula" data-rread style="white-space:pre-line;"></div></div>
+          <div class="pm-card"><div class="pm-formula-label">${escapeHtml(X.flex)}</div><div data-flex></div><div class="pm-formula" data-fread style="white-space:pre-line;"></div></div>
+        </div>
+        <div class="pm-insight">${escapeHtml(X.same)}</div>
+        <div class="pm-formula-label" style="margin-top:0.9rem;">${escapeHtml(X.graph)}</div>
+        <div class="pm-choices">
+          <button type="button" class="pm-opt selected" data-axis="0">${escapeHtml(X.axisK)}</button>
+          <button type="button" class="pm-opt" data-axis="1">${escapeHtml(X.axisC)}</button>
+        </div>
+        <div data-graph style="text-align:center;"></div>
+        <div class="pm-insight" data-insight></div>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+    function redraw() {
+      const P = T / 300, V = 2 * T / 300, C = T - 273, r = 52 * Math.cbrt(V / 4);
+      const hue = Math.round(215 - 205 * (T - 200) / 400);
+      $('[data-tval]').textContent = `${T} K (${C} °C)`;
+      $('[data-rigid]').innerHTML = `<svg viewBox="0 0 160 130" width="160" class="pm-svg" role="img" aria-label="${escapeHtml(X.rigid)}">
+        <rect x="32" y="25" width="96" height="96" rx="16" fill="hsl(${hue},80%,82%)" stroke="#253a52" stroke-width="5"/>
+        <rect x="70" y="10" width="20" height="16" fill="#253a52"/>
+        <rect x="42" y="${113 - 24 * P}" width="76" height="${24 * P}" rx="3" fill="#e8384f" opacity="0.5"/>
+        <text x="80" y="54" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#0d1b2a">${P.toFixed(2)} atm</text>
+      </svg>`;
+      $('[data-flex]').innerHTML = `<svg viewBox="0 0 160 130" width="160" class="pm-svg" role="img" aria-label="${escapeHtml(X.flex)}">
+        <ellipse cx="80" cy="62" rx="${r.toFixed(1)}" ry="${(r * 1.1).toFixed(1)}" fill="hsl(${hue},80%,82%)" stroke="#253a52" stroke-width="2"/>
+        <line x1="80" y1="${(62 + r * 1.1).toFixed(1)}" x2="80" y2="128" stroke="#8a8275" stroke-width="1.5"/>
+        <text x="80" y="67" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#0d1b2a">${V.toFixed(2)} L</text>
+      </svg>`;
+      $('[data-rread]').textContent = `${X.vol}: 2.00 L (${X.stays})\n${X.pres}: ${P.toFixed(2)} atm (${X.changes})\nk = P ÷ T = 0.0033 atm/K`;
+      $('[data-fread]').textContent = `${X.pres}: 1.00 atm (${X.stays})\n${X.vol}: ${V.toFixed(2)} L (${X.changes})\nk = V ÷ T = 0.0067 L/K`;
+      $('[data-graph]').innerHTML = graphSvg(axis === 0
+        ? { xMin: 0, xMax: 620, yMax: 2.2, xTicks: [0, 100, 200, 300, 400, 500, 600], yTicks: [0, 0.5, 1, 1.5, 2], xLabel: X.xK, yLabel: X.y, points: [[0, 0], [620, 620 / 300]], dot: [T, P] }
+        : { xMin: -100, xMax: 350, yMax: 2.2, xTicks: [-100, 0, 100, 200, 300], yTicks: [0, 0.5, 1, 1.5, 2], xLabel: X.xC, yLabel: X.y, points: [[-100, 173 / 300], [350, 623 / 300]], dot: [C, P] });
+      $('[data-insight]').textContent = axis === 0 ? X.insightK : X.insightC;
+      $('[data-insight]').classList.toggle('warn', axis === 1);
+    }
+    $('[data-t]').addEventListener('input', (e) => { T = Number(e.target.value); redraw(); });
+    mount.querySelectorAll('[data-axis]').forEach(b => b.addEventListener('click', () => {
+      axis = Number(b.getAttribute('data-axis'));
+      mount.querySelectorAll('[data-axis]').forEach(x => x.classList.toggle('selected', x === b));
+      redraw();
+    }));
+    redraw();
+  }
+
+  // ======================================================================
+  // Widget (Lesson 60): "Be the Molecule" -- change T or V to hit a target
+  // pressure, then explain it with collisions.
+  // ======================================================================
+  const MOL_CHALLENGES = [
+    { lock: 'T', target: 2.0,
+      goal: L('Double the pressure to 2.0 atm WITHOUT changing the temperature.', 'Duplica la presión a 2.0 atm SIN cambiar la temperatura.'),
+      why: L('Why did the pressure double?', '¿Por qué se duplicó la presión?'),
+      choices: [L('The molecules moved faster', 'Las moléculas se movieron más rápido'), L('Same speed, but the walls are closer, so molecules hit them twice as often', 'Misma rapidez, pero las paredes están más cerca, así que las golpean el doble de veces'), L('The molecules got bigger', 'Las moléculas se hicieron más grandes')], correct: 1 },
+    { lock: 'V', target: 2.0,
+      goal: L('Double the pressure to 2.0 atm WITHOUT changing the volume.', 'Duplica la presión a 2.0 atm SIN cambiar el volumen.'),
+      why: L('Why did the pressure go up this time?', '¿Por qué subió la presión esta vez?'),
+      choices: [L('There are more molecules now', 'Ahora hay más moléculas'), L('Each molecule expanded to fill more space', 'Cada molécula se expandió para ocupar más espacio'), L('Molecules move faster, so they hit the walls more often AND harder', 'Las moléculas se mueven más rápido, así que golpean las paredes más veces Y más fuerte')], correct: 2 },
+    { lock: 'T', target: 0.5,
+      goal: L('Lower the pressure to 0.50 atm WITHOUT changing the temperature.', 'Baja la presión a 0.50 atm SIN cambiar la temperatura.'),
+      why: L('Why did the pressure drop?', '¿Por qué bajó la presión?'),
+      choices: [L('Same speed, but more room between walls, so each wall is hit less often', 'Misma rapidez, pero más espacio entre paredes, así que cada pared recibe menos golpes'), L('The molecules slowed down', 'Las moléculas se hicieron más lentas'), L('Some molecules disappeared', 'Algunas moléculas desaparecieron')], correct: 0 },
+    { lock: 'V', target: 0.5,
+      goal: L('Lower the pressure to 0.50 atm WITHOUT changing the volume.', 'Baja la presión a 0.50 atm SIN cambiar el volumen.'),
+      why: L('Why did the pressure drop this time?', '¿Por qué bajó la presión esta vez?'),
+      choices: [L('The container leaked', 'El recipiente tenía una fuga'), L('Slower molecules hit the walls less often and less hard', 'Las moléculas más lentas golpean las paredes menos veces y con menos fuerza'), L('The molecules shrank', 'Las moléculas se encogieron')], correct: 1 }
+  ];
+  const MOL_TXT = {
+    en: {
+      names: (n) => `Challenge ${n}`, free: 'Free explore', temp: 'Temperature', vol: 'Volume', locked: '(locked for this challenge)',
+      pres: 'Pressure = how often × how hard', hits: 'How OFTEN each bit of wall is hit', push: 'How HARD each hit is', label: 'The box right now (×1.00 = the starting box)',
+      checkIt: 'Check my box', notYet: (p, t2) => `The gauge reads ${p} atm. The goal is ${t2} atm — keep adjusting.`,
+      reached: '✓ Goal reached!', wrongWhy: 'Look at the speed of the molecules and the distance between the walls, then try again.',
+      done: '✓ That is the molecular explanation.', freeNote: 'Change either slider and watch how often and how hard the walls are hit.',
+      note: 'Gas pressure = molecules striking the walls. Pressure rises when hits are more frequent or harder.'
+    },
+    es: {
+      names: (n) => `Reto ${n}`, free: 'Explorar libre', temp: 'Temperatura', vol: 'Volumen', locked: '(bloqueado en este reto)',
+      pres: 'Presión = frecuencia × fuerza', hits: 'Con qué FRECUENCIA se golpea cada parte de la pared', push: 'Con qué FUERZA llega cada choque', label: 'La caja ahora (×1.00 = la caja inicial)',
+      checkIt: 'Revisar mi caja', notYet: (p, t2) => `El medidor marca ${p} atm. La meta es ${t2} atm — sigue ajustando.`,
+      reached: '✓ ¡Meta lograda!', wrongWhy: 'Observa la rapidez de las moléculas y la distancia entre las paredes, y vuelve a intentar.',
+      done: '✓ Esa es la explicación molecular.', freeNote: 'Cambia cualquier control y observa la frecuencia y la fuerza de los choques.',
+      note: 'Presión de un gas = moléculas golpeando las paredes. La presión sube cuando los choques son más frecuentes o más fuertes.'
+    }
+  };
+
+  function renderMoleculeWidget(mount, lang) {
+    const X = MOL_TXT[lang];
+    let T = 300, V = 4, mode = 0; // mode: challenge index, or -1 for free explore
+    mount.innerHTML = `
+      <div class="pm-widget">
+        <div class="pm-choices">${MOL_CHALLENGES.map((c, i) => `<button type="button" class="pm-opt" data-mode="${i}">${escapeHtml(X.names(i + 1))}</button>`).join('')}<button type="button" class="pm-opt" data-mode="-1">${escapeHtml(X.free)}</button></div>
+        <p style="margin:0 0 0.5rem;"><strong data-goal></strong></p>
+        <canvas class="pm-canvas" width="400" height="170"></canvas>
+        <label style="font-size:0.85rem;display:block;margin-top:0.6rem;">${escapeHtml(X.temp)}: <strong data-tval></strong> <em data-tlock></em></label>
+        <input type="range" data-t min="100" max="600" step="10" value="300">
+        <label style="font-size:0.85rem;display:block;">${escapeHtml(X.vol)}: <strong data-vval></strong> <em data-vlock></em></label>
+        <input type="range" data-v min="2" max="8" step="0.5" value="4">
+        <div class="pm-formula-label" style="margin-top:0.5rem;">${escapeHtml(X.label)}</div>
+        <div class="pm-formula" style="white-space:pre-line;"><span data-hits></span>\n<span data-push></span>\n<strong data-pres></strong></div>
+        <p style="margin:0.6rem 0 0;" data-checkwrap><button type="button" class="pm-btn" data-checkbox>${escapeHtml(X.checkIt)}</button></p>
+        <div class="pm-msg" data-msg></div>
+        <div data-why></div>
+        <p class="pm-key">${escapeHtml(X.note)}</p>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+    const cv = $('canvas'), g = cv.getContext('2d');
+    const H = cv.height, R = 4;
+    const boxW = () => V / 8 * (cv.width - 5); // width, and so area, is proportional to V
+    const parts = Array.from({ length: 26 }, (_, i) => {
+      const a = (i + 0.5) / 26 * Math.PI * 2;
+      return { x: R + Math.random() * (boxW() - 2 * R), y: R + Math.random() * (H - 2 * R), ux: Math.cos(a), uy: Math.sin(a) };
+    });
+    const pressure = () => (T / 300) * (4 / V);
+
+    function labels() {
+      $('[data-tval]').textContent = `${T} K`;
+      $('[data-vval]').textContent = `${V.toFixed(1)} L`;
+      $('[data-pres]').textContent = `${X.pres}: ${pressure().toFixed(2)} atm`;
+      // Ideal gas: hits per bit of wall go as speed / volume, force per hit as speed.
+      $('[data-hits]').textContent = `${X.hits}: ×${(Math.sqrt(T / 300) * 4 / V).toFixed(2)}`;
+      $('[data-push]').textContent = `${X.push}: ×${Math.sqrt(T / 300).toFixed(2)}`;
+    }
+    function frame() {
+      if (!cv.isConnected) return; // section re-rendered or left the page
+      if (cv.offsetParent !== null) {
+        const w = boxW(), sp = 2.4 * Math.sqrt(T / 300);
+        g.fillStyle = '#0d1b2a'; g.fillRect(0, 0, cv.width, H);
+        g.fillStyle = '#1b2d42'; g.fillRect(0, 0, w, H);
+        g.fillStyle = '#e8384f'; g.fillRect(w, 0, 5, H);
+        g.fillStyle = `hsl(${Math.round(215 - 205 * (T - 100) / 500)}, 85%, 62%)`;
+        parts.forEach(p => {
+          if (p.x > w - R) p.x = R + Math.random() * (w - 2 * R);
+          p.x += p.ux * sp; p.y += p.uy * sp;
+          if (p.x < R) { p.x = R; p.ux = Math.abs(p.ux); } else if (p.x > w - R) { p.x = w - R; p.ux = -Math.abs(p.ux); }
+          if (p.y < R) { p.y = R; p.uy = Math.abs(p.uy); } else if (p.y > H - R) { p.y = H - R; p.uy = -Math.abs(p.uy); }
+          g.beginPath(); g.arc(p.x, p.y, R, 0, Math.PI * 2); g.fill();
+        });
+      }
+      requestAnimationFrame(frame);
+    }
+    function setMode(m) {
+      mode = m;
+      const c = MOL_CHALLENGES[m];
+      T = 300; V = 4;
+      $('[data-t]').value = T; $('[data-v]').value = V;
+      $('[data-t]').disabled = !!c && c.lock === 'T';
+      $('[data-v]').disabled = !!c && c.lock === 'V';
+      $('[data-tlock]').textContent = c && c.lock === 'T' ? X.locked : '';
+      $('[data-vlock]').textContent = c && c.lock === 'V' ? X.locked : '';
+      $('[data-goal]').textContent = c ? tr(c.goal, lang) : X.freeNote;
+      $('[data-checkwrap]').style.display = c ? 'block' : 'none';
+      $('[data-checkbox]').disabled = false;
+      $('[data-msg]').textContent = ''; $('[data-why]').innerHTML = '';
+      mount.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('selected', Number(b.getAttribute('data-mode')) === m));
+      labels();
+    }
+    function askWhy() {
+      const c = MOL_CHALLENGES[mode];
+      const box = $('[data-why]');
+      box.innerHTML = `<p style="margin:0.4rem 0;"><strong>${escapeHtml(tr(c.why, lang))}</strong></p><div class="pm-mc">${c.choices.map((ch, i) => `<button type="button" data-w="${i}">${escapeHtml(tr(ch, lang))}</button>`).join('')}</div><div class="pm-msg" data-wmsg></div>`;
+      box.querySelectorAll('[data-w]').forEach(b => b.addEventListener('click', () => {
+        const wm = box.querySelector('[data-wmsg]');
+        if (Number(b.getAttribute('data-w')) !== c.correct) { b.classList.add('wrong'); b.disabled = true; wm.className = 'pm-msg bad'; wm.textContent = X.wrongWhy; return; }
+        b.classList.add('right');
+        box.querySelectorAll('[data-w]').forEach(x => { x.disabled = true; });
+        wm.className = 'pm-msg ok'; wm.textContent = X.done;
+      }));
+    }
+    $('[data-t]').addEventListener('input', (e) => { T = Number(e.target.value); labels(); });
+    $('[data-v]').addEventListener('input', (e) => { V = Number(e.target.value); labels(); });
+    $('[data-checkbox]').addEventListener('click', () => {
+      const c = MOL_CHALLENGES[mode], msg = $('[data-msg]');
+      if (Math.abs(pressure() - c.target) > 0.02) { msg.className = 'pm-msg bad'; msg.textContent = X.notYet(pressure().toFixed(2), c.target.toFixed(2)); return; }
+      msg.className = 'pm-msg ok'; msg.textContent = X.reached;
+      $('[data-checkbox]').disabled = true;
+      $('[data-t]').disabled = true; $('[data-v]').disabled = true;
+      askWhy();
+    });
+    mount.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(Number(b.getAttribute('data-mode')))));
+    setMode(0);
+    requestAnimationFrame(frame);
+  }
+
+  // ======================================================================
+  // Widget (Lesson 61): weather balloon. Predict, then climb.
+  // ======================================================================
+  // Altitude data from the class weather balloon table.
+  const ALTITUDES = [
+    { ft: '0', C: 17, P: 1.0 }, { ft: '5,000', C: 5, P: 0.8 }, { ft: '10,000', C: -5, P: 0.7 },
+    { ft: '25,000', C: -35, P: 0.4 }, { ft: '30,000', C: -45, P: 0.3 }, { ft: '40,000', C: -57, P: 0.2 }
+  ];
+  const ALT_V0 = 5000;
+  const ALT_TXT = {
+    en: {
+      predict: 'Predict first. As a weather balloon rises, the pressure drops AND the temperature drops. What happens to its volume?',
+      opts: ['It grows', 'It shrinks', 'It stays the same'], again: 'Now climb and test your prediction.',
+      slider: 'Altitude', label: 'Balloon at this altitude (it held 5,000 L on the ground)',
+      pEff: 'Pressure effect (1.0 ÷ P)', tEff: 'Temperature effect (T ÷ 290)', vol: 'Volume',
+      grow: 'pushes the volume UP', shrink: 'pushes the volume DOWN', none: 'no change yet',
+      ground: 'On the ground: drag the slider upward.',
+      up: 'The lower pressure enlarges the balloon far more than the colder air shrinks it. Pressure wins, so the balloon grows.',
+      guessRight: '✓ Your prediction holds.', guessWrong: 'Your prediction was different — check which effect is bigger.', svg: 'Weather balloon'
+    },
+    es: {
+      predict: 'Primero predice. Cuando un globo meteorológico sube, la presión baja Y la temperatura baja. ¿Qué pasa con su volumen?',
+      opts: ['Crece', 'Se encoge', 'Se mantiene igual'], again: 'Ahora sube y pon a prueba tu predicción.',
+      slider: 'Altitud', label: 'Globo a esta altitud (en el suelo tenía 5,000 L)',
+      pEff: 'Efecto de la presión (1.0 ÷ P)', tEff: 'Efecto de la temperatura (T ÷ 290)', vol: 'Volumen',
+      grow: 'empuja el volumen hacia ARRIBA', shrink: 'empuja el volumen hacia ABAJO', none: 'sin cambio aún',
+      ground: 'En el suelo: mueve el control hacia arriba.',
+      up: 'La presión más baja agranda el globo mucho más de lo que el aire frío lo encoge. Gana la presión, así que el globo crece.',
+      guessRight: '✓ Tu predicción se cumple.', guessWrong: 'Tu predicción fue distinta — revisa cuál efecto es más grande.', svg: 'Globo meteorológico'
+    }
+  };
+
+  function renderAltitudeWidget(mount, lang) {
+    const X = ALT_TXT[lang];
+    let guess = null;
+    mount.innerHTML = `
+      <div class="pm-widget">
+        <p class="pm-lead"><strong>${escapeHtml(X.predict)}</strong></p>
+        <div class="pm-choices">${X.opts.map((o, i) => `<button type="button" class="pm-opt" data-g="${i}">${escapeHtml(o)}</button>`).join('')}</div>
+        <div data-after style="display:none;">
+          <p class="pm-compare">${escapeHtml(X.again)}</p>
+          <label style="font-size:0.85rem;">${escapeHtml(X.slider)}: <strong data-aval></strong></label>
+          <input type="range" data-a min="0" max="${ALTITUDES.length - 1}" step="1" value="0">
+          <div class="pm-stage" style="margin-top:0.5rem;">
+            <div data-art></div>
+            <div class="pm-panel"><div class="pm-formula-label">${escapeHtml(X.label)}</div><div class="pm-formula" data-read style="white-space:pre-line;"></div></div>
+          </div>
+          <div class="pm-insight" data-insight></div>
+        </div>
+      </div>`;
+    const $ = (s) => mount.querySelector(s);
+    function redraw() {
+      const a = ALTITUDES[Number($('[data-a]').value)], K = a.C + 273;
+      const pf = 1 / a.P, tf = K / 290, V = ALT_V0 * pf * tf, r = 28 * Math.cbrt(V / ALT_V0);
+      const eff = (f) => Math.abs(f - 1) < 0.001 ? X.none : (f > 1 ? X.grow : X.shrink);
+      $('[data-aval]').textContent = `${a.ft} ft`;
+      $('[data-art]').innerHTML = `<svg viewBox="0 0 150 150" width="150" class="pm-svg" role="img" aria-label="${escapeHtml(X.svg)}">
+        <ellipse cx="75" cy="62" rx="${r.toFixed(1)}" ry="${(r * 1.12).toFixed(1)}" fill="#f4a261" stroke="#253a52" stroke-width="2"/>
+        <line x1="75" y1="${(62 + r * 1.12).toFixed(1)}" x2="75" y2="136" stroke="#8a8275"/><rect x="67" y="136" width="16" height="11" fill="#253a52"/>
+      </svg>`;
+      $('[data-read]').textContent = `T = ${a.C} °C = ${K} K\nP = ${a.P.toFixed(2)} atm\n${X.pEff}: ×${pf.toFixed(2)} → ${eff(pf)}\n${X.tEff}: ×${tf.toFixed(2)} → ${eff(tf)}\n${X.vol}: ${comma(Math.round(V / 100) * 100)} L`;
+      const atGround = Number($('[data-a]').value) === 0;
+      $('[data-insight]').textContent = atGround ? X.ground : `${guess === 0 ? X.guessRight : X.guessWrong} ${X.up}`;
+    }
+    mount.querySelectorAll('[data-g]').forEach(b => b.addEventListener('click', () => {
+      if (guess !== null) return;
+      guess = Number(b.getAttribute('data-g'));
+      b.classList.add('selected');
+      mount.querySelectorAll('[data-g]').forEach(x => { x.disabled = true; });
+      $('[data-after]').style.display = 'block';
+      redraw();
+    }));
+    $('[data-a]').addEventListener('input', redraw);
+  }
+
+  // ======================================================================
+  // Widget (Lessons 59-61): which gas law? Find what stays the same.
+  // ======================================================================
+  const LAW_ITEMS = [
+    { s: L('You slowly push in the plunger of a sealed syringe in a room that stays at 22 °C.', 'Empujas lentamente el émbolo de una jeringa sellada en un cuarto que se mantiene a 22 °C.'), c: 0 },
+    { s: L('A can of spray paint is left inside a hot car all afternoon.', 'Una lata de pintura en aerosol se queda en un carro caliente toda la tarde.'), c: 1 },
+    { s: L('A balloon is set in warm water. The air pressure around it does not change.', 'Un globo se pone en agua tibia. La presión del aire a su alrededor no cambia.'), c: 2 },
+    { s: L('A weather balloon rises into thinner, colder air.', 'Un globo meteorológico sube hacia aire más delgado y frío.'), c: 3 },
+    { s: L('A bubble rises from the bottom of a lake where the water is the same temperature top to bottom.', 'Una burbuja sube desde el fondo de un lago donde el agua tiene la misma temperatura arriba y abajo.'), c: 0 },
+    { s: L('A sealed steel tank is moved from a warm garage into the winter cold.', 'Un tanque de acero sellado se mueve de un garaje tibio al frío del invierno.'), c: 1 }
+  ];
+  const LAW_TXT = {
+    en: {
+      count: (n, t2) => `Situation ${n} of ${t2}`, ask: 'What stays the same? (The amount of gas never changes here.)',
+      opts: ['Temperature stays the same', 'Volume stays the same', 'Pressure stays the same', 'P, V and T can all change'],
+      laws: ['Boyle\'s law:  P × V = k', 'Gay-Lussac\'s law:  P ÷ T = k', 'Charles\'s law:  V ÷ T = k', 'Combined gas law:  P × V ÷ T = k'],
+      wrong: 'Not that one. Picture the container: can it change size? Does the heat change? Does the surrounding pressure change?'
+    },
+    es: {
+      count: (n, t2) => `Situación ${n} de ${t2}`, ask: '¿Qué se mantiene igual? (La cantidad de gas nunca cambia aquí.)',
+      opts: ['La temperatura se mantiene', 'El volumen se mantiene', 'La presión se mantiene', 'P, V y T pueden cambiar'],
+      laws: ['Ley de Boyle:  P × V = k', 'Ley de Gay-Lussac:  P ÷ T = k', 'Ley de Charles:  V ÷ T = k', 'Ley combinada de los gases:  P × V ÷ T = k'],
+      wrong: 'Esa no. Imagina el recipiente: ¿puede cambiar de tamaño? ¿Cambia el calor? ¿Cambia la presión de alrededor?'
+    }
+  };
+
+  function renderLawSorter(mount, lang) {
+    const X = LAW_TXT[lang];
+    let idx = 0;
+    function show() {
+      const it = LAW_ITEMS[idx];
+      mount.innerHTML = `
+        <div class="pm-widget">
+          <div class="pm-mode-badge">${escapeHtml(X.count(idx + 1, LAW_ITEMS.length))}</div>
+          <p style="margin:0.2rem 0 0.4rem;"><strong>${escapeHtml(tr(it.s, lang))}</strong></p>
+          <p class="pm-lead">${escapeHtml(X.ask)}</p>
+          <div class="pm-mc">${X.opts.map((o, i) => `<button type="button" data-c="${i}">${escapeHtml(o)}</button>`).join('')}</div>
+          <div class="pm-msg" data-msg></div>
+          <div data-law></div>
+          <p data-nextwrap style="display:none;margin-top:0.6rem;"><button type="button" class="pm-btn" data-next></button></p>
+        </div>`;
+      const msg = mount.querySelector('[data-msg]');
+      mount.querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
+        if (Number(b.getAttribute('data-c')) !== it.c) { b.classList.add('wrong'); b.disabled = true; msg.className = 'pm-msg bad'; msg.textContent = X.wrong; return; }
+        b.classList.add('right');
+        mount.querySelectorAll('[data-c]').forEach(x => { x.disabled = true; });
+        msg.className = 'pm-msg ok'; msg.textContent = t('right', lang);
+        mount.querySelector('[data-law]').innerHTML = `<div class="pm-solved">${escapeHtml(X.laws[it.c])}</div>`;
+        mount.querySelector('[data-nextwrap]').style.display = 'block';
+        const nb = mount.querySelector('[data-next]');
+        nb.textContent = idx + 1 < LAW_ITEMS.length ? t('next', lang) : t('startOver', lang);
+        nb.addEventListener('click', () => { idx = (idx + 1) % LAW_ITEMS.length; show(); });
+      }));
+    }
+    show();
+  }
+
+  // ======================================================================
+  // Widget (quiz focus): step-by-step gas law problems, solved the class way
+  // -- set up before/after, find k, then use k.
+  // ======================================================================
+  const SAME_CHOICES = [L('Temperature → Boyle\'s law', 'Temperatura → ley de Boyle'), L('Pressure → Charles\'s law', 'Presión → ley de Charles'), L('Volume → Gay-Lussac\'s law', 'Volumen → ley de Gay-Lussac'), L('Nothing stays the same → combined gas law', 'Nada se mantiene → ley combinada')];
+  function sameStep(correct) {
+    return { title: L('What stays the same? Pick the law.', '¿Qué se mantiene igual? Elige la ley.'),
+      hint: L('Read the table: a variable stays the same if its before and after match, or if the problem says it cannot change.', 'Lee la tabla: una variable se mantiene si su antes y después son iguales, o si el problema dice que no puede cambiar.'),
+      choices: SAME_CHOICES, correct, wrong: L('Check the table again: which quantity is the same before and after?', 'Revisa la tabla: ¿qué cantidad es igual antes y después?') };
+  }
+  const HEAD = [L('', ''), L('Before (1)', 'Antes (1)'), L('After (2)', 'Después (2)')];
+  const P_ROW = L('Pressure', 'Presión'), V_ROW = L('Volume', 'Volumen'), T_ROW = L('Temperature', 'Temperatura');
+  const SAME = L('same', 'igual');
+  const SETUP = L('Set-up table (? = what you are solving for)', 'Tabla de datos (? = lo que vas a calcular)');
+  const K_LABEL = L('k =', 'k =');
+  const NOT_C = L('That used °C. Convert to kelvins and use those numbers.', 'Eso usó °C. Convierte a kelvin y usa esos números.');
+  const kelvinStep = (a, b, ca, cb) => ({
+    title: L('Convert both temperatures to kelvins', 'Convierte ambas temperaturas a kelvin'),
+    hint: L('K = °C + 273', 'K = °C + 273'),
+    fields: [{ label: L('T₁ =', 'T₁ ='), unit: L('K', 'K'), answer: a, rel: 0, abs: 1 }, { label: L('T₂ =', 'T₂ ='), unit: L('K', 'K'), answer: b, rel: 0, abs: 1 }],
+    traps: [{ field: 0, value: ca - 273, msg: L('You subtracted 273. To get kelvins, ADD 273.', 'Restaste 273. Para obtener kelvin, SUMA 273.') }, { field: 0, value: ca, msg: L('That is still °C. Add 273.', 'Eso todavía está en °C. Suma 273.') }, { field: 1, value: cb, msg: L('T₂ is still in °C. Add 273.', 'T₂ todavía está en °C. Suma 273.') }]
+  });
+
+  const GAS_PROBLEMS = [
+    {
+      prompt: L('A diver\'s balloon holds 6.0 L of air at 1.2 atm. Deeper down it is squeezed to 2.4 L. The water temperature does not change. What is the new pressure?', 'El globo de un buzo contiene 6.0 L de aire a 1.2 atm. Más abajo se comprime a 2.4 L. La temperatura del agua no cambia. ¿Cuál es la nueva presión?'),
+      table: { caption: SETUP, head: HEAD, rows: [[P_ROW, '1.2 atm', '?'], [V_ROW, '6.0 L', '2.4 L'], [T_ROW, SAME, SAME]] },
+      steps: [
+        sameStep(0),
+        { title: L('Find k from the BEFORE column', 'Encuentra k con la columna ANTES'), hint: L('Boyle: k = P₁ × V₁', 'Boyle: k = P₁ × V₁'),
+          fields: [{ label: K_LABEL, unit: L('atm·L', 'atm·L'), answer: 7.2 }],
+          traps: [{ value: 0.2, msg: L('You divided. For Boyle\'s law, multiply: k = P × V.', 'Dividiste. En la ley de Boyle se multiplica: k = P × V.') }, { value: 5, msg: L('You divided. For Boyle\'s law, multiply: k = P × V.', 'Dividiste. En la ley de Boyle se multiplica: k = P × V.') }] },
+        { title: L('Use k with the AFTER column', 'Usa k con la columna DESPUÉS'), hint: L('P₂ × V₂ = k, so P₂ = k ÷ V₂', 'P₂ × V₂ = k, así que P₂ = k ÷ V₂'),
+          fields: [{ label: L('P₂ =', 'P₂ ='), unit: L('atm', 'atm'), answer: 3 }],
+          traps: [{ value: 17.28, msg: L('You multiplied k by V₂. Divide: P₂ = k ÷ V₂.', 'Multiplicaste k por V₂. Divide: P₂ = k ÷ V₂.') }, { value: 0.48, msg: L('The volume went DOWN, so the pressure must go UP. P₂ = k ÷ V₂.', 'El volumen BAJÓ, así que la presión debe SUBIR. P₂ = k ÷ V₂.') }] }
+      ],
+      done: L('k = 7.2 atm·L and P₂ = 7.2 ÷ 2.4 = 3.0 atm. Check: smaller volume → bigger pressure ✓', 'k = 7.2 atm·L y P₂ = 7.2 ÷ 2.4 = 3.0 atm. Comprobación: menor volumen → mayor presión ✓')
+    },
+    {
+      prompt: L('A rigid tank holds gas at 1.5 atm and 27 °C. It is heated to 127 °C. What is the new pressure?', 'Un tanque rígido contiene gas a 1.5 atm y 27 °C. Se calienta a 127 °C. ¿Cuál es la nueva presión?'),
+      table: { caption: SETUP, head: HEAD, rows: [[P_ROW, '1.5 atm', '?'], [V_ROW, SAME, SAME], [T_ROW, '27 °C', '127 °C']] },
+      steps: [
+        sameStep(2),
+        kelvinStep(300, 400, 27, 127),
+        { title: L('Find k', 'Encuentra k'), hint: L('Gay-Lussac: k = P₁ ÷ T₁ (T in kelvins)', 'Gay-Lussac: k = P₁ ÷ T₁ (T en kelvin)'),
+          fields: [{ label: K_LABEL, unit: L('atm/K', 'atm/K'), answer: 0.005 }],
+          traps: [{ value: 0.0556, msg: NOT_C }, { value: 200, msg: L('That is T ÷ P. Use k = P ÷ T.', 'Eso es T ÷ P. Usa k = P ÷ T.') }, { value: 450, msg: L('Do not multiply. k = P ÷ T.', 'No multipliques. k = P ÷ T.') }] },
+        { title: L('Use k to find the new pressure', 'Usa k para hallar la nueva presión'), hint: L('P₂ = k × T₂', 'P₂ = k × T₂'),
+          fields: [{ label: L('P₂ =', 'P₂ ='), unit: L('atm', 'atm'), answer: 2 }],
+          traps: [{ value: 0.635, msg: NOT_C }, { value: 80000, msg: L('You divided T₂ by k. Multiply: P₂ = k × T₂.', 'Dividiste T₂ entre k. Multiplica: P₂ = k × T₂.') }] }
+      ],
+      done: L('k = 0.005 atm/K and P₂ = 0.005 × 400 = 2.0 atm. Check: hotter gas, same volume → more pressure ✓', 'k = 0.005 atm/K y P₂ = 0.005 × 400 = 2.0 atm. Comprobación: gas más caliente, mismo volumen → más presión ✓')
+    },
+    {
+      prompt: L('A sample of argon takes up 3.0 L at 300 K and 0.80 atm. It is warmed to 600 K and the pressure rises to 1.2 atm. What is the new volume?', 'Una muestra de argón ocupa 3.0 L a 300 K y 0.80 atm. Se calienta a 600 K y la presión sube a 1.2 atm. ¿Cuál es el nuevo volumen?'),
+      table: { caption: SETUP, head: HEAD, rows: [[P_ROW, '0.80 atm', '1.2 atm'], [V_ROW, '3.0 L', '?'], [T_ROW, '300 K', '600 K']] },
+      steps: [
+        sameStep(3),
+        { title: L('Find k from the BEFORE column', 'Encuentra k con la columna ANTES'), hint: L('Combined: k = P₁ × V₁ ÷ T₁', 'Combinada: k = P₁ × V₁ ÷ T₁'),
+          fields: [{ label: K_LABEL, unit: L('atm·L/K', 'atm·L/K'), answer: 0.008 }],
+          traps: [{ value: 720, msg: L('Multiply P by V, then DIVIDE by T.', 'Multiplica P por V y luego DIVIDE entre T.') }, { value: 125, msg: L('That is upside down. k = P × V ÷ T.', 'Está al revés. k = P × V ÷ T.') }, { value: 2.4, msg: L('That is P × V. Now divide by T.', 'Eso es P × V. Ahora divide entre T.') }] },
+        { title: L('Which line gets V₂ by itself?', '¿Cuál expresión despeja V₂?'), hint: L('Start with P₂ × V₂ ÷ T₂ = k. Undo ÷ T₂ by multiplying, then undo × P₂ by dividing.', 'Empieza con P₂ × V₂ ÷ T₂ = k. Deshaz ÷ T₂ multiplicando y luego deshaz × P₂ dividiendo.'),
+          choices: [L('V₂ = k × P₂ ÷ T₂', 'V₂ = k × P₂ ÷ T₂'), L('V₂ = k ÷ (T₂ × P₂)', 'V₂ = k ÷ (T₂ × P₂)'), L('V₂ = k × T₂ ÷ P₂', 'V₂ = k × T₂ ÷ P₂')], correct: 2,
+          wrong: L('Volume should get bigger with temperature and smaller with pressure.', 'El volumen debe crecer con la temperatura y reducirse con la presión.') },
+        { title: L('Solve', 'Resuelve'), hint: L('0.008 × 600 ÷ 1.2', '0.008 × 600 ÷ 1.2'),
+          fields: [{ label: L('V₂ =', 'V₂ ='), unit: L('L', 'L'), answer: 4 }],
+          traps: [{ value: 4.8, msg: L('Almost — now divide by P₂.', 'Casi — ahora divide entre P₂.') }, { value: 6, msg: L('That only counts the temperature change. Include the pressure change.', 'Eso solo cuenta el cambio de temperatura. Incluye el cambio de presión.') }, { value: 2, msg: L('That only counts the pressure change. Include the temperature change.', 'Eso solo cuenta el cambio de presión. Incluye el cambio de temperatura.') }] }
+      ],
+      done: L('V₂ = 0.008 × 600 ÷ 1.2 = 4.0 L. Doubling T alone would give 6.0 L; the higher pressure squeezes it back to 4.0 L ✓', 'V₂ = 0.008 × 600 ÷ 1.2 = 4.0 L. Solo duplicar T daría 6.0 L; la presión más alta lo comprime a 4.0 L ✓')
+    },
+    {
+      prompt: L('Gas in a flexible bag takes up 4.0 L at 1.0 atm and 127 °C. It cools to 27 °C while the pressure drops to 0.50 atm. What is the new volume?', 'Un gas en una bolsa flexible ocupa 4.0 L a 1.0 atm y 127 °C. Se enfría a 27 °C mientras la presión baja a 0.50 atm. ¿Cuál es el nuevo volumen?'),
+      table: { caption: SETUP, head: HEAD, rows: [[P_ROW, '1.0 atm', '0.50 atm'], [V_ROW, '4.0 L', '?'], [T_ROW, '127 °C', '27 °C']] },
+      steps: [
+        sameStep(3),
+        kelvinStep(400, 300, 127, 27),
+        { title: L('Find k', 'Encuentra k'), hint: L('k = P₁ × V₁ ÷ T₁', 'k = P₁ × V₁ ÷ T₁'),
+          fields: [{ label: K_LABEL, unit: L('atm·L/K', 'atm·L/K'), answer: 0.01 }],
+          traps: [{ value: 0.0315, msg: NOT_C }, { value: 100, msg: L('That is upside down. k = P × V ÷ T.', 'Está al revés. k = P × V ÷ T.') }] },
+        { title: L('Use k to find the new volume', 'Usa k para hallar el nuevo volumen'), hint: L('V₂ = k × T₂ ÷ P₂', 'V₂ = k × T₂ ÷ P₂'),
+          fields: [{ label: L('V₂ =', 'V₂ ='), unit: L('L', 'L'), answer: 6 }],
+          traps: [{ value: 3, msg: L('Almost — now divide by P₂.', 'Casi — ahora divide entre P₂.') }, { value: 1.7, msg: NOT_C }] }
+      ],
+      done: L('V₂ = 0.01 × 300 ÷ 0.50 = 6.0 L. Cooling shrinks the gas, but halving the pressure expands it more ✓', 'V₂ = 0.01 × 300 ÷ 0.50 = 6.0 L. Enfriar reduce el gas, pero bajar la presión a la mitad lo expande más ✓')
+    },
+    {
+      prompt: L('Table problem: all three rows describe the same sample of gas. What temperature, in °C, completes the table?', 'Problema de tabla: las tres filas describen la misma muestra de gas. ¿Qué temperatura, en °C, completa la tabla?'),
+      table: { caption: L('One sample of gas under three conditions', 'Una muestra de gas en tres condiciones'), head: [P_ROW, V_ROW, T_ROW],
+        rows: [['3.0 atm', '4.0 L', '327 °C'], ['1.5 atm', '4.0 L', '27 °C'], ['0.50 atm', '4.0 L', '?']] },
+      steps: [
+        sameStep(2),
+        { title: L('Convert the two known temperatures to kelvins', 'Convierte las dos temperaturas conocidas a kelvin'), hint: L('K = °C + 273', 'K = °C + 273'),
+          fields: [{ label: L('327 °C =', '327 °C ='), unit: L('K', 'K'), answer: 600, rel: 0, abs: 1 }, { label: L('27 °C =', '27 °C ='), unit: L('K', 'K'), answer: 300, rel: 0, abs: 1 }],
+          traps: [{ field: 0, value: 54, msg: L('You subtracted 273. Add it.', 'Restaste 273. Súmalo.') }] },
+        { title: L('Find k using either complete row', 'Encuentra k con cualquier fila completa'), hint: L('k = P ÷ T. Both complete rows should give the same k.', 'k = P ÷ T. Las dos filas completas deben dar la misma k.'),
+          fields: [{ label: K_LABEL, unit: L('atm/K', 'atm/K'), answer: 0.005 }],
+          traps: [{ value: 0.00917, msg: NOT_C }, { value: 0.0556, msg: NOT_C }, { value: 200, msg: L('That is T ÷ P. Use k = P ÷ T.', 'Eso es T ÷ P. Usa k = P ÷ T.') }] },
+        { title: L('Find the missing temperature in kelvins', 'Encuentra la temperatura que falta en kelvin'), hint: L('P ÷ T = k, so T = P ÷ k', 'P ÷ T = k, así que T = P ÷ k'),
+          fields: [{ label: L('T =', 'T ='), unit: L('K', 'K'), answer: 100, rel: 0, abs: 1 }],
+          traps: [{ value: 0.0025, msg: L('You multiplied. T = P ÷ k.', 'Multiplicaste. T = P ÷ k.') }, { value: -173, msg: L('That is the °C answer — this box asks for kelvins first.', 'Esa es la respuesta en °C — esta casilla pide primero kelvin.') }] },
+        { title: L('Change it back to °C', 'Regrésala a °C'), hint: L('°C = K − 273', '°C = K − 273'),
+          fields: [{ label: L('T =', 'T ='), unit: L('°C', '°C'), answer: -173, rel: 0, abs: 1 }],
+          traps: [{ value: 373, msg: L('You added 273. Going from K to °C, subtract.', 'Sumaste 273. De K a °C se resta.') }, { value: 173, msg: L('Watch the sign: 100 − 273 is negative.', 'Cuidado con el signo: 100 − 273 es negativo.') }] }
+      ],
+      done: L('0.50 atm is one third of 1.5 atm, so the kelvin temperature is one third of 300 K: 100 K = −173 °C ✓', '0.50 atm es un tercio de 1.5 atm, así que la temperatura Kelvin es un tercio de 300 K: 100 K = −173 °C ✓')
+    }
+  ];
+
+  // ======================================================================
+  // Widget (quiz focus): build a molecular explanation, then write one.
+  // ======================================================================
+  const SPEED = [L('faster', 'más rápido'), L('slower', 'más lento'), L('at the same speed', 'con la misma rapidez')];
+  const VOL = [L('increases', 'aumenta'), L('decreases', 'disminuye'), L('stays the same', 'se mantiene igual')];
+  const MASS = [L('increases', 'aumenta'), L('decreases', 'disminuye'), L('stays the same', 'se mantiene igual')];
+  const DENS = [L('increases', 'aumenta'), L('decreases', 'disminuye'), L('stays the same', 'se mantiene igual')];
+  const F_SPEED = L('The gas molecules move', 'Las moléculas del gas se mueven');
+  const F_VOL = L('So the volume of the gas', 'Así que el volumen del gas');
+  const F_MASS = L('The mass of the gas', 'La masa del gas');
+  const F_DENS = L('So the density of the gas', 'Así que la densidad del gas');
+  const EXPLAIN = [
+    { s: L('A sealed, flexible bag of air sits on a car seat in the hot sun.', 'Una bolsa flexible y sellada con aire está en el asiento de un carro bajo el sol.'),
+      slots: [
+        { f: F_SPEED, o: SPEED, c: 0 },
+        { f: L('At first they hit the walls', 'Al principio golpean las paredes'), o: [L('less often and more softly', 'menos veces y más suave'), L('more often and harder, pushing the walls out', 'más veces y más fuerte, empujando las paredes'), L('exactly as before', 'igual que antes')], c: 1 },
+        { f: F_VOL, o: VOL, c: 0 }, { f: F_MASS, o: MASS, c: 2 }, { f: F_DENS, o: DENS, c: 1 }
+      ] },
+    { s: L('A sealed bag of pretzels is driven up a mountain, where the outside air pressure is lower. The temperature stays the same.', 'Una bolsa sellada de pretzels se lleva a una montaña, donde la presión del aire es menor. La temperatura no cambia.'),
+      slots: [
+        { f: F_SPEED, o: SPEED, c: 2 },
+        { f: L('The inside hits now out-push the outside air, so the bag stretches until the inside molecules hit each bit of wall', 'Los choques de adentro ahora superan al aire de afuera, así que la bolsa se estira hasta que las moléculas de adentro golpean cada parte de la pared'), o: [L('less often', 'menos veces'), L('more often', 'más veces'), L('much harder', 'mucho más fuerte')], c: 0 },
+        { f: F_VOL, o: VOL, c: 0 }, { f: F_MASS, o: MASS, c: 2 }, { f: F_DENS, o: DENS, c: 1 }
+      ] },
+    { s: L('A sealed, soft plastic bottle of air is pushed deep under water. The temperature stays the same.', 'Una botella de plástico blando, sellada y llena de aire, se hunde profundo en el agua. La temperatura no cambia.'),
+      slots: [
+        { f: F_SPEED, o: SPEED, c: 2 },
+        { f: L('As the water squeezes the walls closer together, the molecules hit them', 'Cuando el agua acerca las paredes, las moléculas las golpean'), o: [L('less often', 'menos veces'), L('more often', 'más veces'), L('with less force', 'con menos fuerza')], c: 1 },
+        { f: F_VOL, o: VOL, c: 1 }, { f: F_MASS, o: MASS, c: 2 }, { f: F_DENS, o: DENS, c: 0 }
+      ] }
+  ];
+  const EXPLAIN_TXT = {
+    en: { count: (n, t2) => `Explanation ${n} of ${t2}`, choose: 'choose…', all: 'Fill in every blank first.', some: (n) => `${n} blank(s) to fix — they are outlined in red.`, good: '✓ A complete explanation. Read it through once from top to bottom.', checkIt: 'Check my explanation' },
+    es: { count: (n, t2) => `Explicación ${n} de ${t2}`, choose: 'elige…', all: 'Primero llena todos los espacios.', some: (n) => `Hay ${n} espacio(s) por corregir — están marcados en rojo.`, good: '✓ Una explicación completa. Léela de principio a fin.', checkIt: 'Revisar mi explicación' }
+  };
+
+  function renderExplainWidget(mount, lang) {
+    const X = EXPLAIN_TXT[lang];
+    let idx = 0;
+    function show() {
+      const it = EXPLAIN[idx];
+      mount.innerHTML = `
+        <div class="pm-widget">
+          <div class="pm-mode-badge${idx === 0 ? ' guided' : ''}">${escapeHtml(X.count(idx + 1, EXPLAIN.length))}</div>
+          <p style="margin:0.2rem 0 0.6rem;"><strong>${escapeHtml(tr(it.s, lang))}</strong></p>
+          ${it.slots.map((sl, i) => `<p class="pm-slot">${escapeHtml(tr(sl.f, lang))} <select data-s="${i}" aria-label="${escapeHtml(tr(sl.f, lang))}"><option value="">${escapeHtml(X.choose)}</option>${sl.o.map((o, oi) => `<option value="${oi}">${escapeHtml(tr(o, lang))}</option>`).join('')}</select>.</p>`).join('')}
+          <p style="margin:0;"><button type="button" class="pm-btn" data-checkex>${escapeHtml(X.checkIt)}</button></p>
+          <div class="pm-msg" data-msg></div>
+          <p data-nextwrap style="display:none;margin-top:0.6rem;"><button type="button" class="pm-btn" data-next></button></p>
+        </div>`;
+      const msg = mount.querySelector('[data-msg]');
+      const selects = Array.from(mount.querySelectorAll('[data-s]'));
+      selects.forEach(s => s.addEventListener('change', () => s.classList.remove('bad', 'ok')));
+      mount.querySelector('[data-checkex]').addEventListener('click', () => {
+        if (selects.some(s => s.value === '')) { msg.className = 'pm-msg bad'; msg.textContent = X.all; return; }
+        let wrong = 0;
+        selects.forEach((s, i) => {
+          const ok = Number(s.value) === it.slots[i].c;
+          if (!ok) wrong++;
+          s.classList.toggle('ok', ok); s.classList.toggle('bad', !ok);
+        });
+        if (wrong) { msg.className = 'pm-msg bad'; msg.textContent = X.some(wrong); return; }
+        msg.className = 'pm-msg ok'; msg.textContent = X.good;
+        selects.forEach(s => { s.disabled = true; });
+        mount.querySelector('[data-checkex]').disabled = true;
+        mount.querySelector('[data-nextwrap]').style.display = 'block';
+        const nb = mount.querySelector('[data-next]');
+        nb.textContent = idx + 1 < EXPLAIN.length ? t('next', lang) : t('startOver', lang);
+        nb.addEventListener('click', () => { idx = (idx + 1) % EXPLAIN.length; show(); });
+      });
+    }
+    show();
+  }
+
+  const WRITE_TXT = {
+    en: {
+      q: 'Now write your own. A sealed STEEL tank of gas is heated by a fire. What happens to the pressure, volume, and density of the gas? Explain using molecules.',
+      ph: 'Type your explanation here (this is practice — it is not saved or sent).',
+      show: 'Compare with a strong answer', checklist: 'Check your own writing. Did you…',
+      items: ['say what happens to the speed of the molecules?', 'say how their collisions with the walls change?', 'say what happens to the pressure?', 'say that the volume cannot change (rigid tank)?', 'connect the same mass and same volume to the same density?'],
+      sample: 'The molecules move faster, so they hit the walls of the tank more often and harder. That makes the pressure go up. The tank is rigid, so the volume stays the same. No gas enters or leaves, so the mass stays the same. Same mass in the same volume means the density stays the same.',
+      label: 'A strong answer', short: 'Write at least one full sentence first, then compare.'
+    },
+    es: {
+      q: 'Ahora escribe la tuya. Un tanque de ACERO sellado con gas se calienta con fuego. ¿Qué pasa con la presión, el volumen y la densidad del gas? Explica usando las moléculas.',
+      ph: 'Escribe tu explicación aquí (es práctica — no se guarda ni se envía).',
+      show: 'Comparar con una respuesta fuerte', checklist: 'Revisa tu escrito. ¿Tú…',
+      items: ['dijiste qué pasa con la rapidez de las moléculas?', 'dijiste cómo cambian sus choques con las paredes?', 'dijiste qué pasa con la presión?', 'dijiste que el volumen no puede cambiar (tanque rígido)?', 'conectaste la misma masa y el mismo volumen con la misma densidad?'],
+      sample: 'Las moléculas se mueven más rápido, así que golpean las paredes del tanque más veces y más fuerte. Por eso sube la presión. El tanque es rígido, así que el volumen no cambia. No entra ni sale gas, así que la masa no cambia. La misma masa en el mismo volumen significa que la densidad no cambia.',
+      label: 'Una respuesta fuerte', short: 'Primero escribe al menos una oración completa y luego compara.'
+    }
+  };
+
+  function renderWriteWidget(mount, lang) {
+    const X = WRITE_TXT[lang];
+    mount.innerHTML = `
+      <div class="pm-widget">
+        <p class="pm-lead"><strong>${escapeHtml(X.q)}</strong></p>
+        <textarea class="pm-text" rows="5" placeholder="${escapeHtml(X.ph)}" aria-label="${escapeHtml(X.q)}"></textarea>
+        <p style="margin:0.5rem 0 0;"><button type="button" class="pm-btn" data-show>${escapeHtml(X.show)}</button></p>
+        <div class="pm-msg" data-msg></div>
+        <div data-out></div>
+      </div>`;
+    mount.querySelector('[data-show]').addEventListener('click', () => {
+      const msg = mount.querySelector('[data-msg]');
+      if (mount.querySelector('textarea').value.trim().length < 25) { msg.className = 'pm-msg bad'; msg.textContent = X.short; return; }
+      msg.textContent = '';
+      mount.querySelector('[data-out]').innerHTML = `
+        <div class="pm-solved" style="font-weight:400;color:var(--text);"><div class="pm-formula-label">${escapeHtml(X.label)}</div>${escapeHtml(X.sample)}</div>
+        <p style="margin:0.7rem 0 0.3rem;"><strong>${escapeHtml(X.checklist)}</strong></p>
+        ${X.items.map(i => `<label class="pm-tick"><input type="checkbox"> ${escapeHtml(i)}</label>`).join('')}`;
+    });
+  }
+
+  // ======================================================================
+  // Widget: spot the mistake in a worked gas law solution.
+  // ======================================================================
+  const SPOT_ITEMS = [
+    { lines: ['k = 2.0 atm × 5.0 L = 10 atm·L', 'V₂ = k × P₂ = 10 × 4.0', 'V₂ = 40 L'], err: 1,
+      problem: L('A gas is 5.0 L at 2.0 atm. The pressure rises to 4.0 atm at the same temperature. Find V₂.', 'Un gas ocupa 5.0 L a 2.0 atm. La presión sube a 4.0 atm a la misma temperatura. Halla V₂.'),
+      why: L('k is right, but V₂ = k ÷ P₂ = 10 ÷ 4.0 = 2.5 L. More pressure must give a SMALLER volume, so 40 L cannot be right.', 'k está bien, pero V₂ = k ÷ P₂ = 10 ÷ 4.0 = 2.5 L. Más presión debe dar un volumen MENOR, así que 40 L no puede ser.') },
+    { lines: ['T₁ = 27 °C   T₂ = 127 °C', 'k = 1.2 ÷ 27 = 0.044', 'P₂ = 0.044 × 127 = 5.6 atm'], err: 0,
+      problem: L('A rigid can is 1.2 atm at 27 °C. It is heated to 127 °C. Find P₂.', 'Una lata rígida está a 1.2 atm y 27 °C. Se calienta a 127 °C. Halla P₂.'),
+      why: L('The temperatures were never converted. T₁ = 300 K and T₂ = 400 K, so k = 0.004 atm/K and P₂ = 1.6 atm.', 'Nunca se convirtieron las temperaturas. T₁ = 300 K y T₂ = 400 K, así que k = 0.004 atm/K y P₂ = 1.6 atm.') },
+    { lines: ['Use Boyle\'s law: P₁V₁ = P₂V₂', '(1.0)(3.0) = (0.50)(V₂)', 'V₂ = 6.0 L'], err: 0,
+      problem: L('A balloon is 3.0 L at 1.0 atm and 300 K. It rises to 0.50 atm and 250 K. Find V₂.', 'Un globo ocupa 3.0 L a 1.0 atm y 300 K. Sube a 0.50 atm y 250 K. Halla V₂.'),
+      why: L('Boyle\'s law only works if the temperature stays the same, and here it changed. Use the combined law: k = 1.0 × 3.0 ÷ 300 = 0.01, so V₂ = 0.01 × 250 ÷ 0.50 = 5.0 L.', 'La ley de Boyle solo sirve si la temperatura no cambia, y aquí cambió. Usa la combinada: k = 1.0 × 3.0 ÷ 300 = 0.01, así que V₂ = 0.01 × 250 ÷ 0.50 = 5.0 L.') },
+    { lines: ['k = (1.0)(2.0) ÷ 200 = 0.01', 'V₂ = k × P₂ ÷ T₂', 'V₂ = 0.01 × 4.0 ÷ 400 = 0.0001 L'], err: 1,
+      problem: L('A gas is 2.0 L at 1.0 atm and 200 K. It changes to 4.0 atm and 400 K. Find V₂.', 'Un gas ocupa 2.0 L a 1.0 atm y 200 K. Cambia a 4.0 atm y 400 K. Halla V₂.'),
+      why: L('The rearrangement is flipped. V₂ = k × T₂ ÷ P₂ = 0.01 × 400 ÷ 4.0 = 1.0 L.', 'El despeje está invertido. V₂ = k × T₂ ÷ P₂ = 0.01 × 400 ÷ 4.0 = 1.0 L.') }
+  ];
+  const SPOT_TXT = {
+    en: { pick: 'Click the line where the mistake happens:', item: (n, t2) => `Mistake ${n} of ${t2}`, right: '✓ You found it!', wrong: 'Not that line — look again.', problem: 'Problem' },
+    es: { pick: 'Haz clic en la línea donde ocurre el error:', item: (n, t2) => `Error ${n} de ${t2}`, right: '✓ ¡Lo encontraste!', wrong: 'Esa no es la línea — mira otra vez.', problem: 'Problema' }
+  };
+
+  function renderSpotMistake(mount, lang) {
+    const X = SPOT_TXT[lang];
+    let idx = 0;
+    function show() {
+      const it = SPOT_ITEMS[idx];
+      mount.innerHTML = `
+        <div class="pm-widget">
+          <div class="pm-mode-badge">${escapeHtml(X.item(idx + 1, SPOT_ITEMS.length))}</div>
+          <p style="margin:0.2rem 0;"><strong>${escapeHtml(X.problem)}:</strong> ${escapeHtml(tr(it.problem, lang))}</p>
+          <p class="pm-lead">${escapeHtml(X.pick)}</p>
+          <div class="pm-work">${it.lines.map((l, i) => `<button type="button" class="pm-line" data-line="${i}">${escapeHtml(l.replace('Use Boyle\'s law:', lang === 'es' ? 'Usar ley de Boyle:' : 'Use Boyle\'s law:'))}</button>`).join('')}</div>
+          <div class="pm-msg" data-msg></div>
+          <div data-why></div>
+          <p data-nextwrap style="display:none;margin-top:0.6rem;"><button type="button" class="pm-btn" data-next></button></p>
+        </div>`;
+      const msg = mount.querySelector('[data-msg]');
+      mount.querySelectorAll('[data-line]').forEach(b => b.addEventListener('click', () => {
+        const i = Number(b.getAttribute('data-line'));
+        if (i !== it.err) { b.classList.add('picked-wrong'); b.disabled = true; msg.className = 'pm-msg bad'; msg.textContent = X.wrong; return; }
+        mount.querySelectorAll('[data-line]').forEach(x => { x.disabled = true; });
+        b.classList.remove('picked-wrong'); b.classList.add('error');
+        msg.className = 'pm-msg ok'; msg.textContent = X.right;
+        mount.querySelector('[data-why]').innerHTML = `<div class="pm-solved" style="font-weight:400;color:var(--text);">${escapeHtml(tr(it.why, lang))}</div>`;
+        mount.querySelector('[data-nextwrap]').style.display = 'block';
+        const nb = mount.querySelector('[data-next]');
+        nb.textContent = idx + 1 < SPOT_ITEMS.length ? t('next', lang) : t('startOver', lang);
+        nb.addEventListener('click', () => { idx = (idx + 1) % SPOT_ITEMS.length; show(); });
+      }));
+    }
+    show();
+  }
+
+  // Four small P-vs-V graphs used by the graph question. Graph B is the curve.
+  function graphChoicesFigure(lang) {
+    const shapes = [
+      '<line x1="26" y1="84" x2="108" y2="16" stroke="#1a8c83" stroke-width="3"/>',
+      '<path d="M 32 14 C 36 58, 54 74, 112 78" fill="none" stroke="#1a8c83" stroke-width="3"/>',
+      '<line x1="26" y1="48" x2="112" y2="48" stroke="#1a8c83" stroke-width="3"/>',
+      '<line x1="26" y1="18" x2="108" y2="84" stroke="#1a8c83" stroke-width="3"/>'
+    ];
+    const name = lang === 'es' ? 'Gráfica' : 'Graph';
+    return `<div class="pm-figs">${shapes.map((s, i) => {
+      const letter = 'ABCD'[i];
+      return `<figure><svg viewBox="0 0 124 100" class="pm-svg" width="124" role="img" aria-label="${name} ${letter}">
+        <line x1="24" y1="8" x2="24" y2="86" stroke="#253a52" stroke-width="1.6"/><line x1="24" y1="86" x2="118" y2="86" stroke="#253a52" stroke-width="1.6"/>
+        <text x="12" y="52" font-family="JetBrains Mono, monospace" font-size="11" fill="#5a6475">P</text><text x="68" y="98" font-family="JetBrains Mono, monospace" font-size="11" fill="#5a6475">V</text>
+        ${s}</svg><figcaption>${name} ${letter}</figcaption></figure>`;
+    }).join('')}</div>`;
+  }
+
+  // Graded check: 24 multiple-choice questions across Lessons 56-61. Numbers
+  // deliberately differ from the paper Chapter 11 Quiz.
+  const QUESTIONS = [
+    // ---- Lesson 56: sublimation & gas density ----
+    { id: 'q1', type: 'mc',
+      prompt: L('Which phase change is sublimation?', '¿Cuál cambio de fase es la sublimación?'),
+      choices: [L('Solid → liquid', 'Sólido → líquido'), L('Solid → gas', 'Sólido → gas'), L('Liquid → gas', 'Líquido → gas'), L('Gas → liquid', 'Gas → líquido')],
+      correct: 1,
+      explanation: L('Sublimation goes directly from solid to gas, like dry ice.', 'La sublimación pasa directamente de sólido a gas, como el hielo seco.') },
+    { id: 'q2', type: 'mc',
+      prompt: L('A bag holds 5.4 g of CO₂ gas and measures 30 cm × 20 cm × 5 cm. What is the density of the gas?', 'Una bolsa contiene 5.4 g de gas CO₂ y mide 30 cm × 20 cm × 5 cm. ¿Cuál es la densidad del gas?'),
+      choices: [L('0.0018 g/mL', '0.0018 g/mL'), L('0.098 g/mL', '0.098 g/mL'), L('556 g/mL', '556 g/mL'), L('16,200 g/mL', '16,200 g/mL')],
+      correct: 0,
+      explanation: L('V = 30 × 20 × 5 = 3,000 mL, so D = 5.4 ÷ 3,000 = 0.0018 g/mL.', 'V = 30 × 20 × 5 = 3,000 mL, así que D = 5.4 ÷ 3,000 = 0.0018 g/mL.') },
+    { id: 'q3', type: 'mc',
+      prompt: L('What is the white "fog" you see around dry ice?', '¿Qué es la "niebla" blanca que ves alrededor del hielo seco?'),
+      choices: [L('Carbon dioxide gas', 'Gas dióxido de carbono'), L('Smoke from the dry ice burning', 'Humo del hielo seco quemándose'), L('Tiny droplets of liquid water', 'Gotitas diminutas de agua líquida'), L('Liquid carbon dioxide', 'Dióxido de carbono líquido')],
+      correct: 2,
+      explanation: L('CO₂ gas is invisible. The cold makes water vapor in the air condense into droplets.', 'El gas CO₂ es invisible. El frío hace que el vapor de agua del aire se condense en gotitas.') },
+    // ---- Lesson 57: air pressure ----
+    { id: 'q4', type: 'mc',
+      prompt: L('What causes the pressure of a gas inside a container?', '¿Qué causa la presión de un gas dentro de un recipiente?'),
+      choices: [L('The molecules sitting still and resting on the bottom', 'Las moléculas quietas apoyadas en el fondo'), L('The molecules pulling the walls inward', 'Las moléculas jalando las paredes hacia dentro'), L('The molecules growing larger', 'Las moléculas haciéndose más grandes'), L('Moving molecules striking the walls', 'Moléculas en movimiento golpeando las paredes')],
+      correct: 3,
+      explanation: L('Gas pressure is force per unit area from molecules colliding with surfaces.', 'La presión es fuerza por área de moléculas que chocan contra superficies.') },
+    { id: 'q5', type: 'mc',
+      prompt: L('A 140 lb person stands on a board with an area of 20 in². What pressure does the person put on the floor under the board?', 'Una persona de 140 lb está parada sobre una tabla con un área de 20 in². ¿Qué presión ejerce sobre el piso bajo la tabla?'),
+      choices: [L('2,800 lb/in²', '2,800 lb/in²'), L('7.0 lb/in²', '7.0 lb/in²'), L('160 lb/in²', '160 lb/in²'), L('0.14 lb/in²', '0.14 lb/in²')],
+      correct: 1,
+      explanation: L('P = F ÷ A = 140 lb ÷ 20 in² = 7.0 lb/in².', 'P = F ÷ A = 140 lb ÷ 20 in² = 7.0 lb/in².') },
+    { id: 'q6', type: 'mc',
+      prompt: L('Atmospheric pressure at sea level is 14.7 lb/in². How much force does the air put on a 10 in × 5 in sheet of paper (one side)?', 'La presión atmosférica al nivel del mar es 14.7 lb/in². ¿Cuánta fuerza ejerce el aire sobre una hoja de 10 in × 5 in (un lado)?'),
+      choices: [L('0.29 lb', '0.29 lb'), L('65 lb', '65 lb'), L('735 lb', '735 lb'), L('3.4 lb', '3.4 lb')],
+      correct: 2,
+      explanation: L('A = 50 in², so F = P × A = 14.7 × 50 = 735 lb. Air pushes equally on the other side.', 'A = 50 in², así que F = P × A = 14.7 × 50 = 735 lb. El aire empuja igual en el otro lado.') },
+    { id: 'q7', type: 'mc',
+      prompt: L('A steaming can is flipped into cold water and collapses. What is the best explanation?', 'Una lata con vapor se voltea en agua fría y se aplasta. ¿Cuál es la mejor explicación?'),
+      choices: [L('Pressure inside drops as steam condenses, so the outside air pushes harder', 'La presión interior baja al condensarse el vapor, así que el aire exterior empuja más'), L('The cold water melts the can', 'El agua fría derrite la lata'), L('A vacuum inside pulls the walls in', 'Un vacío interior jala las paredes'), L('The atmosphere gets stronger near cold water', 'La atmósfera se hace más fuerte cerca del agua fría')],
+      correct: 0,
+      explanation: L('Fewer gas molecules inside means fewer hits from inside. The outside air wins.', 'Menos moléculas adentro significa menos choques desde adentro. Gana el aire exterior.') },
+    // ---- Lesson 58: Boyle's law ----
+    { id: 'q8', type: 'mc',
+      prompt: L('The volume of a gas is cut to one fourth at constant temperature. What happens to its pressure?', 'El volumen de un gas se reduce a un cuarto a temperatura constante. ¿Qué pasa con su presión?'),
+      choices: [L('It becomes one fourth as large', 'Se reduce a un cuarto'), L('It stays the same', 'No cambia'), L('It doubles', 'Se duplica'), L('It becomes 4 times as large', 'Se vuelve 4 veces mayor')],
+      correct: 3,
+      explanation: L('Boyle: P and V are inversely proportional (PV = k).', 'Boyle: P y V son inversamente proporcionales (PV = k).') },
+    { id: 'q9', type: 'mc',
+      prompt: L('Which graph shows how pressure and volume are related for a gas at constant temperature?', '¿Cuál gráfica muestra la relación entre presión y volumen de un gas a temperatura constante?'),
+      figure: graphChoicesFigure,
+      choices: [L('Graph A', 'Gráfica A'), L('Graph B', 'Gráfica B'), L('Graph C', 'Gráfica C'), L('Graph D', 'Gráfica D')],
+      correct: 1,
+      explanation: L('An inverse proportion is a curve: steep at small volumes, flat at large volumes, never touching the axes.', 'Una proporción inversa es una curva: empinada con volúmenes pequeños, plana con grandes, sin tocar los ejes.') },
+    { id: 'q10', type: 'mc',
+      prompt: L('A balloon holds 4.0 L at 1.0 atm. The pressure is increased to 1.6 atm at constant temperature. What is the new volume?', 'Un globo contiene 4.0 L a 1.0 atm. La presión sube a 1.6 atm a temperatura constante. ¿Cuál es el nuevo volumen?'),
+      choices: [L('6.4 L', '6.4 L'), L('0.40 L', '0.40 L'), L('2.5 L', '2.5 L'), L('4.6 L', '4.6 L')],
+      correct: 2,
+      explanation: L('k = 1.0 × 4.0 = 4.0 atm·L, so V₂ = 4.0 ÷ 1.6 = 2.5 L.', 'k = 1.0 × 4.0 = 4.0 atm·L, así que V₂ = 4.0 ÷ 1.6 = 2.5 L.') },
+    { id: 'q11', type: 'mc',
+      prompt: L('A sealed syringe holds 30 mL of air at 1.0 atm. It is pushed to 12 mL at constant temperature. What is the new pressure?', 'Una jeringa sellada contiene 30 mL de aire a 1.0 atm. Se empuja hasta 12 mL a temperatura constante. ¿Cuál es la nueva presión?'),
+      choices: [L('2.5 atm', '2.5 atm'), L('0.40 atm', '0.40 atm'), L('18 atm', '18 atm'), L('360 atm', '360 atm')],
+      correct: 0,
+      explanation: L('k = 1.0 × 30 = 30 atm·mL, so P₂ = 30 ÷ 12 = 2.5 atm.', 'k = 1.0 × 30 = 30 atm·mL, así que P₂ = 30 ÷ 12 = 2.5 atm.') },
+    // ---- Lesson 59: Gay-Lussac's law ----
+    { id: 'q12', type: 'mc',
+      prompt: L('A rigid tank is at 2.4 atm and 300 K. It is heated to 375 K. What is the new pressure?', 'Un tanque rígido está a 2.4 atm y 300 K. Se calienta a 375 K. ¿Cuál es la nueva presión?'),
+      choices: [L('1.9 atm', '1.9 atm'), L('2.4 atm', '2.4 atm'), L('77 atm', '77 atm'), L('3.0 atm', '3.0 atm')],
+      correct: 3,
+      explanation: L('k = 2.4 ÷ 300 = 0.0080 atm/K, so P₂ = 0.0080 × 375 = 3.0 atm.', 'k = 2.4 ÷ 300 = 0.0080 atm/K, así que P₂ = 0.0080 × 375 = 3.0 atm.') },
+    { id: 'q13', type: 'mc',
+      prompt: L('A sealed, rigid container of gas is warmed from 27 °C to 327 °C. What happens to the pressure?', 'Un recipiente rígido y sellado se calienta de 27 °C a 327 °C. ¿Qué pasa con la presión?'),
+      choices: [L('It becomes about 12 times as large', 'Se vuelve unas 12 veces mayor'), L('It stays the same', 'No cambia'), L('It doubles', 'Se duplica'), L('It is cut in half', 'Se reduce a la mitad')],
+      correct: 2,
+      explanation: L('In kelvins the change is 300 K → 600 K, which doubles T, so P doubles.', 'En kelvin el cambio es 300 K → 600 K, que duplica T, así que P se duplica.') },
+    { id: 'q14', type: 'mc',
+      prompt: L('In which container will heating the gas mainly change its VOLUME?', '¿En cuál recipiente calentar el gas cambiará principalmente su VOLUMEN?'),
+      choices: [L('A sealed glass bottle', 'Una botella de vidrio sellada'), L('A sealed balloon', 'Un globo sellado'), L('A steel gas tank', 'Un tanque de gas de acero'), L('A sealed metal can', 'Una lata de metal sellada')],
+      correct: 1,
+      explanation: L('A flexible container can change size. Rigid containers change pressure instead.', 'Un recipiente flexible puede cambiar de tamaño. Los rígidos cambian de presión.') },
+    { id: 'q15', type: 'mc',
+      prompt: L('Why do gas law calculations use kelvins?', '¿Por qué los cálculos de las leyes de los gases usan kelvin?'),
+      choices: [L('Kelvin numbers are smaller', 'Los números Kelvin son más pequeños'), L('Celsius only works for liquids', 'Celsius solo sirve para líquidos'), L('Kelvin degrees are much bigger than Celsius degrees', 'Los grados Kelvin son mucho más grandes que los Celsius'), L('Pressure and volume are proportional to kelvin temperature, which starts at absolute zero', 'La presión y el volumen son proporcionales a la temperatura Kelvin, que empieza en el cero absoluto')],
+      correct: 3,
+      explanation: L('0 K is absolute zero. A graph against °C does not pass through (0, 0).', '0 K es el cero absoluto. Una gráfica contra °C no pasa por (0, 0).') },
+    // ---- Lesson 60: molecular view ----
+    { id: 'q16', type: 'mc',
+      prompt: L('How does decreasing the volume of a gas at constant temperature raise its pressure?', '¿Cómo sube la presión al disminuir el volumen de un gas a temperatura constante?'),
+      choices: [L('Molecules keep the same speed but hit the walls more often', 'Las moléculas mantienen su rapidez pero golpean las paredes más veces'), L('Molecules move faster and hit harder', 'Las moléculas van más rápido y golpean más fuerte'), L('More molecules appear in the container', 'Aparecen más moléculas en el recipiente'), L('The molecules expand and press on the walls', 'Las moléculas se expanden y presionan las paredes')],
+      correct: 0,
+      explanation: L('Same temperature means same average speed. Closer walls mean more frequent hits.', 'La misma temperatura significa la misma rapidez promedio. Paredes más cercanas significan choques más frecuentes.') },
+    { id: 'q17', type: 'mc',
+      prompt: L('Why does heating a gas in a rigid container raise the pressure?', '¿Por qué calentar un gas en un recipiente rígido sube la presión?'),
+      choices: [L('The container shrinks', 'El recipiente se encoge'), L('The molecules get heavier', 'Las moléculas se vuelven más pesadas'), L('Faster molecules hit the walls more often and harder', 'Las moléculas más rápidas golpean las paredes más veces y más fuerte'), L('The molecules stick to the walls', 'Las moléculas se pegan a las paredes')],
+      correct: 2,
+      explanation: L('Temperature is tied to molecular speed.', 'La temperatura se relaciona con la rapidez de las moléculas.') },
+    { id: 'q18', type: 'mc',
+      prompt: L('Which would LOWER the pressure of a trapped gas?', '¿Qué BAJARÍA la presión de un gas atrapado?'),
+      choices: [L('Heating it', 'Calentarlo'), L('Squeezing it into less space', 'Comprimirlo en menos espacio'), L('Pumping in more gas', 'Bombear más gas'), L('Cooling it or giving it more space', 'Enfriarlo o darle más espacio')],
+      correct: 3,
+      explanation: L('Both reduce how often (and, for cooling, how hard) molecules hit the walls.', 'Ambos reducen la frecuencia (y al enfriar, la fuerza) de los choques.') },
+    // ---- Lesson 61 & combined practice ----
+    { id: 'q19', type: 'mc',
+      prompt: L('Why does a helium weather balloon get bigger as it rises?', '¿Por qué un globo meteorológico de helio se hace más grande al subir?'),
+      choices: [L('Atmospheric pressure drops, and that matters more than the drop in temperature', 'La presión atmosférica baja, y eso importa más que la bajada de temperatura'), L('The air gets colder, which expands the gas', 'El aire se enfría, lo que expande el gas'), L('Helium atoms grow at high altitude', 'Los átomos de helio crecen a gran altitud'), L('Air leaks into the balloon', 'Entra aire al globo')],
+      correct: 0,
+      explanation: L('Colder air alone would shrink it; the much lower pressure expands it more.', 'El aire frío solo lo encogería; la presión mucho menor lo expande más.') },
+    { id: 'q20', type: 'mc',
+      prompt: L('A problem describes gas in a rigid steel container that is heated. Which equation fits best?', 'Un problema describe gas en un recipiente rígido de acero que se calienta. ¿Qué ecuación encaja mejor?'),
+      choices: [L('P × V = k', 'P × V = k'), L('V = kT', 'V = kT'), L('P = kT', 'P = kT'), L('D = m ÷ V', 'D = m ÷ V')],
+      correct: 2,
+      explanation: L('Rigid means constant volume: Gay-Lussac\'s law, P = kT.', 'Rígido significa volumen constante: ley de Gay-Lussac, P = kT.') },
+    { id: 'q21', type: 'mc',
+      prompt: L('A gas is 6.0 L at 1.0 atm and 300 K. It changes to 2.0 atm and 400 K. What is the new volume?', 'Un gas ocupa 6.0 L a 1.0 atm y 300 K. Cambia a 2.0 atm y 400 K. ¿Cuál es el nuevo volumen?'),
+      choices: [L('16 L', '16 L'), L('4.0 L', '4.0 L'), L('9.0 L', '9.0 L'), L('2.3 L', '2.3 L')],
+      correct: 1,
+      explanation: L('k = 1.0 × 6.0 ÷ 300 = 0.020; V₂ = 0.020 × 400 ÷ 2.0 = 4.0 L.', 'k = 1.0 × 6.0 ÷ 300 = 0.020; V₂ = 0.020 × 400 ÷ 2.0 = 4.0 L.') },
+    { id: 'q22', type: 'mc',
+      prompt: L('A balloon is 2.5 L at 1.2 atm and 300 K. It rises to where the pressure is 0.80 atm and the temperature is 280 K. What is the new volume?', 'Un globo ocupa 2.5 L a 1.2 atm y 300 K. Sube a donde la presión es 0.80 atm y la temperatura 280 K. ¿Cuál es el nuevo volumen?'),
+      choices: [L('1.6 L', '1.6 L'), L('2.3 L', '2.3 L'), L('4.0 L', '4.0 L'), L('3.5 L', '3.5 L')],
+      correct: 3,
+      explanation: L('k = 1.2 × 2.5 ÷ 300 = 0.010; V₂ = 0.010 × 280 ÷ 0.80 = 3.5 L.', 'k = 1.2 × 2.5 ÷ 300 = 0.010; V₂ = 0.010 × 280 ÷ 0.80 = 3.5 L.') },
+    { id: 'q23', type: 'mc',
+      prompt: L('One sample of gas, volume held constant: 4.0 atm at 527 °C, then 2.0 atm at 127 °C. At what temperature is the pressure 1.0 atm?', 'Una muestra de gas a volumen constante: 4.0 atm a 527 °C y luego 2.0 atm a 127 °C. ¿A qué temperatura la presión es 1.0 atm?'),
+      choices: [L('−73 °C', '−73 °C'), L('64 °C', '64 °C'), L('200 °C', '200 °C'), L('−137 °C', '−137 °C')],
+      correct: 0,
+      explanation: L('k = 2.0 atm ÷ 400 K = 0.0050; T = 1.0 ÷ 0.0050 = 200 K = −73 °C.', 'k = 2.0 atm ÷ 400 K = 0.0050; T = 1.0 ÷ 0.0050 = 200 K = −73 °C.') },
+    { id: 'q24', type: 'mc',
+      prompt: L('A sealed balloon of air is placed in a freezer, then taken out and left to warm up. While it WARMS, what happens to the mass and density of the air inside?', 'Un globo de aire sellado se pone en el congelador y luego se saca para que se caliente. Mientras se CALIENTA, ¿qué pasa con la masa y la densidad del aire de adentro?'),
+      choices: [L('Mass increases and density increases', 'La masa aumenta y la densidad aumenta'), L('Mass stays the same and density decreases', 'La masa no cambia y la densidad disminuye'), L('Mass decreases and density stays the same', 'La masa disminuye y la densidad no cambia'), L('Mass stays the same and density increases', 'La masa no cambia y la densidad aumenta')],
+      correct: 1,
+      explanation: L('No gas enters or leaves, so mass is constant. Warming expands the volume, so density drops.', 'No entra ni sale gas, así que la masa es constante. Al calentarse crece el volumen y la densidad baja.') }
+  ];
+
+  const focus = (lang) => `<div class="pm-focus-badge">★ ${escapeHtml(t('focusBadge', lang))}</div>`;
+
+  const STATIC_SECTIONS = [
+    // ---------------------------------------------------------------- 0
+    {
+      title: L('Before You Begin', 'Antes de Empezar'),
+      time: L('2 min', '2 min'),
+      bodyHtml: {
+        en: `
+        <div class="concept-box">
+          <div class="concept-label">Chapter Big Question</div>
+          <p>Air is invisible, so how can it crush a can, hold up a card, or make a cloud? What do pressure, volume, and temperature tell us about what gas molecules are doing?</p>
+        </div>
+        <p>This review covers <strong>Chapter 11: Pressing Matter</strong> — Lessons 56–61 and the gas law practice days. It is built to get you ready for the <strong>Chapter 11 Quiz</strong>.</p>
+        <div class="note-box">
+          <span class="note-icon">⭐</span>
+          <div class="note-text">Sections marked <strong>Quiz focus</strong> practice the skills to master: <strong>explaining</strong> what happens to a gas using molecules, <strong>Boyle\'s law</strong>, the <strong>combined gas law</strong>, and <strong>completing a table</strong> of pressure, volume, and temperature.</div>
+        </div>
+        <p><strong>How this works:</strong></p>
+        <ul>
+          <li>Click a section header to open it. Try each interactive tool <em>before</em> reading the explanation.</li>
+          <li>Work through each practice problem yourself before clicking <em>Reveal Answer</em>. A calculator is fine.</li>
+          <li>Click <strong>Mark Section Complete</strong> at the bottom of each section to move to the next.</li>
+          <li>The last section is a <strong>graded Check for Understanding</strong> — it saves your score and gives you a completion code to show your teacher.</li>
+        </ul>
+        <p><strong>By the end of this review, you should be able to:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Describe sublimation and calculate the density of a gas (56.1–56.3)</li>
+          <li><span class="obj-check">◎</span> Explain what causes gas pressure and use P = F ÷ A (57.1–57.3)</li>
+          <li><span class="obj-check">◎</span> State Boyle\'s law and solve pressure–volume problems (58.1–58P.3)</li>
+          <li><span class="obj-check">◎</span> Use Gay-Lussac\'s law in kelvins and compare rigid and flexible containers (59.1–59P.3)</li>
+          <li><span class="obj-check">◎</span> Explain changes in P, V, and T using moving molecules (60.1–60.2)</li>
+          <li><span class="obj-check">◎</span> Choose the right gas law and solve combined gas law problems (61.1–61P.3)</li>
+        </ul>`,
+        es: `
+        <div class="concept-box">
+          <div class="concept-label">Gran Pregunta del Capítulo</div>
+          <p>El aire es invisible, ¿cómo puede aplastar una lata, sostener una tarjeta o formar una nube? ¿Qué nos dicen la presión, el volumen y la temperatura sobre lo que hacen las moléculas de un gas?</p>
+        </div>
+        <p>Este repaso cubre el <strong>Capítulo 11: Materia Bajo Presión</strong> — las Lecciones 56–61 y los días de práctica de las leyes de los gases. Está diseñado para prepararte para el <strong>Quiz del Capítulo 11</strong>.</p>
+        <div class="note-box">
+          <span class="note-icon">⭐</span>
+          <div class="note-text">Las secciones marcadas <strong>Enfoque del quiz</strong> practican las destrezas que debes dominar: <strong>explicar</strong> lo que le pasa a un gas usando moléculas, la <strong>ley de Boyle</strong>, la <strong>ley combinada de los gases</strong> y <strong>completar una tabla</strong> de presión, volumen y temperatura.</div>
+        </div>
+        <p><strong>Cómo funciona esto:</strong></p>
+        <ul>
+          <li>Haz clic en el encabezado de una sección para abrirla. Prueba cada herramienta interactiva <em>antes</em> de leer la explicación.</li>
+          <li>Resuelve cada problema de práctica tú mismo antes de hacer clic en <em>Mostrar Respuesta</em>. Puedes usar calculadora.</li>
+          <li>Haz clic en <strong>Marcar Sección como Completa</strong> al final de cada sección para pasar a la siguiente.</li>
+          <li>La última sección es una <strong>Comprobación de Comprensión calificada</strong> — guarda tu puntaje y te da un código de finalización para mostrarle a tu maestro.</li>
+        </ul>
+        <p><strong>Al terminar este repaso, deberías poder:</strong></p>
+        <ul class="objectives-list">
+          <li><span class="obj-check">◎</span> Describir la sublimación y calcular la densidad de un gas (56.1–56.3)</li>
+          <li><span class="obj-check">◎</span> Explicar qué causa la presión de un gas y usar P = F ÷ A (57.1–57.3)</li>
+          <li><span class="obj-check">◎</span> Enunciar la ley de Boyle y resolver problemas de presión y volumen (58.1–58P.3)</li>
+          <li><span class="obj-check">◎</span> Usar la ley de Gay-Lussac en kelvin y comparar recipientes rígidos y flexibles (59.1–59P.3)</li>
+          <li><span class="obj-check">◎</span> Explicar cambios de P, V y T con moléculas en movimiento (60.1–60.2)</li>
+          <li><span class="obj-check">◎</span> Elegir la ley correcta y resolver problemas con la ley combinada (61.1–61P.3)</li>
+        </ul>`
+      }
+    },
+    // ---------------------------------------------------------------- 1 (L56)
+    {
+      title: L('Sublimation & Gas Density', 'Sublimación y Densidad de un Gas'),
+      time: L('7 min', '7 min'),
+      bodyHtml: {
+        en: `
+        <h2>From a Small Solid to a Big Bag of Gas</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definitions</div>
+          <p><strong>Sublimation</strong>: the phase change from a solid directly to a gas. <strong>Evaporation</strong>: the phase change from a liquid to a gas.</p>
+        </div>
+        <p>Drag the slider to let the dry ice sublime. Watch which number stays the same and which numbers change.</p>
+        <div id="pm-sublime-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Key Ideas</div>
+          <p>When a substance becomes a gas, the molecules move much farther apart. The <strong>mass stays the same</strong>, the volume grows enormously, so the <strong>density drops</strong>. The "fog" near dry ice is tiny droplets of <em>water</em>, condensed from the air — CO₂ gas is invisible.</p>
+        </div>
+        <h3>Calculate the density of a gas</h3>
+        <p><strong>D = m ÷ V</strong> · volume of a box = length × width × height · 1 cm³ = 1 mL</p>
+        <div id="pm-density-mount"></div>
+        ${practiceProblem('en', 'pm-56a', 'Why do you think the fog around dry ice cannot be carbon dioxide gas?', 'medium', 'Can you see the CO₂ you breathe out on a warm day?', 'Carbon dioxide gas is invisible. The cold dry ice makes water vapor in the surrounding air condense into tiny liquid droplets, which you can see.')}`,
+        es: `
+        <h2>De un Sólido Pequeño a una Bolsa Grande de Gas</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definiciones</div>
+          <p><strong>Sublimación</strong>: el cambio de fase de sólido directamente a gas. <strong>Evaporación</strong>: el cambio de fase de líquido a gas.</p>
+        </div>
+        <p>Mueve el control para que el hielo seco se sublime. Observa qué número se mantiene y cuáles cambian.</p>
+        <div id="pm-sublime-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Ideas Clave</div>
+          <p>Cuando una sustancia se vuelve gas, las moléculas se separan mucho. La <strong>masa se mantiene</strong>, el volumen crece enormemente y por eso la <strong>densidad baja</strong>. La "niebla" cerca del hielo seco son gotitas de <em>agua</em> condensadas del aire — el gas CO₂ es invisible.</p>
+        </div>
+        <h3>Calcula la densidad de un gas</h3>
+        <p><strong>D = m ÷ V</strong> · volumen de una caja = largo × ancho × altura · 1 cm³ = 1 mL</p>
+        <div id="pm-density-mount"></div>
+        ${practiceProblem('es', 'pm-56a', '¿Por qué crees que la niebla alrededor del hielo seco no puede ser gas dióxido de carbono?', 'medium', '¿Puedes ver el CO₂ que exhalas en un día cálido?', 'El gas dióxido de carbono es invisible. El hielo seco frío hace que el vapor de agua del aire se condense en gotitas líquidas, que sí puedes ver.')}`
+      }
+    },
+    // ---------------------------------------------------------------- 2 (L57)
+    {
+      title: L('Air Pressure', 'La Presión del Aire'),
+      time: L('9 min', '9 min'),
+      bodyHtml: {
+        en: `
+        <h2>What Evidence Shows That Gases Push?</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definitions</div>
+          <p><strong>Pressure</strong>: force per unit area, <strong>P = F ÷ A</strong>. Gas pressure comes from molecules colliding with objects or container walls. <strong>1 atm = 14.7 lb/in²</strong>, atmospheric pressure at sea level.</p>
+        </div>
+        <p>Revisit the class demonstrations. For each one, find where air is trapped and which side is pushing harder.</p>
+        <div id="pm-demo-mount"></div>
+        <h3>Same force, different area</h3>
+        <div id="pm-pressure-mount"></div>
+        <h3>Pressure calculations</h3>
+        <div id="pm-psolver-mount"></div>`,
+        es: `
+        <h2>¿Qué Evidencia Muestra que los Gases Empujan?</h2>
+        <div class="concept-box">
+          <div class="concept-label">Definiciones</div>
+          <p><strong>Presión</strong>: fuerza por unidad de área, <strong>P = F ÷ A</strong>. La presión de un gas viene de moléculas que chocan contra objetos o paredes. <strong>1 atm = 14.7 lb/in²</strong>, la presión atmosférica al nivel del mar.</p>
+        </div>
+        <p>Vuelve a las demostraciones de clase. En cada una, encuentra dónde está atrapado el aire y qué lado empuja más.</p>
+        <div id="pm-demo-mount"></div>
+        <h3>La misma fuerza, distinta área</h3>
+        <div id="pm-pressure-mount"></div>
+        <h3>Cálculos de presión</h3>
+        <div id="pm-psolver-mount"></div>`
+      }
+    },
+    // ---------------------------------------------------------------- 3 (L58)
+    {
+      title: L('Boyle\'s Law: Volume & Pressure', 'Ley de Boyle: Volumen y Presión'),
+      time: L('7 min', '7 min'),
+      bodyHtml: {
+        en: `
+        ${focus('en')}
+        <h2>Squeeze a Gas</h2>
+        <p>Move the piston and watch the point travel along the graph. Compare <strong>P × V</strong> at several volumes, then switch the graph.</p>
+        <div id="pm-piston-mount"></div>
+        <div class="concept-box">
+          <div class="concept-label">Boyle\'s Law</div>
+          <p>The pressure of a given amount of gas is <strong>inversely proportional</strong> to its volume if the temperature does not change: <strong>PV = k</strong>, so P₁V₁ = P₂V₂.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Worked example: 5.0 L at 1.0 atm is squeezed to 2.0 L. k = 1.0 × 5.0 = 5.0 atm·L. P₂ = k ÷ V₂ = 5.0 ÷ 2.0 = <strong>2.5 atm</strong>. Check: smaller volume → bigger pressure. Want more practice? Open <strong>Lesson 58P: Boyle\'s Law Practice</strong> on your dashboard.</div>
+        </div>
+        ${practiceProblem('en', 'pm-58a', 'A beach ball holds 9.0 L of air at 1.0 atm. A diver pulls it underwater where the pressure is 1.8 atm. The temperature is the same. What is its new volume?', 'basic', 'k = P₁ × V₁, then V₂ = k ÷ P₂.', 'k = 1.0 × 9.0 = 9.0 atm·L. V₂ = 9.0 ÷ 1.8 = 5.0 L. More pressure, smaller volume.')}
+        ${practiceProblem('en', 'pm-58b', 'A gas is 200 mL at 3.0 atm. It expands until the pressure is 0.50 atm. What is the new volume?', 'medium', 'The pressure becomes 6 times smaller. What happens to the volume?', 'k = 3.0 × 200 = 600 atm·mL. V₂ = 600 ÷ 0.50 = 1,200 mL.')}`,
+        es: `
+        ${focus('es')}
+        <h2>Comprime un Gas</h2>
+        <p>Mueve el pistón y observa cómo el punto recorre la gráfica. Compara <strong>P × V</strong> en varios volúmenes y luego cambia la gráfica.</p>
+        <div id="pm-piston-mount"></div>
+        <div class="concept-box">
+          <div class="concept-label">Ley de Boyle</div>
+          <p>La presión de una cantidad dada de gas es <strong>inversamente proporcional</strong> a su volumen si la temperatura no cambia: <strong>PV = k</strong>, así que P₁V₁ = P₂V₂.</p>
+        </div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Ejemplo resuelto: 5.0 L a 1.0 atm se comprimen a 2.0 L. k = 1.0 × 5.0 = 5.0 atm·L. P₂ = k ÷ V₂ = 5.0 ÷ 2.0 = <strong>2.5 atm</strong>. Comprobación: menor volumen → mayor presión. ¿Quieres más práctica? Abre <strong>Lección 58P: Práctica de la Ley de Boyle</strong> en tu panel.</div>
+        </div>
+        ${practiceProblem('es', 'pm-58a', 'Una pelota de playa contiene 9.0 L de aire a 1.0 atm. Un buzo la hunde donde la presión es 1.8 atm. La temperatura es la misma. ¿Cuál es su nuevo volumen?', 'basic', 'k = P₁ × V₁, luego V₂ = k ÷ P₂.', 'k = 1.0 × 9.0 = 9.0 atm·L. V₂ = 9.0 ÷ 1.8 = 5.0 L. Más presión, menos volumen.')}
+        ${practiceProblem('es', 'pm-58b', 'Un gas ocupa 200 mL a 3.0 atm. Se expande hasta que la presión es 0.50 atm. ¿Cuál es el nuevo volumen?', 'medium', 'La presión se vuelve 6 veces menor. ¿Qué le pasa al volumen?', 'k = 3.0 × 200 = 600 atm·mL. V₂ = 600 ÷ 0.50 = 1,200 mL.')}`
+      }
+    },
+    // ---------------------------------------------------------------- 4 (L59)
+    {
+      title: L('Gay-Lussac\'s Law: Rigid vs. Flexible', 'Ley de Gay-Lussac: Rígido vs. Flexible'),
+      time: L('8 min', '8 min'),
+      bodyHtml: {
+        en: `
+        ${focus('en')}
+        <h2>Heat Two Containers</h2>
+        <p>Before you move the slider, predict: which container will change its pressure, and which will change its volume?</p>
+        <div id="pm-rigid-mount"></div>
+        <div class="concept-box">
+          <div class="concept-label">Gay-Lussac\'s Law</div>
+          <p>The pressure of a given amount of gas is directly proportional to its <strong>kelvin</strong> temperature if the volume does not change: <strong>P = kT</strong>, so k = P ÷ T.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Key Ideas</div>
+          <p><strong>Always convert first:</strong> K = °C + 273 (and °C = K − 273). In a <strong>rigid</strong> container the volume cannot change, so pressure changes. In a <strong>flexible</strong> container the pressure inside adjusts to match the outside, so the volume changes.</p>
+        </div>
+        ${practiceProblem('en', 'pm-59a', 'A sealed, rigid jar of air is at 1.0 atm and 22 °C. It is put in a freezer at −18 °C. What is the new pressure?', 'medium', 'Convert both to kelvins. k = P₁ ÷ T₁, then P₂ = k × T₂.', 'T₁ = 295 K, T₂ = 255 K. k = 1.0 ÷ 295 = 0.00339 atm/K. P₂ = 0.00339 × 255 = 0.86 atm. Colder gas, lower pressure.')}
+        ${practiceProblem('en', 'pm-59b', 'Warming a rigid tank from 10 °C to 20 °C: does the pressure double? Explain.', 'challenge', 'What are those temperatures in kelvins?', 'No. 283 K → 293 K is only about a 4% increase in kelvin temperature, so the pressure rises only about 4%.')}`,
+        es: `
+        ${focus('es')}
+        <h2>Calienta Dos Recipientes</h2>
+        <p>Antes de mover el control, predice: ¿cuál recipiente cambiará de presión y cuál de volumen?</p>
+        <div id="pm-rigid-mount"></div>
+        <div class="concept-box">
+          <div class="concept-label">Ley de Gay-Lussac</div>
+          <p>La presión de una cantidad dada de gas es directamente proporcional a su temperatura <strong>Kelvin</strong> si el volumen no cambia: <strong>P = kT</strong>, así que k = P ÷ T.</p>
+        </div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Ideas Clave</div>
+          <p><strong>Siempre convierte primero:</strong> K = °C + 273 (y °C = K − 273). En un recipiente <strong>rígido</strong> el volumen no puede cambiar, así que cambia la presión. En uno <strong>flexible</strong> la presión interior se ajusta a la exterior, así que cambia el volumen.</p>
+        </div>
+        ${practiceProblem('es', 'pm-59a', 'Un frasco rígido y sellado con aire está a 1.0 atm y 22 °C. Se pone en un congelador a −18 °C. ¿Cuál es la nueva presión?', 'medium', 'Convierte ambas a kelvin. k = P₁ ÷ T₁, luego P₂ = k × T₂.', 'T₁ = 295 K, T₂ = 255 K. k = 1.0 ÷ 295 = 0.00339 atm/K. P₂ = 0.00339 × 255 = 0.86 atm. Gas más frío, menos presión.')}
+        ${practiceProblem('es', 'pm-59b', 'Al calentar un tanque rígido de 10 °C a 20 °C, ¿se duplica la presión? Explica.', 'challenge', '¿Cuánto son esas temperaturas en kelvin?', 'No. De 283 K a 293 K es solo cerca de un 4% más de temperatura Kelvin, así que la presión sube solo cerca de un 4%.')}`
+      }
+    },
+    // ---------------------------------------------------------------- 5 (L60)
+    {
+      title: L('Be the Molecule', 'Sé la Molécula'),
+      time: L('8 min', '8 min'),
+      bodyHtml: {
+        en: `
+        ${focus('en')}
+        <h2>How Do Molecules Cause Pressure?</h2>
+        <p>Complete all four challenges. For each, reach the target pressure, press <em>Check my box</em>, then explain it.</p>
+        <div id="pm-molecule-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Kinetic Theory of Gases</div>
+          <p>Gas molecules are in constant motion, and pressure comes from them striking the walls. <strong>Hotter</strong> → faster molecules → hits are more frequent <em>and</em> harder. <strong>Smaller volume</strong> → same speed, walls closer → hits are more frequent.</p>
+        </div>
+        ${practiceProblem('en', 'pm-60a', 'A basketball left outside overnight in winter feels flat in the morning, but it has no leak. Explain using molecules.', 'medium', 'What happens to molecular speed when the gas cools? What does that do to the hits on the wall?', 'The gas inside cools, so its molecules move more slowly. They hit the walls less often and less hard, so the pressure inside drops and the ball feels soft. Warming it brings the pressure back.')}`,
+        es: `
+        ${focus('es')}
+        <h2>¿Cómo Causan Presión las Moléculas?</h2>
+        <p>Completa los cuatro retos. En cada uno, alcanza la presión meta, presiona <em>Revisar mi caja</em> y luego explícalo.</p>
+        <div id="pm-molecule-mount"></div>
+        <div class="info-panel">
+          <div class="panel-label">🔍 Teoría Cinética de los Gases</div>
+          <p>Las moléculas de un gas están en movimiento constante, y la presión viene de sus golpes contra las paredes. <strong>Más caliente</strong> → moléculas más rápidas → choques más frecuentes <em>y</em> más fuertes. <strong>Menor volumen</strong> → misma rapidez, paredes más cerca → choques más frecuentes.</p>
+        </div>
+        ${practiceProblem('es', 'pm-60a', 'Un balón de baloncesto que pasa la noche afuera en invierno amanece desinflado, pero no tiene fuga. Explica usando moléculas.', 'medium', '¿Qué pasa con la rapidez de las moléculas cuando el gas se enfría? ¿Qué efecto tiene en los choques?', 'El gas se enfría, así que sus moléculas se mueven más despacio. Golpean las paredes menos veces y con menos fuerza, la presión interior baja y el balón se siente blando. Al calentarlo, la presión regresa.')}`
+      }
+    },
+    // ---------------------------------------------------------------- 6 (L61)
+    {
+      title: L('Combined Gas Law: Which Law?', 'Ley Combinada: ¿Cuál Ley?'),
+      time: L('8 min', '8 min'),
+      bodyHtml: {
+        en: `
+        <h2>When P, V, and T All Change</h2>
+        <div id="pm-altitude-mount"></div>
+        <div class="concept-box">
+          <div class="concept-label">Combined Gas Law</div>
+          <p>For a given amount of gas: <strong>P × V ÷ T = k</strong>, so P₁V₁ ÷ T₁ = P₂V₂ ÷ T₂ (T in kelvins). If one variable stays the same, it cancels and you get one of the simpler laws.</p>
+        </div>
+        <table>
+          <thead><tr><th>Law</th><th>Stays the same</th><th>Equation</th><th>Relationship</th></tr></thead>
+          <tbody>
+            <tr><td>Boyle</td><td>T</td><td>k = P × V</td><td>inverse</td></tr>
+            <tr><td>Charles</td><td>P</td><td>k = V ÷ T</td><td>direct</td></tr>
+            <tr><td>Gay-Lussac</td><td>V</td><td>k = P ÷ T</td><td>direct</td></tr>
+            <tr><td>Combined</td><td>amount of gas only</td><td>k = P × V ÷ T</td><td>—</td></tr>
+          </tbody>
+        </table>
+        <h3>Pick the right law</h3>
+        <div id="pm-law-mount"></div>`,
+        es: `
+        <h2>Cuando P, V y T Cambian a la Vez</h2>
+        <div id="pm-altitude-mount"></div>
+        <div class="concept-box">
+          <div class="concept-label">Ley Combinada de los Gases</div>
+          <p>Para una cantidad dada de gas: <strong>P × V ÷ T = k</strong>, así que P₁V₁ ÷ T₁ = P₂V₂ ÷ T₂ (T en kelvin). Si una variable no cambia, se cancela y obtienes una de las leyes más simples.</p>
+        </div>
+        <table>
+          <thead><tr><th>Ley</th><th>No cambia</th><th>Ecuación</th><th>Relación</th></tr></thead>
+          <tbody>
+            <tr><td>Boyle</td><td>T</td><td>k = P × V</td><td>inversa</td></tr>
+            <tr><td>Charles</td><td>P</td><td>k = V ÷ T</td><td>directa</td></tr>
+            <tr><td>Gay-Lussac</td><td>V</td><td>k = P ÷ T</td><td>directa</td></tr>
+            <tr><td>Combinada</td><td>solo la cantidad de gas</td><td>k = P × V ÷ T</td><td>—</td></tr>
+          </tbody>
+        </table>
+        <h3>Elige la ley correcta</h3>
+        <div id="pm-law-mount"></div>`
+      }
+    },
+    // ---------------------------------------------------------------- 7
+    {
+      title: L('Solve It: Gas Law Problems', 'Resuélvelo: Problemas de Gases'),
+      time: L('15 min', '15 min'),
+      bodyHtml: {
+        en: `
+        ${focus('en')}
+        <h2>The Same Steps Every Time</h2>
+        <ol>
+          <li><strong>Set up</strong> the before and after values and mark the unknown with <strong>?</strong></li>
+          <li>Decide <strong>what stays the same</strong> — that picks the law.</li>
+          <li>Change every <strong>°C to K</strong>.</li>
+          <li>Find <strong>k</strong> from the complete column.</li>
+          <li><strong>Use k</strong> to find the unknown, then check that the answer makes sense.</li>
+        </ol>
+        <p>Problem 1 is guided. Do 2–5 on your own; problem 5 is a table problem.</p>
+        <div id="pm-solver-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">Keep k unrounded (or keep at least three digits) until your final answer. P₁V₁ ÷ T₁ = P₂V₂ ÷ T₂ is the same method written in one line: both sides equal k.</div>
+        </div>`,
+        es: `
+        ${focus('es')}
+        <h2>Los Mismos Pasos Siempre</h2>
+        <ol>
+          <li><strong>Organiza</strong> los valores de antes y después y marca la incógnita con <strong>?</strong></li>
+          <li>Decide <strong>qué se mantiene igual</strong> — eso elige la ley.</li>
+          <li>Cambia todo <strong>°C a K</strong>.</li>
+          <li>Encuentra <strong>k</strong> con la columna completa.</li>
+          <li><strong>Usa k</strong> para hallar la incógnita y comprueba que la respuesta tenga sentido.</li>
+        </ol>
+        <p>El problema 1 es guiado. Haz del 2 al 5 por tu cuenta; el 5 es un problema de tabla.</p>
+        <div id="pm-solver-mount"></div>
+        <div class="note-box">
+          <span class="note-icon">📝</span>
+          <div class="note-text">No redondees k (o conserva al menos tres cifras) hasta tu respuesta final. P₁V₁ ÷ T₁ = P₂V₂ ÷ T₂ es el mismo método en una sola línea: ambos lados son iguales a k.</div>
+        </div>`
+      }
+    },
+    // ---------------------------------------------------------------- 8
+    {
+      title: L('Explain It & Spot the Mistake', 'Explícalo y Encuentra el Error'),
+      time: L('10 min', '10 min'),
+      bodyHtml: {
+        en: `
+        ${focus('en')}
+        <h2>Explain Volume and Density</h2>
+        <p>A strong explanation walks the chain: <strong>molecules → collisions → volume → mass → density</strong>. Build three of them.</p>
+        <div id="pm-explain-mount"></div>
+        <div id="pm-write-mount"></div>
+        <h2 style="margin-top:1.3rem;">Spot the Mistake</h2>
+        <p>Each solution has one wrong line. Find it.</p>
+        <div id="pm-spot-mount"></div>`,
+        es: `
+        ${focus('es')}
+        <h2>Explica el Volumen y la Densidad</h2>
+        <p>Una explicación fuerte sigue la cadena: <strong>moléculas → choques → volumen → masa → densidad</strong>. Construye tres.</p>
+        <div id="pm-explain-mount"></div>
+        <div id="pm-write-mount"></div>
+        <h2 style="margin-top:1.3rem;">Encuentra el Error</h2>
+        <p>Cada solución tiene una línea equivocada. Encuéntrala.</p>
+        <div id="pm-spot-mount"></div>`
+      }
+    }
+  ];
+
+  function render(host, ctx) {
+    ensureStylesInjected();
+    const lang = getLang();
+
+    const sectionsHtml = STATIC_SECTIONS.map((sec, i) => `
+      <div class="section-card" id="pm-sec-${i}" data-section="${i}">
+        <div class="section-header" data-toggle="${i}">
+          <span class="section-num">${i === 0 ? '★' : String(i).padStart(2, '0')}</span>
+          <span class="section-title">${escapeHtml(tr(sec.title, lang))}</span>
+          <span class="section-time">${escapeHtml(tr(sec.time, lang))}</span>
+          <span class="section-arrow">▼</span>
+        </div>
+        <div class="section-body">
+          ${tr(sec.bodyHtml, lang)}
+          <button type="button" class="mark-done-btn" data-mark-done="${i}">${escapeHtml(t('markSectionComplete', lang))}</button>
+        </div>
+      </div>
+    `).join('');
+
+    host.innerHTML = `
+      <div class="pm-lesson">
+        <div class="pm-header">
+          <div class="pm-lang-toggle" role="group" aria-label="${escapeHtml(t('langToggleAria', lang))}">
+            <button type="button" class="pm-lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en">EN</button>
+            <button type="button" class="pm-lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es">ES</button>
+          </div>
+          <div class="pm-header-label">${escapeHtml(t('headerLabel', lang))}</div>
+          <h1>${escapeHtml(ctx.activity.title)}</h1>
+          <div class="pm-header-meta">${escapeHtml(t('headerMeta', lang))}</div>
+        </div>
+        <div class="pm-progress-wrap">
+          <span class="pm-progress-label">${escapeHtml(t('progress', lang))}</span>
+          <div class="pm-progress-track"><div class="pm-progress-fill" id="pm-progress-fill"></div></div>
+          <span class="pm-progress-count" id="pm-progress-count">${escapeHtml(t('sectionCount', lang, 0, SECTION_COUNT))}</span>
+        </div>
+        <main>
+          ${sectionsHtml}
+          <div class="section-card" id="pm-sec-${SECTION_COUNT - 1}" data-section="${SECTION_COUNT - 1}">
+            <div class="section-header" data-toggle="${SECTION_COUNT - 1}">
+              <span class="section-num">✓</span>
+              <span class="section-title">${escapeHtml(t('checkForUnderstanding', lang))}</span>
+              <span class="section-time">${escapeHtml(t('quizTimeGraded', lang))}</span>
+              <span class="section-arrow">▼</span>
+            </div>
+            <div class="section-body">
+              <div class="quiz-note">${t('quizNote', lang)}</div>
+              <div id="pm-quiz-mount"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    `;
+
+    const root = host.querySelector('.pm-lesson');
+    const quizIndex = SECTION_COUNT - 1;
+    const completed = new Array(SECTION_COUNT).fill(false);
+
+    function updateProgress() {
+      const done = completed.filter(Boolean).length;
+      const pct = Math.round((done / SECTION_COUNT) * 100);
+      root.querySelector('#pm-progress-fill').style.width = pct + '%';
+      root.querySelector('#pm-progress-count').textContent = t('sectionCount', lang, done, SECTION_COUNT);
+    }
+
+    function openSection(i, scroll) {
+      const card = root.querySelector(`#pm-sec-${i}`);
+      if (!card) return;
+      card.querySelector('.section-body').classList.add('open');
+      card.querySelector('.section-header').classList.add('open');
+      if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function toggleSection(i) {
+      const card = root.querySelector(`#pm-sec-${i}`);
+      const body = card.querySelector('.section-body');
+      const header = card.querySelector('.section-header');
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      header.classList.toggle('open', !isOpen);
+    }
+
+    root.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', () => toggleSection(Number(el.getAttribute('data-toggle'))));
+    });
+
+    root.querySelectorAll('[data-mark-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.getAttribute('data-mark-done'));
+        if (completed[i]) return;
+        completed[i] = true;
+        root.querySelector(`#pm-sec-${i}`).classList.add('done');
+        btn.textContent = t('sectionComplete', lang);
+        btn.disabled = true;
+        updateProgress();
+        setTimeout(() => openSection(i + 1, true), 250);
+      });
+    });
+
+    root.querySelectorAll('[data-hint-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-hint-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? t('hintHide', lang) : t('hintShow', lang);
+      });
+    });
+    root.querySelectorAll('[data-answer-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const box = root.querySelector('#' + btn.getAttribute('data-answer-target'));
+        const open = box.classList.toggle('open');
+        btn.textContent = open ? t('hideAnswer', lang) : t('revealAnswer', lang);
+      });
+    });
+
+    root.querySelectorAll('[data-lang]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newLang = btn.getAttribute('data-lang');
+        if (newLang === lang) return;
+        setLang(newLang);
+        render(host, ctx); // full re-render; progress lives in ctx.getProgress(), untouched by language
+      });
+    });
+
+    // Interactive widgets -- ungraded, session-only state.
+    const stepSet = (problems) => (mount, l) => renderStepProblems(mount, l, problems);
+    const mountMap = [
+      ['#pm-sublime-mount', renderSublimeWidget], ['#pm-density-mount', stepSet(DENSITY_PROBLEMS)],
+      ['#pm-demo-mount', renderDemoWidget], ['#pm-pressure-mount', renderPressureWidget],
+      ['#pm-psolver-mount', stepSet(PRESSURE_PROBLEMS)], ['#pm-piston-mount', renderPistonWidget],
+      ['#pm-rigid-mount', renderRigidWidget], ['#pm-molecule-mount', renderMoleculeWidget],
+      ['#pm-altitude-mount', renderAltitudeWidget], ['#pm-law-mount', renderLawSorter],
+      ['#pm-solver-mount', stepSet(GAS_PROBLEMS)], ['#pm-explain-mount', renderExplainWidget],
+      ['#pm-write-mount', renderWriteWidget], ['#pm-spot-mount', renderSpotMistake]
+    ];
+    mountMap.forEach(([sel, fn]) => { const m = root.querySelector(sel); if (m) fn(m, lang); });
+
+    // Quiz (final section) — graded, saved via ctx.saveProgress.
+    const quizMount = root.querySelector('#pm-quiz-mount');
+    renderQuiz(quizMount, ctx);
+
+    const progress = ctx.getProgress();
+    if (progress && (progress.status === 'in_progress' || progress.status === 'completed')) {
+      if (progress.status === 'completed') completed[quizIndex] = true;
+      openSection(quizIndex, false);
+    } else {
+      openSection(0, false);
+    }
+    updateProgress();
+  }
+
+  function renderQuiz(mount, ctx) {
+    const progress = ctx.getProgress();
+    if (progress && progress.status === 'completed') {
+      renderQuizSummary(mount, ctx);
+      return;
+    }
+    const answers = (progress && progress.answers) || [];
+    const index = answers.length;
+    if (index >= QUESTIONS.length) {
+      finishQuiz(mount, ctx, answers);
+      return;
+    }
+    renderQuizQuestion(mount, ctx, answers, index);
+  }
+
+  function renderQuizQuestion(mount, ctx, answersSoFar, index) {
+    const lang = getLang();
+    const q = QUESTIONS[index];
+    const pct = Math.round((index / QUESTIONS.length) * 100);
+    mount.innerHTML = `
+      <div class="quiz-question-count">${escapeHtml(t('questionCount', lang, index + 1, QUESTIONS.length))}</div>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <p class="quiz-prompt">${escapeHtml(tr(q.prompt, lang))}</p>
+      ${q.figure ? q.figure(lang) : ''}
+      <div id="pm-answer-area"></div>
+      <div id="pm-feedback-area"></div>
+      <button type="button" class="pm-next-btn" id="pm-next-btn" style="display:none;">${escapeHtml(t('nextQuestion', lang))}</button>
+    `;
+
+    const answerArea = mount.querySelector('#pm-answer-area');
+    const feedbackArea = mount.querySelector('#pm-feedback-area');
+    const nextBtn = mount.querySelector('#pm-next-btn');
+    let submitted = false;
+
+    answerArea.innerHTML = q.choices.map((choice, i) => `
+      <button type="button" class="pm-choice" data-choice="${i}">${escapeHtml(tr(choice, lang))}</button>
+    `).join('');
+
+    function submit(response, btnEl) {
+      if (submitted) return;
+      submitted = true;
+
+      const correct = response === q.correct;
+      answerArea.querySelectorAll('.pm-choice').forEach(el => {
+        el.disabled = true;
+        const val = Number(el.getAttribute('data-choice'));
+        if (val === q.correct) el.classList.add('selected-correct');
+        else if (el === btnEl) el.classList.add('selected-incorrect');
+      });
+
+      feedbackArea.innerHTML = `
+        <div class="pm-feedback ${correct ? 'correct' : 'incorrect'}">
+          ${correct ? escapeHtml(t('correctPrefix', lang)) : escapeHtml(t('incorrectPrefix', lang))} ${escapeHtml(tr(q.explanation, lang))}
+        </div>
+      `;
+      nextBtn.style.display = 'inline-block';
+
+      const answers = answersSoFar.concat([{ questionId: q.id, response, correct }]);
+      const record = {
+        status: 'in_progress',
+        score: answers.filter(a => a.correct).length,
+        totalQuestions: QUESTIONS.length,
+        answers
+      };
+      ctx.saveProgress(record);
+    }
+
+    answerArea.querySelectorAll('.pm-choice').forEach(btn => {
+      btn.addEventListener('click', () => submit(Number(btn.getAttribute('data-choice')), btn));
+    });
+
+    nextBtn.addEventListener('click', () => renderQuiz(mount, ctx));
+  }
+
+  async function finishQuiz(mount, ctx, answers) {
+    const record = {
+      status: 'completed',
+      score: answers.filter(a => a.correct).length,
+      totalQuestions: QUESTIONS.length,
+      answers
+    };
+    await ctx.saveProgress(record);
+    renderQuizSummary(mount, ctx);
+  }
+
+  function renderQuizSummary(mount, ctx) {
+    const lang = getLang();
+    const progress = ctx.getProgress();
+    const score = progress ? progress.score : 0;
+    const code = progress && progress.code ? progress.code : '';
+    const total = QUESTIONS.length;
+    mount.innerHTML = `
+      <div class="pm-summary">
+        <div class="pm-score">${score} / ${total}</div>
+        ${code
+          ? `<p class="pm-code-label">${escapeHtml(t('completionCode', lang))}</p><div class="pm-code">${escapeHtml(code)}</div>`
+          : `<p><button type="button" class="pm-retake-btn" id="pm-show-code-btn">${escapeHtml(t('showMyCode', lang))}</button></p>`}
+        <p>${escapeHtml(t('summaryText', lang))}</p>
+        <button type="button" class="pm-retake-btn" id="pm-retake-btn">${escapeHtml(t('retakeQuiz', lang))}</button>
+      </div>
+    `;
+    // Quizzes finished before completion codes existed have none; saving the
+    // already-completed record again makes Storage.saveProgress mint one.
+    const showCodeBtn = mount.querySelector('#pm-show-code-btn');
+    if (showCodeBtn) {
+      showCodeBtn.addEventListener('click', async () => {
+        showCodeBtn.disabled = true;
+        await ctx.saveProgress(Object.assign({}, progress));
+        renderQuizSummary(mount, ctx);
+      });
+    }
+    mount.querySelector('#pm-retake-btn').addEventListener('click', async () => {
+      await ctx.saveProgress({ status: 'in_progress', score: 0, totalQuestions: total, answers: [] });
+      renderQuiz(mount, ctx);
+    });
+  }
+
+  window.Activities = window.Activities || {};
+  window.Activities['pressing-matter-review'] = { render };
+})();
+
+</script>
